@@ -8,12 +8,11 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// إعداد عميل الواتساب مع دعم البيئة السحابية
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
-        // هذا السطر يضمن تشغيل المتصفح سواء كنت على جهازك أو على سيرفر Render
+        // هذا المسار خاص ببيئة Render التي أعددناها سابقاً
         executablePath: process.env.NODE_ENV === 'production' 
             ? '/opt/render/project/src/.cache/puppeteer/chrome/linux-143.0.7499.169/chrome-linux64/chrome' 
             : undefined,
@@ -21,61 +20,55 @@ const client = new Client({
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--no-zygote',
-            '--single-process'
-        ]
+            '--disable-gpu',
+            '--no-zygote'
+        ],
+        // حل مشكلة الخطأ: يمنع المتصفح من إغلاق الاتصال بسرعة
+        handleSIGINT: false,
+        handleSIGTERM: false,
+        handleSIGHUP: false
     }
 });
 
-// التعامل مع الباركود
+// عرض الباركود بحجم أكبر لضمان الرؤية في Render
 client.on('qr', (qr) => {
-    console.log('🔗 QR Code Received! Scan this from your Phone:');
-    qrcode.generate(qr, { small: true });
+    console.log('--- QR CODE START ---');
+    qrcode.generate(qr, { small: false });
+    console.log('--- QR CODE END ---');
 });
 
-// رسالة نجاح الاتصال
 client.on('ready', () => {
-    console.log('✅ WhatsApp is READY! Connected to the cloud.');
+    console.log('✅ WhatsApp is READY!');
 });
 
-client.initialize();
+// التعامل مع الأخطاء المفاجئة لمنع السيرفر من الانهيار
+client.on('auth_failure', msg => console.error('❌ Auth failure', msg));
+client.on('disconnected', (reason) => console.log('⚠️ Client was logged out', reason));
+
+client.initialize().catch(err => console.error('❌ Initialization error:', err));
 
 app.use(bodyParser.json());
 
-// مسار افتراضي للتأكد من عمل السيرفر
-app.get('/', (req, res) => {
-    res.send('WhatsApp Bot is Online! 🚀');
-});
+app.get('/', (req, res) => res.send('Bot Status: Active 🚀'));
 
-// استقبال بيانات فودكس
 app.post('/api/webhooks/foodics', async (req, res) => {
-    console.log('📥 Received data from Foodics');
     try {
-        const eventData = req.body;
-        const payload = eventData.payload || {};
-        const customer = payload.customer || {};
-        const customerName = customer.name || 'عميلنا العزيز';
-        let phone = customer.phone || null;
-
-        if (phone) {
-            phone = phone.replace(/\D/g, '');
+        const { payload, event } = req.body;
+        if (event === 'order.paid' && payload?.customer?.phone) {
+            let phone = payload.customer.phone.replace(/\D/g, '');
             if (phone.startsWith('05')) phone = '966' + phone.substring(1);
 
             const contact = await client.getNumberId(phone);
-
             if (contact) {
-                const message = `مرحباً ${customerName} 👋\nشكراً لطلبك! نتشرف بتقييمك لنا:\nhttps://google.com/review-link`;
-                await client.sendMessage(contact._serialized, message);
+                await client.sendMessage(contact._serialized, `مرحباً ${payload.customer.name || 'عميلنا العزيز'} 👋\nشكراً لزيارتك! نتشرف بتقييمك:\nhttps://google.com/review-link`);
                 console.log(`✅ Sent to ${phone}`);
             }
         }
-        res.status(200).send('OK');
+        res.sendStatus(200);
     } catch (error) {
-        console.error('❌ Error:', error);
-        res.status(500).send('Error');
+        console.error('❌ Webhook Error:', error);
+        res.sendStatus(500);
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Server listening on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
