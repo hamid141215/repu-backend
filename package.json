@@ -1,22 +1,21 @@
 {
   "name": "repu-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "WhatsApp Foodics Webhook Bot",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "npx puppeteer browsers install chrome"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "body-parser": "^2.2.2",
-    "dotenv": "^17.2.3",
-    "express": "^5.2.1",
-    "ngrok": "^5.0.0-beta.2",
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "puppeteer": "^22.10.0",
     "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "^1.34.4"
+    "whatsapp-web.js": "^1.23.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

@@ -3,53 +3,53 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const path = require('path');
 
 const app = express();
-// Render يخصص المنفذ تلقائياً، وإذا لم يجد يستخدم 10000
-const PORT = process.env.PORT || 10000; 
+const PORT = process.env.PORT || 10000;
 
-// إعداد عميل الواتساب
+// إعداد عميل الواتساب مع دعم البيئة السحابية
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
-        // هذه الأوامر ضرورية لتشغيل المتصفح داخل سيرفرات Linux (مثل Render)
+        // هذا السطر يضمن تشغيل المتصفح سواء كنت على جهازك أو على سيرفر Render
+        executablePath: process.env.NODE_ENV === 'production' 
+            ? '/opt/render/project/src/.cache/puppeteer/chrome/linux-143.0.7499.169/chrome-linux64/chrome' 
+            : undefined,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
             '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
+            '--single-process'
         ]
     }
 });
 
-// عرض الباركود في الـ Logs
+// التعامل مع الباركود
 client.on('qr', (qr) => {
-    console.log('🔗 QR Code Received! Scan it now:');
+    console.log('🔗 QR Code Received! Scan this from your Phone:');
     qrcode.generate(qr, { small: true });
 });
 
-// تأكيد الاتصال
+// رسالة نجاح الاتصال
 client.on('ready', () => {
-    console.log('✅ WhatsApp is READY! السيرفر متصل الآن');
+    console.log('✅ WhatsApp is READY! Connected to the cloud.');
 });
 
 client.initialize();
 
 app.use(bodyParser.json());
 
-// مسار فحص حالة السيرفر
+// مسار افتراضي للتأكد من عمل السيرفر
 app.get('/', (req, res) => {
-    res.send('WhatsApp Webhook Server is Live! 🚀');
+    res.send('WhatsApp Bot is Online! 🚀');
 });
 
-// مسار استقبال طلبات فودكس
+// استقبال بيانات فودكس
 app.post('/api/webhooks/foodics', async (req, res) => {
-    console.log('📥 Webhook received from Foodics...');
+    console.log('📥 Received data from Foodics');
     try {
         const eventData = req.body;
         const payload = eventData.payload || {};
@@ -58,36 +58,24 @@ app.post('/api/webhooks/foodics', async (req, res) => {
         let phone = customer.phone || null;
 
         if (phone) {
-            // تنظيف الرقم من أي رموز
             phone = phone.replace(/\D/g, '');
-            
-            // تحويل الرقم للصيغة الدولية (للسعودية)
-            if (phone.startsWith('05')) {
-                phone = '966' + phone.substring(1);
-            }
+            if (phone.startsWith('05')) phone = '966' + phone.substring(1);
 
-            console.log(`🔍 Checking WhatsApp for: ${phone}`);
             const contact = await client.getNumberId(phone);
 
             if (contact) {
-                const message = `مرحباً ${customerName} 👋\nشكراً لزيارتك! نتشرف بسماع رأيك لخدمتك بشكل أفضل في المرة القادمة:\nhttps://google.com/review-link`;
-                
+                const message = `مرحباً ${customerName} 👋\nشكراً لطلبك! نتشرف بتقييمك لنا:\nhttps://google.com/review-link`;
                 await client.sendMessage(contact._serialized, message);
-                console.log(`✅ Message Sent to: ${phone}`);
-            } else {
-                console.log(`❌ Number not on WhatsApp: ${phone}`);
+                console.log(`✅ Sent to ${phone}`);
             }
-        } else {
-            console.log('⚠️ No phone number in payload.');
         }
-
-        res.status(200).send('Webhook Processed');
+        res.status(200).send('OK');
     } catch (error) {
-        console.error('❌ Error in processing webhook:', error);
-        res.status(500).send('Internal Server Error');
+        console.error('❌ Error:', error);
+        res.status(500).send('Error');
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server is listening on port ${PORT}`);
+    console.log(`🚀 Server listening on port ${PORT}`);
 });
