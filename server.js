@@ -75,17 +75,23 @@ async function processQueue() {
 
     const { phone, message } = messageQueue.shift();
     try {
-        const contact = await client.getNumberId(phone);
-        if (contact) {
-            await client.sendMessage(contact._serialized, message);
-            console.log(`✅ Message sent to ${phone}. Queue left: ${messageQueue.length}`);
-        } else {
-            console.log(`⚠️ Number ${phone} is not on WhatsApp.`);
-        }
+        // بدلاً من getNumberId، نرسل مباشرة باستخدام التنسيق الصحيح
+        const chatId = phone.includes('@c.us') ? phone : `${phone}@c.us`;
+        
+        await client.sendMessage(chatId, message);
+        console.log(`✅ Message sent to ${phone}`);
+        
     } catch (err) {
         console.error('❌ Error sending message:', err);
     }
 
+    // التأخير العشوائي (15-25 ثانية)
+    const delay = Math.floor(Math.random() * 10000) + 15000;
+    setTimeout(() => {
+        isProcessing = false;
+        processQueue();
+    }, delay);
+}
     // تأخير بشري عشوائي (بين 15 و 25 ثانية) لمحاكاة السلوك البشري
     const delay = Math.floor(Math.random() * 10000) + 15000;
     setTimeout(() => {
