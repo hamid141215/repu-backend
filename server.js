@@ -1,74 +1,99 @@
 require('dotenv').config();
 const express = require('express');
-const bodyParser = require('body-parser');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, RemoteAuth } = require('whatsapp-web.js');
+const { MongoStore } = require('wwebjs-mongo');
+const mongoose = require('mongoose');
 const qrcode = require('qrcode-terminal');
+const fs = require('fs');
 const path = require('path');
 
 const app = express();
+app.use(express.json());
+
+const MONGO_URI = process.env.MONGO_URI;
 const PORT = process.env.PORT || 10000;
 
-const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-        headless: true,
-        // هذا المسار خاص ببيئة Render التي أعددناها سابقاً
-        executablePath: process.env.NODE_ENV === 'production' 
-            ? '/opt/render/project/src/.cache/puppeteer/chrome/linux-143.0.7499.169/chrome-linux64/chrome' 
-            : undefined,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--no-zygote'
-        ],
-        // حل مشكلة الخطأ: يمنع المتصفح من إغلاق الاتصال بسرعة
-        handleSIGINT: false,
-        handleSIGTERM: false,
-        handleSIGHUP: false
-    }
-});
+let client;
+let messageQueue = [];
+let isProcessing = false;
 
-// عرض الباركود بحجم أكبر لضمان الرؤية في Render
-client.on('qr', (qr) => {
-    console.log('--- QR CODE START ---');
-    qrcode.generate(qr, { small: false });
-    console.log('--- QR CODE END ---');
-});
-
-client.on('ready', () => {
-    console.log('✅ WhatsApp is READY!');
-});
-
-// التعامل مع الأخطاء المفاجئة لمنع السيرفر من الانهيار
-client.on('auth_failure', msg => console.error('❌ Auth failure', msg));
-client.on('disconnected', (reason) => console.log('⚠️ Client was logged out', reason));
-
-client.initialize().catch(err => console.error('❌ Initialization error:', err));
-
-app.use(bodyParser.json());
-
-app.get('/', (req, res) => res.send('Bot Status: Active 🚀'));
-
-app.post('/api/webhooks/foodics', async (req, res) => {
-    try {
-        const { payload, event } = req.body;
-        if (event === 'order.paid' && payload?.customer?.phone) {
-            let phone = payload.customer.phone.replace(/\D/g, '');
-            if (phone.startsWith('05')) phone = '966' + phone.substring(1);
-
-            const contact = await client.getNumberId(phone);
-            if (contact) {
-                await client.sendMessage(contact._serialized, `مرحباً ${payload.customer.name || 'عميلنا العزيز'} 👋\nشكراً لزيارتك! نتشرف بتقييمك:\nhttps://google.com/review-link`);
-                console.log(`✅ Sent to ${phone}`);
-            }
+// دالة ذكية لإيجاد مسار المتصفح تلقائياً في Render
+function getChromePath() {
+    if (process.env.NODE_ENV !== 'production') return undefined;
+    const baseDir = '/opt/render/project/src/.cache/puppeteer/chrome';
+    if (fs.existsSync(baseDir)) {
+        const versions = fs.readdirSync(baseDir);
+        if (versions.length > 0) {
+            // يبحث عن ملف chrome داخل أول مجلد إصدار يجده
+            return path.join(baseDir, versions[0], 'chrome-linux64/chrome');
         }
-        res.sendStatus(200);
-    } catch (error) {
-        console.error('❌ Webhook Error:', error);
-        res.sendStatus(500);
     }
+    return undefined;
+}
+
+// الاتصال بقاعدة البيانات وإعداد الواتساب
+mongoose.connect(MONGO_URI).then(() => {
+    console.log('✅ Connected to MongoDB');
+    const store = new MongoStore({ mongoose: mongoose });
+
+    client = new Client({
+        authStrategy: new RemoteAuth({
+            store: store,
+            backupSyncIntervalMs: 300000
+        }),
+        puppeteer: {
+            headless: true,
+            executablePath: getChromePath(),
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        }
+    });
+
+    client.on('qr', qr => {
+        console.log('🔗 QR CODE RECEIVED:');
+        qrcode.generate(qr, { small: true });
+    });
+
+    client.on('ready', () => console.log('🚀 WhatsApp Client is Ready!'));
+    client.on('remote_session_saved', () => console.log('💾 Session saved to MongoDB!'));
+    
+    client.initialize().catch(err => console.error('❌ Initialization error:', err));
 });
 
-app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
+// نظام الطابور (لمنع الحظر)
+async function processQueue() {
+    if (isProcessing || messageQueue.length === 0) return;
+    isProcessing = true;
+
+    const { phone, message } = messageQueue.shift();
+    try {
+        const contact = await client.getNumberId(phone);
+        if (contact) {
+            await client.sendMessage(contact._serialized, message);
+            console.log(`✅ Message sent to ${phone}`);
+        }
+    } catch (err) {
+        console.error('❌ Error sending message:', err);
+    }
+
+    const delay = Math.floor(Math.random() * 10000) + 15000; // تأخير 15-25 ثانية
+    setTimeout(() => {
+        isProcessing = false;
+        processQueue();
+    }, delay);
+}
+
+app.post('/api/webhooks/foodics', (req, res) => {
+    const { payload } = req.body;
+    if (payload?.customer?.phone) {
+        let phone = payload.customer.phone.replace(/\D/g, '');
+        if (phone.startsWith('05')) phone = '966' + phone.substring(1);
+
+        const message = `مرحباً ${payload.customer.name} 👋\nشكراً لطلبك! نتشرف بتقييمك لنا هنا: https://google.com/review`;
+        
+        messageQueue.push({ phone, message });
+        processQueue();
+    }
+    res.sendStatus(200);
+});
+
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
