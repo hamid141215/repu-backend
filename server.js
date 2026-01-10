@@ -58,7 +58,9 @@ mongoose.connect(MONGO_URI).then(() => {
     });
 
     client.on('qr', qr => {
-        console.log('🔗 QR CODE RECEIVED - Scan with your phone:');
+        console.log('🔗 QR CODE RECEIVED:');
+        // طباعة الرابط الذي يمكنك الضغط عليه لمسح الكود بسهولة
+        console.log('👉 Open this link to scan QR: https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(qr));
         qrcode.generate(qr, { small: true });
     });
 
