@@ -17,7 +17,7 @@ let client;
 let messageQueue = [];
 let isProcessing = false;
 
-// تحسين العثور على مسار الكروم في بيئة Render
+// دالة العثور على مسار الكروم في بيئة Render
 function getChromePath() {
     if (process.env.NODE_ENV !== 'production') return undefined;
     const baseDir = '/opt/render/project/src/.cache/puppeteer/chrome';
@@ -31,7 +31,7 @@ function getChromePath() {
     return undefined;
 }
 
-// تشغيل النظام بعد التأكد من قاعدة البيانات
+// الاتصال بـ MongoDB وتشغيل الواتساب
 mongoose.connect(MONGO_URI).then(() => {
     console.log('✅ Connected to MongoDB');
     const store = new MongoStore({ mongoose: mongoose });
@@ -39,34 +39,38 @@ mongoose.connect(MONGO_URI).then(() => {
     client = new Client({
         authStrategy: new RemoteAuth({
             store: store,
-            backupSyncIntervalMs: 60000, // مزامنة كل دقيقة لضمان عدم ضياع الجلسة
-            clientId: 'main-session' // تثبيت معرف الجلسة
+            backupSyncIntervalMs: 60000, 
+            clientId: 'main-session' 
         }),
         puppeteer: {
             headless: true,
             executablePath: getChromePath(),
             args: [
-                '--no-sandbox', 
+                '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
+                '--single-process',
                 '--disable-gpu'
-            ]
+            ],
+            handleSIGINT: false,
+            handleSIGTERM: false,
+            handleSIGHUP: false
         }
     });
 
+    // إعداد مستمعي الأحداث
     client.on('qr', qr => {
         console.log('🔗 QR CODE RECEIVED:');
-        // طباعة الرابط الذي يمكنك الضغط عليه لمسح الكود بسهولة
+        // رابط خارجي لمسح الباركود بسهولة
         console.log('👉 Open this link to scan QR: https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(qr));
         qrcode.generate(qr, { small: true });
     });
 
     client.on('ready', () => {
         console.log('🚀 WhatsApp Client is Ready!');
-        // البدء في معالجة الطابور بمجرد الجاهزية
         processQueue();
     });
 
@@ -78,18 +82,23 @@ mongoose.connect(MONGO_URI).then(() => {
     
     client.on('disconnected', (reason) => {
         console.log('⚠️ Client was disconnected:', reason);
-        // محاولة إعادة التهيئة إذا انقطع الاتصال
-        client.initialize();
     });
 
-    client.initialize();
+    // انتظار 5 ثوانٍ لاستقرار النظام قبل التشغيل
+    console.log('⏳ Waiting 5 seconds for system stability...');
+    setTimeout(() => {
+        console.log('🚀 Starting WhatsApp initialization...');
+        client.initialize().catch(err => {
+            console.error('❌ Initialization Error:', err);
+        });
+    }, 5000);
+
 }).catch(err => console.error('❌ MongoDB Connection Error:', err));
 
-// نظام الطابور الذكي
+// نظام الطابور لمعالجة الرسائل وحماية الرقم من الحظر
 async function processQueue() {
     if (isProcessing || messageQueue.length === 0) return;
 
-    // حماية: التأكد من أن المتصفح جاهز تماماً قبل سحب أي رسالة
     if (!client || !client.pupPage || client.pupPage.isClosed()) {
         console.log('⏳ Waiting for browser page to be available...');
         setTimeout(processQueue, 5000);
@@ -105,7 +114,6 @@ async function processQueue() {
         
         console.log(`📤 Attempting to send message to: ${chatId}`);
         
-        // التحقق من حالة الاتصال قبل الإرسال
         const state = await client.getState().catch(() => 'DISCONNECTED');
         if (state !== 'CONNECTED') throw new Error('Client not connected');
 
@@ -114,13 +122,11 @@ async function processQueue() {
         
     } catch (err) {
         console.error('❌ Send Error:', err.message);
-        // إعادة الرسالة للطابور في حال فشل الإرسال لسبب مؤقت
         if (err.message.includes('evaluate') || err.message.includes('closed')) {
             messageQueue.unshift({ phone, message });
         }
     }
 
-    // تأخير عشوائي آمن (بين 15 و 25 ثانية)
     const delay = Math.floor(Math.random() * 10000) + 15000;
     setTimeout(() => {
         isProcessing = false;
@@ -128,13 +134,12 @@ async function processQueue() {
     }, delay);
 }
 
-// استقبال طلبات فودكس
+// استقبال طلبات فودكس (Webhook)
 app.post('/api/webhooks/foodics', (req, res) => {
     const { payload } = req.body;
     
     if (payload?.customer?.phone) {
         let phone = payload.customer.phone.replace(/\D/g, '');
-        // تحويل أرقام الجوال السعودية للصيغة الدولية
         if (phone.startsWith('05')) phone = '966' + phone.substring(1);
         if (phone.startsWith('5')) phone = '966' + phone;
         
@@ -151,7 +156,7 @@ app.post('/api/webhooks/foodics', (req, res) => {
     }
 });
 
-// مسار لفحص حالة البوت (Health Check)
+// مسار فحص الحالة
 app.get('/health', async (req, res) => {
     const state = client ? await client.getState().catch(() => 'OFFLINE') : 'NOT_INIT';
     res.json({ status: 'active', whatsapp_state: state, queue_length: messageQueue.length });
