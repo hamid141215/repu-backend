@@ -12,12 +12,15 @@ let isReady = false;
 let lastQR = null; // تخزين آخر كود لتظهره في المتصفح
 
 async function connectToWhatsApp() {
+    console.log('🔄 Starting WhatsApp connection...');
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
     sock = makeWASocket({
         auth: state,
         logger: pino({ level: 'silent' }),
-        browser: ['Ubuntu', 'Chrome', '20.0.04'] // تعريف المتصفح لتسهيل الربط
+        browser: ['Ubuntu', 'Chrome', '20.0.04'],
+        connectTimeoutMs: 60000, // زيادة وقت الانتظار لـ 60 ثانية
+        defaultQueryTimeoutMs: 0
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -27,13 +30,15 @@ async function connectToWhatsApp() {
         
         if (qr) {
             lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}`;
-            console.log('🔗 QR CODE UPDATED: ', lastQR);
+            console.log('✅ QR Code generated successfully!');
         }
 
         if (connection === 'close') {
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            console.log(`⚠️ Connection closed (Status: ${statusCode}). Reconnecting: ${shouldReconnect}`);
             isReady = false;
-            if (shouldReconnect) connectToWhatsApp();
+            if (shouldReconnect) setTimeout(connectToWhatsApp, 5000); // إعادة محاولة بعد 5 ثوانٍ
         } else if (connection === 'open') {
             console.log('🚀 WhatsApp CONNECTED!');
             isReady = true;
