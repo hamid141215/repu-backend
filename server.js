@@ -17,7 +17,6 @@ let client;
 let messageQueue = [];
 let isProcessing = false;
 
-// دالة العثور على مسار الكروم في بيئة Render
 function getChromePath() {
     if (process.env.NODE_ENV !== 'production') return undefined;
     const baseDir = '/opt/render/project/src/.cache/puppeteer/chrome';
@@ -31,7 +30,6 @@ function getChromePath() {
     return undefined;
 }
 
-// الاتصال بـ MongoDB وتشغيل الواتساب
 mongoose.connect(MONGO_URI).then(() => {
     console.log('✅ Connected to MongoDB');
     const store = new MongoStore({ mongoose: mongoose });
@@ -39,13 +37,12 @@ mongoose.connect(MONGO_URI).then(() => {
     client = new Client({
         authStrategy: new RemoteAuth({
             store: store,
-            backupSyncIntervalMs: 60000, 
+            backupSyncIntervalMs: 300000, // مزامنة كل 5 دقائق لتقليل الضغط
             clientId: 'main-session' 
         }),
-        // --- تحسينات لسرعة الربط الضعيفة في ريندر ---
-        authTimeoutMs: 180000, // زيادة وقت الانتظار لـ 3 دقائق لمنع ظهور كود ثاني بسرعة
-        qrMaxRetries: 10,      // السماح بعدد محاولات أكثر
-        // ------------------------------------------
+        // إعدادات لتقليل استهلاك الرام ومنع تكرار الأكواد
+        authTimeoutMs: 180000, 
+        qrMaxRetries: 5,
         puppeteer: {
             headless: true,
             executablePath: getChromePath(),
@@ -53,21 +50,18 @@ mongoose.connect(MONGO_URI).then(() => {
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
+                '--single-process', 
                 '--no-zygote',
-                '--single-process',
-                '--disable-gpu'
-            ],
-            handleSIGINT: false,
-            handleSIGTERM: false,
-            handleSIGHUP: false
+                '--disable-gpu',
+                '--no-first-run',
+                '--js-flags="--max-old-space-size=300"' // تقييد المحرك بـ 300MB رام فقط
+            ]
         }
     });
 
     client.on('qr', qr => {
         console.log('🔗 QR CODE RECEIVED:');
-        console.log('👉 CLICK THIS LINK TO SCAN: https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(qr));
+        console.log('👉 SCAN HERE: https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(qr));
         qrcode.generate(qr, { small: true });
     });
 
@@ -76,31 +70,18 @@ mongoose.connect(MONGO_URI).then(() => {
         processQueue();
     });
 
-    client.on('remote_session_saved', () => {
-        console.log('💾 Session backup saved to MongoDB successfully!');
-    });
+    client.on('remote_session_saved', () => console.log('💾 Session saved!'));
 
-    client.on('auth_failure', msg => console.error('❌ Auth Failure:', msg));
-    
-    client.on('disconnected', (reason) => {
-        console.log('⚠️ Client was disconnected:', reason);
-    });
-
-    // انتظار 10 ثوانٍ كاملة قبل البدء لضمان استقرار الذاكرة
-    console.log('⏳ System stabilization for 10 seconds...');
+    // الانتظار 15 ثانية كاملة قبل التشغيل لضمان استقرار البيئة
     setTimeout(() => {
-        console.log('🚀 Starting WhatsApp initialization...');
-        client.initialize().catch(err => {
-            console.error('❌ Initialization Error:', err);
-        });
-    }, 10000);
+        console.log('🚀 Initializing WhatsApp...');
+        client.initialize().catch(err => console.error('❌ Init Error:', err));
+    }, 15000);
 
-}).catch(err => console.error('❌ MongoDB Connection Error:', err));
+}).catch(err => console.error('❌ MongoDB Error:', err));
 
-// نظام الطابور الذكي
 async function processQueue() {
     if (isProcessing || messageQueue.length === 0) return;
-
     if (!client || !client.pupPage || client.pupPage.isClosed()) {
         setTimeout(processQueue, 5000);
         return;
@@ -112,26 +93,25 @@ async function processQueue() {
     try {
         const cleanNumber = phone.replace(/\D/g, '');
         const chatId = `${cleanNumber}@c.us`;
-        
-        console.log(`📤 Sending to: ${chatId}`);
         const state = await client.getState().catch(() => 'DISCONNECTED');
-        if (state !== 'CONNECTED') throw new Error('Client not connected');
-
-        await client.sendMessage(chatId, message);
-        console.log(`✅ Message sent to ${cleanNumber}`);
         
-    } catch (err) {
-        console.error('❌ Send Error:', err.message);
-        if (err.message.includes('evaluate') || err.message.includes('closed')) {
+        if (state === 'CONNECTED') {
+            await client.sendMessage(chatId, message);
+            console.log(`✅ Sent to ${cleanNumber}`);
+        } else {
+            console.log('⚠️ Client not connected, re-queuing...');
             messageQueue.unshift({ phone, message });
         }
+    } catch (err) {
+        console.error('❌ Send Error:', err.message);
+        messageQueue.unshift({ phone, message });
     }
 
-    const delay = Math.floor(Math.random() * 10000) + 15000;
+    // تأخير آمن بين الرسائل (20 ثانية)
     setTimeout(() => {
         isProcessing = false;
         processQueue();
-    }, delay);
+    }, 20000);
 }
 
 app.post('/api/webhooks/foodics', (req, res) => {
@@ -139,17 +119,16 @@ app.post('/api/webhooks/foodics', (req, res) => {
     if (payload?.customer?.phone) {
         let phone = payload.customer.phone.replace(/\D/g, '');
         if (phone.startsWith('05')) phone = '966' + phone.substring(1);
-        if (phone.startsWith('5')) phone = '966' + phone;
+        else if (phone.startsWith('5')) phone = '966' + phone;
         
         messageQueue.push({ 
             phone, 
-            message: `مرحباً ${payload.customer.name} 👋\nشكراً لطلبك من مطعمنا! نتشرف بتقييمك لنا عبر الرابط: https://google.com/review` 
+            message: `مرحباً ${payload.customer.name} 👋\nشكراً لطلبك من مطعمنا! نتشرف بتقييمك لنا: https://google.com/review` 
         });
-        
         processQueue();
-        res.status(200).json({ status: 'success' });
+        res.status(200).json({ status: 'queued' });
     } else {
-        res.status(400).json({ status: 'error' });
+        res.status(400).json({ status: 'invalid_phone' });
     }
 });
 
