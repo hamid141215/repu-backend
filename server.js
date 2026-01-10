@@ -42,6 +42,10 @@ mongoose.connect(MONGO_URI).then(() => {
             backupSyncIntervalMs: 60000, 
             clientId: 'main-session' 
         }),
+        // --- تحسينات لسرعة الربط الضعيفة في ريندر ---
+        authTimeoutMs: 180000, // زيادة وقت الانتظار لـ 3 دقائق لمنع ظهور كود ثاني بسرعة
+        qrMaxRetries: 10,      // السماح بعدد محاولات أكثر
+        // ------------------------------------------
         puppeteer: {
             headless: true,
             executablePath: getChromePath(),
@@ -61,11 +65,9 @@ mongoose.connect(MONGO_URI).then(() => {
         }
     });
 
-    // إعداد مستمعي الأحداث
     client.on('qr', qr => {
         console.log('🔗 QR CODE RECEIVED:');
-        // رابط خارجي لمسح الباركود بسهولة
-        console.log('👉 Open this link to scan QR: https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(qr));
+        console.log('👉 CLICK THIS LINK TO SCAN: https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(qr));
         qrcode.generate(qr, { small: true });
     });
 
@@ -84,23 +86,22 @@ mongoose.connect(MONGO_URI).then(() => {
         console.log('⚠️ Client was disconnected:', reason);
     });
 
-    // انتظار 5 ثوانٍ لاستقرار النظام قبل التشغيل
-    console.log('⏳ Waiting 5 seconds for system stability...');
+    // انتظار 10 ثوانٍ كاملة قبل البدء لضمان استقرار الذاكرة
+    console.log('⏳ System stabilization for 10 seconds...');
     setTimeout(() => {
         console.log('🚀 Starting WhatsApp initialization...');
         client.initialize().catch(err => {
             console.error('❌ Initialization Error:', err);
         });
-    }, 5000);
+    }, 10000);
 
 }).catch(err => console.error('❌ MongoDB Connection Error:', err));
 
-// نظام الطابور لمعالجة الرسائل وحماية الرقم من الحظر
+// نظام الطابور الذكي
 async function processQueue() {
     if (isProcessing || messageQueue.length === 0) return;
 
     if (!client || !client.pupPage || client.pupPage.isClosed()) {
-        console.log('⏳ Waiting for browser page to be available...');
         setTimeout(processQueue, 5000);
         return;
     }
@@ -112,13 +113,12 @@ async function processQueue() {
         const cleanNumber = phone.replace(/\D/g, '');
         const chatId = `${cleanNumber}@c.us`;
         
-        console.log(`📤 Attempting to send message to: ${chatId}`);
-        
+        console.log(`📤 Sending to: ${chatId}`);
         const state = await client.getState().catch(() => 'DISCONNECTED');
         if (state !== 'CONNECTED') throw new Error('Client not connected');
 
         await client.sendMessage(chatId, message);
-        console.log(`✅ Success: Message sent to ${cleanNumber}`);
+        console.log(`✅ Message sent to ${cleanNumber}`);
         
     } catch (err) {
         console.error('❌ Send Error:', err.message);
@@ -134,10 +134,8 @@ async function processQueue() {
     }, delay);
 }
 
-// استقبال طلبات فودكس (Webhook)
 app.post('/api/webhooks/foodics', (req, res) => {
     const { payload } = req.body;
-    
     if (payload?.customer?.phone) {
         let phone = payload.customer.phone.replace(/\D/g, '');
         if (phone.startsWith('05')) phone = '966' + phone.substring(1);
@@ -148,18 +146,16 @@ app.post('/api/webhooks/foodics', (req, res) => {
             message: `مرحباً ${payload.customer.name} 👋\nشكراً لطلبك من مطعمنا! نتشرف بتقييمك لنا عبر الرابط: https://google.com/review` 
         });
         
-        console.log(`📥 New order added to queue for: ${phone}`);
         processQueue();
-        res.status(200).json({ status: 'success', message: 'Message added to queue' });
+        res.status(200).json({ status: 'success' });
     } else {
-        res.status(400).json({ status: 'error', message: 'Invalid phone number' });
+        res.status(400).json({ status: 'error' });
     }
 });
 
-// مسار فحص الحالة
 app.get('/health', async (req, res) => {
     const state = client ? await client.getState().catch(() => 'OFFLINE') : 'NOT_INIT';
     res.json({ status: 'active', whatsapp_state: state, queue_length: messageQueue.length });
 });
 
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
