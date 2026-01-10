@@ -23,9 +23,15 @@ async function connectToWhatsApp() {
         version,
         auth: state,
         logger: pino({ level: 'error' }),
-        browser: ['Windows', 'Chrome', '110.0.0.0'],
-        connectTimeoutMs: 60000,
+        // تغيير هوية المتصفح لهوية متوافقة مع الخوادم (Linux)
+        browser: ['Ubuntu', 'Chrome', '110.0.5481.177'], 
+        printQRInTerminal: false,
+        connectTimeoutMs: 120000, // زيادة وقت الانتظار لـ 120 ثانية
         defaultQueryTimeoutMs: 0,
+        keepAliveIntervalMs: 10000,
+        generateHighQualityLinkPreview: true,
+        // إضافة هذا السطر لحل مشكلة الـ Loop
+        getMessage: async (key) => { return { conversation: 'Welcome' } }
     });
 
     // تحديث ملفات الجلسة عند كل تغيير
