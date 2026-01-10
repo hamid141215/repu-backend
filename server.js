@@ -1,140 +1,96 @@
 require('dotenv').config();
 const express = require('express');
-const { Client, RemoteAuth } = require('whatsapp-web.js');
-const { MongoStore } = require('wwebjs-mongo');
-const mongoose = require('mongoose');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
-const fs = require('fs');
-const path = require('path');
+const pino = require('pino');
+const mongoose = require('mongoose');
 
 const app = express();
 app.use(express.json());
 
-const MONGO_URI = process.env.MONGO_URI;
 const PORT = process.env.PORT || 10000;
+let sock;
+let isReady = false;
 
-let client;
-let messageQueue = [];
-let isProcessing = false;
+// 1. الاتصال بـ MongoDB
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('✅ Connected to MongoDB'))
+    .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
-function getChromePath() {
-    if (process.env.NODE_ENV !== 'production') return undefined;
-    const baseDir = '/opt/render/project/src/.cache/puppeteer/chrome';
-    if (fs.existsSync(baseDir)) {
-        const folders = fs.readdirSync(baseDir);
-        if (folders.length > 0) {
-            const chromePath = path.join(baseDir, folders[0], 'chrome-linux64/chrome');
-            if (fs.existsSync(chromePath)) return chromePath;
-        }
-    }
-    return undefined;
-}
+// 2. دالة الاتصال بالواتساب (Baileys - Low Memory)
+async function connectToWhatsApp() {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
-mongoose.connect(MONGO_URI).then(() => {
-    console.log('✅ Connected to MongoDB');
-    const store = new MongoStore({ mongoose: mongoose });
-
-    client = new Client({
-        authStrategy: new RemoteAuth({
-            store: store,
-            backupSyncIntervalMs: 300000, // مزامنة كل 5 دقائق لتقليل الضغط
-            clientId: 'main-session' 
-        }),
-        // إعدادات لتقليل استهلاك الرام ومنع تكرار الأكواد
-        authTimeoutMs: 180000, 
-        qrMaxRetries: 5,
-        puppeteer: {
-            headless: true,
-            executablePath: getChromePath(),
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--single-process', 
-                '--no-zygote',
-                '--disable-gpu',
-                '--no-first-run',
-                '--js-flags="--max-old-space-size=300"' // تقييد المحرك بـ 300MB رام فقط
-            ]
-        }
+    sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: true,
+        logger: pino({ level: 'silent' })
     });
 
-    client.on('qr', qr => {
-        console.log('🔗 QR CODE RECEIVED:');
-        console.log('👉 SCAN HERE: https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(qr));
-        qrcode.generate(qr, { small: true });
-    });
+    sock.ev.on('creds.update', saveCreds);
 
-    client.on('ready', () => {
-        console.log('🚀 WhatsApp Client is Ready!');
-        processQueue();
-    });
-
-    client.on('remote_session_saved', () => console.log('💾 Session saved!'));
-
-    // الانتظار 15 ثانية كاملة قبل التشغيل لضمان استقرار البيئة
-    setTimeout(() => {
-        console.log('🚀 Initializing WhatsApp...');
-        client.initialize().catch(err => console.error('❌ Init Error:', err));
-    }, 15000);
-
-}).catch(err => console.error('❌ MongoDB Error:', err));
-
-async function processQueue() {
-    if (isProcessing || messageQueue.length === 0) return;
-    if (!client || !client.pupPage || client.pupPage.isClosed()) {
-        setTimeout(processQueue, 5000);
-        return;
-    }
-
-    isProcessing = true;
-    const { phone, message } = messageQueue.shift();
-
-    try {
-        const cleanNumber = phone.replace(/\D/g, '');
-        const chatId = `${cleanNumber}@c.us`;
-        const state = await client.getState().catch(() => 'DISCONNECTED');
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
         
-        if (state === 'CONNECTED') {
-            await client.sendMessage(chatId, message);
-            console.log(`✅ Sent to ${cleanNumber}`);
-        } else {
-            console.log('⚠️ Client not connected, re-queuing...');
-            messageQueue.unshift({ phone, message });
+        if (qr) {
+            console.log('🔗 QR CODE RECEIVED:');
+            console.log('👉 SCAN THIS LINK: https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(qr));
+            qrcode.generate(qr, { small: true });
         }
-    } catch (err) {
-        console.error('❌ Send Error:', err.message);
-        messageQueue.unshift({ phone, message });
-    }
 
-    // تأخير آمن بين الرسائل (20 ثانية)
-    setTimeout(() => {
-        isProcessing = false;
-        processQueue();
-    }, 20000);
+        if (connection === 'close') {
+            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            isReady = false;
+            if (shouldReconnect) connectToWhatsApp();
+        } else if (connection === 'open') {
+            console.log('🚀 WhatsApp IS READY (Smart Filter Active)!');
+            isReady = true;
+        }
+    });
 }
 
-app.post('/api/webhooks/foodics', (req, res) => {
+// 3. استقبال طلبات فودكس ومعالجة "الفلترة الذكية"
+app.post('/api/webhooks/foodics', async (req, res) => {
     const { payload } = req.body;
-    if (payload?.customer?.phone) {
+    
+    if (payload?.customer?.phone && isReady) {
         let phone = payload.customer.phone.replace(/\D/g, '');
         if (phone.startsWith('05')) phone = '966' + phone.substring(1);
         else if (phone.startsWith('5')) phone = '966' + phone;
-        
-        messageQueue.push({ 
-            phone, 
-            message: `مرحباً ${payload.customer.name} 👋\nشكراً لطلبك من مطعمنا! نتشرف بتقييمك لنا: https://google.com/review` 
-        });
-        processQueue();
-        res.status(200).json({ status: 'queued' });
+
+        const customerName = payload.customer.name;
+        const jid = `${phone}@s.whatsapp.net`;
+
+        // --- إعدادات الروابط (استبدلها بروابطك الحقيقية) ---
+        const googleMapLink = "https://g.page/r/YOUR_REVIEWS_LINK/review"; 
+        const supportLink = "https://wa.me/9665XXXXXXXX"; // رقم خدمة العملاء/المدير
+        // ----------------------------------------------
+
+        const smartMessage = `مرحباً ${customerName} 👋\n\nنشكرك على طلبك من مطعمنا! نود أن نسألك: كيف كانت تجربتك معنا اليوم؟\n\n✅ إذا كنت راضياً، يسعدنا تقييمك لنا على جوجل: \n${googleMapLink}\n\n❌ إذا كان لديك أي ملاحظات أو لم تكن راضياً، نرجو إبلاغنا مباشرة لنتمكن من خدمتك: \n${supportLink}`;
+
+        try {
+            await sock.sendMessage(jid, { text: smartMessage });
+            console.log(`✅ Smart Message sent to ${phone}`);
+            res.status(200).json({ status: 'sent' });
+        } catch (err) {
+            console.error('❌ Send Error:', err);
+            res.status(500).json({ status: 'error' });
+        }
     } else {
-        res.status(400).json({ status: 'invalid_phone' });
+        res.status(400).json({ status: 'failed', reason: 'Client not ready or invalid data' });
     }
 });
 
-app.get('/health', async (req, res) => {
-    const state = client ? await client.getState().catch(() => 'OFFLINE') : 'NOT_INIT';
-    res.json({ status: 'active', whatsapp_state: state, queue_length: messageQueue.length });
+// 4. فحص الحالة (Health Check)
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'active', 
+        whatsapp_connected: isReady,
+        memory_usage: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`
+    });
 });
 
-app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    connectToWhatsApp();
+});
