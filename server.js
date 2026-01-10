@@ -1,8 +1,7 @@
 require('dotenv').config();
 const express = require('express');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const pino = require('pino');
-const fs = require('fs'); // لإدارة الملفات
 
 const app = express();
 app.use(express.json());
@@ -10,66 +9,112 @@ app.use(express.json());
 let sock = null;
 let isReady = false;
 let lastQR = null;
-let isConnecting = false;
 
 async function connectToWhatsApp() {
-    if (isConnecting) return;
-    isConnecting = true;
-
-    console.log('🔄 STARTING CLEAN SESSION...');
+    console.log("🔄 جاري تنظيف الجلسة وبدء اتصال جديد...");
     
-    // استخدام اسم مجلد جديد تماماً لتخطي خطأ 405
+    // جلب أحدث إصدار متوافق مع واتساب لضمان استقرار الربط
+    const { version } = await fetchLatestBaileysVersion();
+    console.log(`📡 استخدام نسخة واتساب رقم: ${version.join('.')}`);
+
     const { state, saveCreds } = await useMultiFileAuthState('auth_new_session');
 
-    try {
-        sock = makeWASocket({
-            auth: state,
-            logger: pino({ level: 'silent' }),
-            // هوية متصفح مختلفة تماماً
-            browser: ['Windows', 'Edge', '115.0.1901.183'],
-            connectTimeoutMs: 60000,
-            printQRInTerminal: false
-        });
+    sock = makeWASocket({
+        version,
+        auth: state,
+        logger: pino({ level: 'error' }),
+        browser: ['Windows', 'Chrome', '110.0.0.0'],
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 0,
+    });
 
-        sock.ev.on('creds.update', saveCreds);
+    // تحديث ملفات الجلسة عند كل تغيير
+    sock.ev.on('creds.update', saveCreds);
 
-        sock.ev.on('connection.update', (update) => {
-            const { connection, lastDisconnect, qr } = update;
-            
-            if (qr) {
-                lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}`;
-                console.log('✅ NEW QR CREATED');
-                isConnecting = false;
-            }
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
+        
+        if (qr) {
+            lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
+            console.log('✅ باركود جديد جاهز للمسح في صفحة /health');
+        }
 
-            if (connection === 'close') {
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                console.log(`⚠️ Closed with status: ${statusCode}`);
-                isReady = false;
-                isConnecting = false;
-                
-                // إذا تكرر الخطأ 405، نزيد وقت الانتظار لـ 30 ثانية
-                const delay = statusCode === 405 ? 30000 : 10000;
-                setTimeout(connectToWhatsApp, delay);
-            } else if (connection === 'open') {
-                console.log('🚀 CONNECTED SUCCESSFULLY!');
-                isReady = true;
-                isConnecting = false;
-                lastQR = null;
-            }
-        });
-    } catch (err) {
-        isConnecting = false;
-        setTimeout(connectToWhatsApp, 20000);
-    }
+        if (connection === 'close') {
+            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log(`⚠️ تم إغلاق الاتصال. إعادة المحاولة: ${shouldReconnect}`);
+            isReady = false;
+            if (shouldReconnect) setTimeout(connectToWhatsApp, 5000);
+        } else if (connection === 'open') {
+            console.log('🚀 تم الاتصال بنجاح! نظام سمعة جاهز.');
+            isReady = true;
+            lastQR = null;
+        }
+    });
+
+    // استقبال الرسائل (منطق الفلترة الذكية)
+    sock.ev.on('messages.upsert', async (m) => {
+        const msg = m.messages[0];
+        if (!msg.message || msg.key.fromMe) return;
+
+        // قمنا بإزالة شرط (if msg.key.fromMe) لكي تستطيع تجربة النظام بنفسك
+        const remoteJid = msg.key.remoteJid;
+        
+        let textMessage = msg.message.conversation || 
+                          msg.message.extendedTextMessage?.text || "";
+        
+        textMessage = textMessage.trim();
+
+        console.log(`📩 رسالة مستلمة: [${textMessage}]`);
+
+        if (textMessage === '1') {
+            await sock.sendMessage(remoteJid, { text: "تجربة ممتازة! 😍 شكراً لتقييمك." });
+        } 
+        else if (textMessage === '2') {
+            await sock.sendMessage(remoteJid, { text: "نعتذر منك.. 😔 سنقوم بحل مشكلتك." });
+        }
+    });
 }
 
+// --- قسم مسارات السيرفر (Routes) ---
+
+// 1. واجهة الفحص والربط
 app.get('/health', (req, res) => {
-    if (isReady) return res.send('<h1>✅ Connected!</h1>');
-    if (lastQR) return res.send(`<h1>🔗 Scan Now:</h1><img src="${lastQR}" />`);
-    res.send('<h1>⏳ Initializing clean session... Refresh in 30s.</h1>');
+    if (isReady) return res.send('<h1 style="color:green; text-align:center; font-family:sans-serif; margin-top:50px;">✅ نظام سمعة متصل الآن!</h1>');
+    if (lastQR) return res.send(`<div style="text-align:center; font-family:sans-serif; margin-top:50px;"><h1>🔗 امسح الرمز للربط</h1><img src="${lastQR}" /><p>بعد المسح، انتظر ثواني ثم قم بتحديث الصفحة.</p></div>`);
+    res.send('<h1 style="text-align:center; margin-top:50px;">⏳ جاري تجهيز النظام... انتظر 10 ثوانٍ وحدث الصفحة.</h1>');
 });
 
-app.listen(process.env.PORT || 10000, () => {
+// 2. استقبال بيانات فودكس (Webhook)
+app.post('/foodics-webhook', async (req, res) => {
+    try {
+        const order = req.body;
+        // ملاحظة: فودكس ترسل حالة الطلب، الرقم 4 عادةً يعني مكتمل
+        if (order.status === 4 || order.status === 'completed') {
+            const customerPhone = order.customer?.phone;
+            const customerName = order.customer?.name || 'عميلنا العزيز';
+            
+            if (customerPhone && isReady) {
+                // تنظيف الرقم من أي علامات وإضافة صيغة الواتساب
+                const cleanPhone = customerPhone.replace('+', '').replace(/\s/g, '');
+                const jid = `${cleanPhone}@s.whatsapp.net`;
+
+                console.log(`📦 إرسال طلب تقييم لـ: ${customerName} على الرقم: ${cleanPhone}`);
+                
+                await sock.sendMessage(jid, { 
+                    text: `مرحباً يا ${customerName}! 🌸\n\nشكراً لطلبك من مطعمنا. يهمنا جداً نعرف رأيك في التجربة:\n\n1. تجربة ممتازة 👍\n2. تجربة سيئة 👎` 
+                });
+            }
+        }
+        res.status(200).send('OK');
+    } catch (error) {
+        console.error('❌ Webhook Error:', error);
+        res.status(500).send('Error');
+    }
+});
+
+// تشغيل السيرفر
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+    console.log(`📡 السيرفر يعمل على منفذ: ${PORT}`);
     connectToWhatsApp();
 });

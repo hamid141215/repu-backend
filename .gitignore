@@ -1,4 +1,6 @@
-node_modules
+node_modules/
 .env
-.wwebjs_auth
-.wwebjs_cache
+auth_new_session/
+.wwebjs_auth/
+.wwebjs_cache/
+npm-debug.log*
