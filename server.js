@@ -17,7 +17,7 @@ let client;
 let messageQueue = [];
 let isProcessing = false;
 
-// دالة ذكية لإيجاد مسار المتصفح تلقائياً في Render لضمان عدم حدوث خطأ Browser not found
+// دالة العثور على المسار الصحيح للكروم في Render
 function getChromePath() {
     if (process.env.NODE_ENV !== 'production') return undefined;
     const baseDir = '/opt/render/project/src/.cache/puppeteer/chrome';
@@ -30,7 +30,7 @@ function getChromePath() {
     return undefined;
 }
 
-// الاتصال بـ MongoDB وإعداد الواتساب
+// الاتصال بـ MongoDB وتشغيل الواتساب
 mongoose.connect(MONGO_URI).then(() => {
     console.log('✅ Connected to MongoDB');
     const store = new MongoStore({ mongoose: mongoose });
@@ -38,17 +38,12 @@ mongoose.connect(MONGO_URI).then(() => {
     client = new Client({
         authStrategy: new RemoteAuth({
             store: store,
-            backupSyncIntervalMs: 300000 // مزامنة الجلسة كل 5 دقائق
+            backupSyncIntervalMs: 300000
         }),
         puppeteer: {
             headless: true,
             executablePath: getChromePath(),
-            args: [
-                '--no-sandbox', 
-                '--disable-setuid-sandbox', 
-                '--disable-dev-shm-usage',
-                '--disable-gpu'
-            ]
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
         }
     });
 
@@ -57,72 +52,52 @@ mongoose.connect(MONGO_URI).then(() => {
         qrcode.generate(qr, { small: true });
     });
 
-    client.on('ready', () => {
-        console.log('🚀 WhatsApp Client is Ready and connected to MongoDB!');
-    });
+    client.on('ready', () => console.log('🚀 WhatsApp Client is Ready!'));
+    
+    client.on('remote_session_saved', () => console.log('💾 Session saved to MongoDB!'));
 
-    client.on('remote_session_saved', () => {
-        console.log('💾 Session backup saved to MongoDB successfully!');
-    });
+    client.initialize().catch(err => console.error('❌ Init Error:', err));
+}).catch(err => console.error('❌ MongoDB Connection Error:', err));
 
-    client.initialize().catch(err => console.error('❌ Initialization error:', err));
-});
-
-// نظام الطابور (لمنع حظر الرقم عبر فواصل زمنية عشوائية)
+// نظام الطابور لمعالجة الرسائل
 async function processQueue() {
     if (isProcessing || messageQueue.length === 0) return;
     isProcessing = true;
 
     const { phone, message } = messageQueue.shift();
     try {
-        // بدلاً من getNumberId، نرسل مباشرة باستخدام التنسيق الصحيح
-        const chatId = phone.includes('@c.us') ? phone : `${phone}@c.us`;
-        
+        const cleanNumber = phone.replace(/\D/g, '');
+        const chatId = `${cleanNumber}@c.us`;
+        console.log(`📤 Sending to: ${chatId}`);
         await client.sendMessage(chatId, message);
-        console.log(`✅ Message sent to ${phone}`);
-        
+        console.log(`✅ Sent successfully to ${cleanNumber}`);
     } catch (err) {
-        console.error('❌ Error sending message:', err);
+        console.error('❌ Send Error:', err.message);
     }
 
-    // التأخير العشوائي (15-25 ثانية)
-    const delay = Math.floor(Math.random() * 10000) + 15000;
-    setTimeout(() => {
-        isProcessing = false;
-        processQueue();
-    }, delay);
-}
-    // تأخير بشري عشوائي (بين 15 و 25 ثانية) لمحاكاة السلوك البشري
-    const delay = Math.floor(Math.random() * 10000) + 15000;
+    const delay = Math.floor(Math.random() * 5000) + 10000; 
     setTimeout(() => {
         isProcessing = false;
         processQueue();
     }, delay);
 }
 
-// مسار استقبال الويب هوك (تم إعداده للتجربة بدون حساب فودكس حالياً)
+// استقبال طلبات فودكس
 app.post('/api/webhooks/foodics', (req, res) => {
-    console.log('📥 Incoming Request:', JSON.stringify(req.body));
-    
     const { payload } = req.body;
-    
     if (payload?.customer?.phone) {
         let phone = payload.customer.phone.replace(/\D/g, '');
-        // تحويل الرقم للصيغة الدولية السعودية
         if (phone.startsWith('05')) phone = '966' + phone.substring(1);
-        if (phone.startsWith('5')) phone = '966' + phone;
-
-        const customerName = payload.customer.name || 'عميلنا العزيز';
-        const message = `مرحباً ${customerName} 👋\nشكراً لطلبك من مطعمنا! نتشرف بتقييمك لنا هنا: https://google.com/review`;
         
-        messageQueue.push({ phone, message });
+        messageQueue.push({ 
+            phone, 
+            message: `مرحباً ${payload.customer.name} 👋\nشكراً لطلبك! نتشرف بتقييمك لنا هنا: https://google.com/review` 
+        });
         processQueue();
-        res.status(200).send('Message queued successfully');
+        res.status(200).send('Queued');
     } else {
-        res.status(400).send('Invalid data: No phone number found');
+        res.status(400).send('Invalid Phone');
     }
 });
 
-app.get('/', (req, res) => res.send('WhatsApp Bot is Active! 🚀'));
-
-app.listen(PORT, () => console.log(`🚀 Server listening on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
