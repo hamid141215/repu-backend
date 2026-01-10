@@ -61,21 +61,31 @@ mongoose.connect(MONGO_URI).then(() => {
 
 // نظام الطابور لمعالجة الرسائل
 async function processQueue() {
-    if (isProcessing || messageQueue.length === 0) return;
+    // شرط إضافي: لا تبدأ المعالجة إذا لم يكن العميل (client) جاهزاً تماماً
+    if (isProcessing || messageQueue.length === 0 || !client?.pupPage) {
+        if (messageQueue.length > 0 && !client?.pupPage) {
+            console.log('⏳ Waiting for WhatsApp Client to be fully Ready...');
+        }
+        return;
+    }
+    
     isProcessing = true;
-
     const { phone, message } = messageQueue.shift();
+
     try {
         const cleanNumber = phone.replace(/\D/g, '');
         const chatId = `${cleanNumber}@c.us`;
-        console.log(`📤 Sending to: ${chatId}`);
+        
+        console.log(`📤 Attempting to send to: ${chatId}`);
         await client.sendMessage(chatId, message);
-        console.log(`✅ Sent successfully to ${cleanNumber}`);
+        console.log(`✅ Message sent to ${cleanNumber}`);
     } catch (err) {
         console.error('❌ Send Error:', err.message);
+        // إعادة الرسالة للطابور للمحاولة لاحقاً
+        messageQueue.unshift({ phone, message });
     }
 
-    const delay = Math.floor(Math.random() * 5000) + 10000; 
+    const delay = Math.floor(Math.random() * 5000) + 15000;
     setTimeout(() => {
         isProcessing = false;
         processQueue();
