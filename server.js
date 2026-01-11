@@ -28,15 +28,15 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- نظام مراقبة الأخطاء لمنع الانهيار (تم تحسينه للتشخيص) ---
+// --- نظام مراقبة الأخطاء لمنع الانهيار ---
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('⚠️ خطأ غير معالج (Unhandled Rejection). تأكد من إعدادات MongoDB و Render.');
+    console.error('⚠️ خطأ غير معالج (Unhandled Rejection).');
 });
 process.on('uncaughtException', (err) => {
     console.error('❌ خطأ حرج في النظام:', err.message);
 });
 
-// --- MongoDB Setup (تحسين الاتصال) ---
+// --- MongoDB Setup (تحسين التشخيص) ---
 let MongoClient;
 try { 
     MongoClient = require('mongodb').MongoClient; 
@@ -60,9 +60,13 @@ const initMongo = async () => {
             dbConnected = true;
             console.log("🔗 تم الربط السحابي بنجاح.");
         } catch (e) {
-            console.error("⚠️ فشل الاتصال بـ MongoDB. سيستمر النظام بالعمل محلياً.");
+            // تحديث: إظهار الرسالة الدقيقة للخطأ في السجلات
+            console.error(`⚠️ فشل الاتصال بـ MongoDB: ${e.message}`);
+            console.warn("🏠 سيستمر النظام بالعمل محلياً (المزامنة السحابية معطلة).");
             client = null;
         }
+    } else {
+        console.log("ℹ️ MONGO_URL غير معرف، يعمل بالوضع المحلي.");
     }
 };
 
@@ -141,7 +145,9 @@ async function connectToWhatsApp() {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 isReady = false;
-                console.log(`📡 انقطع الاتصال (كود: ${statusCode}). إعادة المحاولة: ${shouldReconnect}`);
+                if (statusCode !== 408 && statusCode !== 440 && statusCode !== 515) {
+                    console.log(`📡 انقطع الاتصال (كود: ${statusCode}). إعادة المحاولة: ${shouldReconnect}`);
+                }
                 if (shouldReconnect) setTimeout(connectToWhatsApp, 5000);
             } else if (connection === 'open') {
                 isReady = true;
