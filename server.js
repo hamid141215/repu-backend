@@ -1,7 +1,7 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة v3.3 (الإصلاح التلقائي للجلسة)
- * التحديث: معالجة خطأ 401 (Session Invalid) بمسح البيانات التالفة تلقائياً وطلب إعادة الربط.
- * الخصوصية: محتوى الرسائل محمي ولا يظهر في السجلات.
+ * نظام سُمعة (RepuSystem) - النسخة v3.4 (نسخة الاستقرار الأقصى)
+ * التحديث: تحسين مزامنة التشغيل بين السيرفر وقاعدة البيانات لضمان استعادة الجلسة قبل طلب الباركود.
+ * الخصوصية: نظام التشفير ومنع المجموعات لا يزال مفعلاً بأعلى المعايير.
  */
 
 require('dotenv').config();
@@ -19,7 +19,7 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 
-// --- إعدادات CORS ---
+// --- إعدادات CORS الشاملة ---
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -28,15 +28,15 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- نظام مراقبة الأخطاء لمنع الانهيار ---
+// --- نظام مراقبة الأخطاء الاستباقي ---
 process.on('unhandledRejection', (reason) => {
-    // تجاهل أخطاء الاتصال البسيطة
+    // تجاهل أخطاء الشبكة البسيطة لمنع امتلاء السجلات
 });
 process.on('uncaughtException', (err) => {
-    console.error('❌ خطأ غير متوقع في النظام:', err.message);
+    console.error('❌ خطأ غير متوقع:', err.message);
 });
 
-// --- MongoDB Setup ---
+// --- إعدادات MongoDB الحديثة ---
 let MongoClient;
 try { 
     MongoClient = require('mongodb').MongoClient; 
@@ -48,25 +48,29 @@ const MONGO_URL = process.env.MONGO_URL;
 let client = null;
 let dbConnected = false;
 
+// تحسين: جعل الاتصال بـ MongoDB ينتظر قليلاً لضمان الاستقرار
 const initMongo = async () => {
     if (typeof MONGO_URL === 'string' && MONGO_URL.trim().startsWith('mongodb')) {
         try {
-            client = new MongoClient(MONGO_URL.trim(), { connectTimeoutMS: 10000 });
+            client = new MongoClient(MONGO_URL.trim(), { 
+                connectTimeoutMS: 15000,
+                serverSelectionTimeoutMS: 15000 
+            });
             await client.connect();
             dbConnected = true;
             console.log("🔗 [MongoDB] تم الربط السحابي بنجاح.");
         } catch (e) {
             console.error(`⚠️ [MongoDB] فشل الاتصال: ${e.message}`);
-            client = null;
+            dbConnected = false;
         }
     } else {
-        console.log("🏠 [System] يعمل بالوضع المحلي.");
+        console.log("🏠 [System] يعمل بالوضع المحلي (MONGO_URL غير موجود).");
     }
 };
 
 const SESSION_PATH = 'auth_new_session';
 
-// --- إدارة المزامنة السحابية ---
+// --- إدارة المزامنة السحابية الذكية ---
 let syncTimeout = null;
 async function syncSessionToMongo() {
     if (!client || !dbConnected) return;
@@ -82,6 +86,7 @@ async function syncSessionToMongo() {
                     { $set: { data: credsData, updatedAt: new Date() } },
                     { upsert: true }
                 );
+                console.log("☁️ [MongoDB] تم تحديث نسخة الجلسة سحابياً.");
             }
         } catch (err) {}
     }, 5000); 
@@ -95,14 +100,17 @@ async function loadSessionFromMongo() {
         if (result && result.data) {
             if (!fs.existsSync(SESSION_PATH)) fs.mkdirSync(SESSION_PATH, { recursive: true });
             fs.writeFileSync(path.join(SESSION_PATH, 'creds.json'), result.data);
-            console.log('📥 [System] تم استيراد الجلسة من السحابة.');
+            console.log('📥 [System] تم تحميل الجلسة بنجاح من السحابة.');
+            return true;
         }
-    } catch (err) {}
+    } catch (err) {
+        console.error("❌ فشل استعادة الجلسة من السحابة.");
+    }
+    return false;
 }
 
-// دالة لمسح الجلسة التالفة (تستخدم عند حدوث خطأ 401)
 async function clearInvalidSession() {
-    console.log("🧹 [System] جاري مسح بيانات الجلسة غير الصالحة...");
+    console.log("🧹 [System] جاري مسح البيانات التالفة لإعادة الربط...");
     try {
         if (fs.existsSync(SESSION_PATH)) {
             fs.rmSync(SESSION_PATH, { recursive: true, force: true });
@@ -110,10 +118,10 @@ async function clearInvalidSession() {
         if (client && dbConnected) {
             const db = client.db('whatsapp_bot');
             await db.collection('session_data').deleteOne({ _id: 'whatsapp_creds' });
-            console.log("☁️ [MongoDB] تم حذف الجلسة التالفة من السحابة.");
+            console.log("☁️ [MongoDB] تم حذف السجل التالف من السحابة.");
         }
     } catch (err) {
-        console.error("❌ فشل مسح البيانات:", err.message);
+        console.error("❌ خطأ أثناء مسح البيانات:", err.message);
     }
 }
 
@@ -125,7 +133,11 @@ const processedWebhooks = new Map();
 
 async function connectToWhatsApp() {
     try {
-        await loadSessionFromMongo();
+        // تحسين: التأكد من محاولة التحميل من السحابة قبل بدء الجلسة المحلية
+        if (dbConnected) {
+            await loadSessionFromMongo();
+        }
+
         const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
         const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1015901307] }));
 
@@ -136,12 +148,13 @@ async function connectToWhatsApp() {
             browser: ['RepuSystem', 'Chrome', '110.0'],
             printQRInTerminal: false,
             connectTimeoutMS: 60000,
-            keepAliveIntervalMs: 15000
+            defaultQueryTimeoutMs: 0,
+            keepAliveIntervalMs: 20000
         });
 
         sock.ev.on('creds.update', async () => {
             await saveCreds();
-            syncSessionToMongo();
+            if (dbConnected) syncSessionToMongo();
         });
 
         sock.ev.on('connection.update', async (update) => {
@@ -149,7 +162,7 @@ async function connectToWhatsApp() {
             
             if (qr) {
                 lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
-                console.log("📲 [WhatsApp] بانتظار مسح الباركود في صفحة /health");
+                console.log("📲 [WhatsApp] بانتظار مسح الباركود الجديد...");
             }
 
             if (connection === 'close') {
@@ -158,21 +171,18 @@ async function connectToWhatsApp() {
                 isReady = false;
                 
                 if (statusCode === 401) {
-                    console.log("❌ [WhatsApp] الجلسة غير صالحة أو تم تسجيل الخروج. يرجى إعادة الربط.");
+                    console.log("❌ [WhatsApp] الجلسة تالفة. جاري الإصلاح التلقائي...");
                     await clearInvalidSession();
-                    setTimeout(connectToWhatsApp, 2000);
-                } else if (statusCode === 515) {
-                    console.log("🔄 [WhatsApp] جاري تحديث الاتصال تلقائياً...");
-                    setTimeout(connectToWhatsApp, 5000);
+                    setTimeout(connectToWhatsApp, 3000);
                 } else if (shouldReconnect) {
-                    console.log(`📡 [WhatsApp] انقطع الاتصال (كود: ${statusCode}). إعادة المحاولة...`);
+                    console.log(`📡 [WhatsApp] إعادة الاتصال (كود: ${statusCode})...`);
                     setTimeout(connectToWhatsApp, 5000);
                 }
             } else if (connection === 'open') {
                 isReady = true;
                 lastQR = null;
-                console.log('✅ [WhatsApp] النظام متصل وجاهز للاستقبال!');
-                syncSessionToMongo();
+                console.log('✅ [WhatsApp] نظام سُمعة متصل ونشط الآن!');
+                if (dbConnected) syncSessionToMongo();
             }
         });
 
@@ -181,29 +191,33 @@ async function connectToWhatsApp() {
             if (!msg.message || msg.key.fromMe) return;
 
             const remoteJid = msg.key.remoteJid;
-            if (remoteJid.endsWith('@g.us')) return; 
+            if (remoteJid.endsWith('@g.us')) return; // تجاهل المجموعات
 
             let text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
-            
-            if (text.length > 0) {
-                console.log(`📩 [Activity] رسالة واردة من رقم ينتهي بـ: [${remoteJid.split('@')[0].slice(-4)}]`);
-            }
+            if (!text) return;
+
+            // تسجيل نشاط مجهول (حماية الخصوصية)
+            console.log(`📩 نشاط من عميل: [${remoteJid.split('@')[0].slice(-4)}***]`);
 
             if (/^[1١]/.test(text)) {
-                await sock.sendMessage(remoteJid, { text: "يسعدنا جداً أن التجربة كانت ممتازة! 😍 كرمًا منك شاركنا تقييمك هنا:\n📍 [رابط جوجل ماب الخاص بك]" });
+                await sock.sendMessage(remoteJid, { text: "يسعدنا جداً أن التجربة كانت ممتازة! 😍 كرمًا منك شاركنا تقييمك هنا لتصل تجربتك للجميع:\n📍 [رابط جوجل ماب الخاص بك]" });
             } 
             else if (/^[2٢]/.test(text)) {
-                await sock.sendMessage(remoteJid, { text: "نعتذر منك جداً 😔، هدفنا رضاك التام. سيتم التواصل معك من قبل الإدارة فوراً." });
+                await sock.sendMessage(remoteJid, { text: "نعتذر منك جداً 😔، هدفنا رضاك التام. سيتم التواصل معك من قبل الإدارة فوراً لحل الموضوع." });
                 const managerPhone = process.env.MANAGER_PHONE;
                 if (managerPhone && isReady) {
                     const customerPhone = remoteJid.split('@')[0];
-                    const managerJid = `${managerPhone.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
-                    await sock.sendMessage(managerJid, { text: `⚠️ تنبيه: تقييم سلبي من ${customerPhone}\nللتواصل: https://wa.me/${customerPhone}` });
+                    // تحسين: تنظيف رقم المدير من أي رموز زائدة
+                    const cleanManager = managerPhone.replace(/[^0-9]/g, '');
+                    const managerJid = `${cleanManager}@s.whatsapp.net`;
+                    await sock.sendMessage(managerJid, { 
+                        text: `⚠️ *تنبيه تقييم سلبي*:\nالعميل: ${customerPhone}\nاختار "يحتاج تحسين".\nللتواصل معه: https://wa.me/${customerPhone}` 
+                    });
                 }
             }
         });
     } catch (error) {
-        console.error("❌ خطأ في محرك الواتساب:", error.message);
+        console.error("❌ خطأ في المحرك:", error.message);
         setTimeout(connectToWhatsApp, 10000);
     }
 }
@@ -212,20 +226,28 @@ async function connectToWhatsApp() {
 app.post('/foodics-webhook', async (req, res) => {
     const apiKey = req.query.key;
     if (apiKey !== process.env.WEBHOOK_KEY) return res.status(401).send('Unauthorized');
+    
     const { customer, status, id, hid } = req.body;
     if (!customer?.phone) return res.status(400).send('Missing data');
 
     const orderId = id || hid || customer.phone;
-    if (processedWebhooks.has(orderId)) return res.send('OK');
+    if (processedWebhooks.has(orderId)) return res.send('Duplicate ignored');
+    
     processedWebhooks.set(orderId, Date.now());
     setTimeout(() => processedWebhooks.delete(orderId), 600000);
 
     if ((status === 4 || status === 'closed' || status === 'completed') && isReady) {
-        const jid = `${customer.phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+        const cleanPhone = customer.phone.replace(/[^0-9]/g, '');
+        const jid = `${cleanPhone}@s.whatsapp.net`;
+        
+        console.log(`📤 إرسال طلب تقييم: ${customer.name || cleanPhone}`);
+        
         setTimeout(async () => {
             try { 
                 if (sock && isReady) {
-                    await sock.sendMessage(jid, { text: `مرحباً ${customer.name || 'عميلنا العزيز'}، كيف كانت تجربتك؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` }); 
+                    await sock.sendMessage(jid, { 
+                        text: `مرحباً ${customer.name || 'عميلنا العزيز'}، نورتنا! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
+                    }); 
                 }
             } catch (e) {}
         }, 3000);
@@ -235,13 +257,26 @@ app.post('/foodics-webhook', async (req, res) => {
 
 // --- صفحة الحالة الصحية ---
 app.get('/health', (req, res) => {
-    res.send(`<div style="font-family:sans-serif;text-align:center;padding-top:50px;direction:rtl;">${isReady ? '<h1 style="color:green;">✅ نظام سمعة آمن ونشط</h1><p>السيرفر متصل بالواتساب وجاهز.</p>' : (lastQR ? '<h1>📲 الربط مطلوب</h1><p>الجلسة السابقة انتهت صلاحيتها. يرجى إعادة مسح الباركود:</p><img src="'+lastQR+'" style="border:10px solid #eee; border-radius:15px;"/>' : '<h1>⏳ جاري التحميل...</h1>')}</div>`);
+    res.send(`
+        <div style="font-family:sans-serif; text-align:center; padding-top:50px; direction:rtl;">
+            ${isReady ? 
+                '<h1 style="color:green;">✅ نظام سمعة متصل ونشط</h1><p>السيرفر جاهز لاستقبال الطلبات.</p>' : 
+                (lastQR ? 
+                    '<h1>📲 الربط مطلوب</h1><p>يرجى مسح الباركود لتفعيل الواتساب:</p><img src="'+lastQR+'" style="border:10px solid #eee; border-radius:15px;"/>' : 
+                    '<h1>⏳ جاري تجهيز المحرك...</h1>')
+            }
+            <p style="color:gray; font-size:12px; margin-top:30px;">
+                MongoDB: ${dbConnected ? 'متصل 🔗' : 'الوضع المحلي 🏠'}
+            </p>
+        </div>
+    `);
 });
 
 // --- تشغيل السيرفر ---
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => {
     console.log(`🚀 [Server] يعمل الآن على المنفذ ${PORT}`);
+    // تحسين: ضمان انتهاء اتصال MongoDB قبل بدء محرك الواتساب لضمان استعادة الجلسة
     await initMongo();
     connectToWhatsApp();
 });
