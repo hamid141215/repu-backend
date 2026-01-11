@@ -1,6 +1,6 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة v4.1 (نسخة اللمسة الإنسانية)
- * التحديث: إضافة نظام الرد على كلمات الشكر لإنهاء المحادثة بلباقة.
+ * نظام سُمعة (RepuSystem) - النسخة v4.6 (النسخة العالمية الهجينة)
+ * التحديث: إضافة واجهة إرسال يدوية مدمجة في صفحة الحالة لخدمة المطاعم التي لا تملك نظام ربط آلي.
  * الخصوصية: نظام التشفير ومنع المجموعات لا يزال مفعلاً بأعلى المعايير.
  */
 
@@ -166,13 +166,9 @@ async function connectToWhatsApp() {
             let text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
             if (!text) return;
 
-            console.log(`📩 نشاط من عميل: [${remoteJid.split('@')[0].slice(-4)}***]`);
-
-            // 1. التقييم الإيجابي
             if (/^[1١]/.test(text)) {
                 await sock.sendMessage(remoteJid, { text: "يسعدنا جداً أن التجربة كانت ممتازة! 😍 كرمًا منك شاركنا تقييمك هنا:\n📍 [رابط جوجل ماب الخاص بك]" });
             } 
-            // 2. التقييم السلبي
             else if (/^[2٢]/.test(text)) {
                 const discountCode = process.env.DISCOUNT_CODE || "WELCOME10";
                 await sock.sendMessage(remoteJid, { text: `نعتذر منك جداً 😔، هدفنا رضاك التام. وتقديراً منا لصدقك، نهديك كود خصم خاص بطلبك القادم:\n🎫 كود الخصم: *${discountCode}*` });
@@ -183,7 +179,6 @@ async function connectToWhatsApp() {
                     await sock.sendMessage(`${cleanManager}@s.whatsapp.net`, { text: `⚠️ تنبيه تقييم سلبي من ${remoteJid.split('@')[0]}\nللتواصل: https://wa.me/${remoteJid.split('@')[0]}` });
                 }
             }
-            // 3. كلمات الشكر (لإغلاق المحادثة بلباقة)
             else if (/(شكرا|شكراً|تسلم|يعطيك|تمام|اوكي|ok|thanks)/i.test(text)) {
                 await sock.sendMessage(remoteJid, { text: "في خدمتك دائماً، نورتنا! ❤️" });
             }
@@ -193,48 +188,85 @@ async function connectToWhatsApp() {
     }
 }
 
-// --- استقبال بيانات فودكس (Webhook) ---
+// --- دالة الإرسال المركزية ---
+const sendEvaluationMessage = async (phone, name) => {
+    if (!isReady || !sock) return { success: false, error: 'البوت غير متصل حالياً' };
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const jid = `${cleanPhone}@s.whatsapp.net`;
+    try {
+        await sock.sendMessage(jid, { 
+            text: `مرحباً ${name || 'عميلنا العزيز'}، نورتنا! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
+        });
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+};
+
+// --- [1] استقبال بيانات فودكس ---
 app.post('/foodics-webhook', async (req, res) => {
     const apiKey = req.query.key;
     if (apiKey !== process.env.WEBHOOK_KEY) return res.status(401).send('Unauthorized');
-    
     const { customer, status, id, hid } = req.body;
     if (!customer?.phone) return res.status(400).send('Missing data');
-
     const orderId = id || hid || customer.phone;
-    if (processedWebhooks.has(orderId)) return res.send('Duplicate ignored');
+    if (processedWebhooks.has(orderId)) return res.send('Duplicate');
     processedWebhooks.set(orderId, Date.now());
     setTimeout(() => processedWebhooks.delete(orderId), 600000);
-
     if (status == 4 || status === 'closed' || status === 'completed') {
-        const cleanPhone = customer.phone.replace(/[^0-9]/g, '');
-        const jid = `${cleanPhone}@s.whatsapp.net`;
-        
-        console.log(`⚙️ استلام طلب لـ: ${customer.name || cleanPhone} | جاري محاولة الإرسال...`);
-
-        const trySendMessage = async (attempt = 1) => {
-            if (isReady && sock) {
-                try {
-                    await sock.sendMessage(jid, { text: `مرحباً ${customer.name || 'عميلنا العزيز'}، نورتنا! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` });
-                    console.log(`✅ تم الإرسال بنجاح إلى: ${cleanPhone}`);
-                } catch (e) {
-                    console.error(`❌ فشل الإرسال الفعلي لـ ${cleanPhone}:`, e.message);
-                }
-            } else if (attempt <= 3) {
-                console.log(`⏳ البوت غير جاهز، محاولة رقم ${attempt} بعد 5 ثوانٍ لـ ${cleanPhone}...`);
-                setTimeout(() => trySendMessage(attempt + 1), 5000);
-            } else {
-                console.error(`❌ تعذر الإرسال لـ ${cleanPhone} بعد 3 محاولات (البوت غير متصل).`);
-            }
-        };
-
-        trySendMessage();
+        setTimeout(() => sendEvaluationMessage(customer.phone, customer.name), 3000);
     }
     res.send('OK');
 });
 
+// --- [2] استقبال الإرسال اليدوي ---
+app.post('/send-evaluation', async (req, res) => {
+    const apiKey = req.query.key;
+    if (apiKey !== process.env.WEBHOOK_KEY) return res.status(401).send('Unauthorized');
+    const { phone, name } = req.body;
+    if (!phone) return res.status(400).json({ error: 'رقم الجوال مطلوب' });
+    const result = await sendEvaluationMessage(phone, name);
+    if (result.success) res.json({ message: 'تم الإرسال بنجاح' });
+    else res.status(500).json({ error: result.error });
+});
+
 app.get('/health', (req, res) => {
-    res.send(`<div style="font-family:sans-serif;text-align:center;padding-top:50px;direction:rtl;">${isReady ? '<h1 style="color:green;">✅ نظام سمعة متصل ونشط</h1>' : (lastQR ? '<h1>📲 الربط مطلوب</h1><img src="'+lastQR+'" style="border:10px solid #eee; border-radius:15px;"/>' : '<h1>⏳ جاري تجهيز المحرك...</h1>')}<p>MongoDB: ${dbConnected ? 'متصل 🔗' : 'محلي 🏠'}</p></div>`);
+    const statusHtml = isReady ? '<h1 style="color:green;">✅ نظام سمعة متصل ونشط</h1>' : (lastQR ? '<h1>📲 الربط مطلوب</h1><img src="'+lastQR+'" style="border:10px solid #eee; border-radius:15px;"/>' : '<h1>⏳ جاري التحميل...</h1>');
+    
+    res.send(`
+        <div style="font-family:sans-serif; text-align:center; padding-top:50px; direction:rtl; max-width:500px; margin:auto;">
+            ${statusHtml}
+            <hr style="margin:30px 0; border:0; border-top:1px solid #eee;">
+            <div style="background:#f9f9f9; padding:20px; border-radius:15px; border:1px solid #eee;">
+                <h3>🚀 إرسال تقييم يدوي</h3>
+                <p style="font-size:12px; color:gray;">(للمطاعم بدون فودكس أو لطلبات هنقرستيشن)</p>
+                <input type="text" id="phone" placeholder="9665xxxxxxxx" style="width:90%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ccc;">
+                <input type="text" id="name" placeholder="اسم العميل (اختياري)" style="width:90%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ccc;">
+                <button onclick="send()" id="btn" style="width:90%; padding:12px; background:#10b981; color:white; border:none; border-radius:8px; cursor:pointer; font-bold;">إرسال الآن</button>
+                <p id="msg" style="margin-top:10px; font-weight:bold;"></p>
+            </div>
+            <script>
+                async function send() {
+                    const phone = document.getElementById('phone').value;
+                    const name = document.getElementById('name').value;
+                    const btn = document.getElementById('btn');
+                    const msg = document.getElementById('msg');
+                    if(!phone) return alert('ضع رقم الجوال');
+                    btn.disabled = true; btn.innerText = 'جاري الإرسال...';
+                    try {
+                        const res = await fetch('/send-evaluation?key=${process.env.WEBHOOK_KEY}', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({phone, name})
+                        });
+                        if(res.ok) { msg.style.color='green'; msg.innerText='✅ تم الإرسال!'; }
+                        else { msg.style.color='red'; msg.innerText='❌ فشل الإرسال'; }
+                    } catch(e) { msg.innerText='خطأ في الاتصال'; }
+                    btn.disabled = false; btn.innerText = 'إرسال الآن';
+                }
+            </script>
+        </div>
+    `);
 });
 
 const PORT = process.env.PORT || 10000;
