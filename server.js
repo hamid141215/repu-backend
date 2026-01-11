@@ -1,6 +1,6 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة v3.4 (نسخة الاستقرار الأقصى)
- * التحديث: تحسين مزامنة التشغيل بين السيرفر وقاعدة البيانات لضمان استعادة الجلسة قبل طلب الباركود.
+ * نظام سُمعة (RepuSystem) - النسخة v3.5 (نسخة التعويض التلقائي)
+ * التحديث: إضافة ميزة إرسال كود خصم آلي للعملاء عند التقييم السلبي لامتصاص الغضب.
  * الخصوصية: نظام التشفير ومنع المجموعات لا يزال مفعلاً بأعلى المعايير.
  */
 
@@ -48,7 +48,6 @@ const MONGO_URL = process.env.MONGO_URL;
 let client = null;
 let dbConnected = false;
 
-// تحسين: جعل الاتصال بـ MongoDB ينتظر قليلاً لضمان الاستقرار
 const initMongo = async () => {
     if (typeof MONGO_URL === 'string' && MONGO_URL.trim().startsWith('mongodb')) {
         try {
@@ -133,7 +132,6 @@ const processedWebhooks = new Map();
 
 async function connectToWhatsApp() {
     try {
-        // تحسين: التأكد من محاولة التحميل من السحابة قبل بدء الجلسة المحلية
         if (dbConnected) {
             await loadSessionFromMongo();
         }
@@ -191,27 +189,32 @@ async function connectToWhatsApp() {
             if (!msg.message || msg.key.fromMe) return;
 
             const remoteJid = msg.key.remoteJid;
-            if (remoteJid.endsWith('@g.us')) return; // تجاهل المجموعات
+            if (remoteJid.endsWith('@g.us')) return; 
 
             let text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
             if (!text) return;
 
-            // تسجيل نشاط مجهول (حماية الخصوصية)
             console.log(`📩 نشاط من عميل: [${remoteJid.split('@')[0].slice(-4)}***]`);
 
             if (/^[1١]/.test(text)) {
                 await sock.sendMessage(remoteJid, { text: "يسعدنا جداً أن التجربة كانت ممتازة! 😍 كرمًا منك شاركنا تقييمك هنا لتصل تجربتك للجميع:\n📍 [رابط جوجل ماب الخاص بك]" });
             } 
             else if (/^[2٢]/.test(text)) {
-                await sock.sendMessage(remoteJid, { text: "نعتذر منك جداً 😔، هدفنا رضاك التام. سيتم التواصل معك من قبل الإدارة فوراً لحل الموضوع." });
+                // جلب كود الخصم من متغيرات البيئة أو استخدام كود افتراضي
+                const discountCode = process.env.DISCOUNT_CODE || "WELCOME10";
+                
+                // إرسال رسالة الاعتذار والتعويض التلقائي للعميل
+                await sock.sendMessage(remoteJid, { 
+                    text: `نعتذر منك جداً 😔، هدفنا رضاك التام. وتقديراً منا لصدقك، نهديك كود خصم خاص بطلبك القادم:\n\n🎫 كود الخصم: *${discountCode}*\n\nسيتم التواصل معك من قبل الإدارة فوراً لحل أي ملاحظة واجهتها.` 
+                });
+
                 const managerPhone = process.env.MANAGER_PHONE;
                 if (managerPhone && isReady) {
                     const customerPhone = remoteJid.split('@')[0];
-                    // تحسين: تنظيف رقم المدير من أي رموز زائدة
                     const cleanManager = managerPhone.replace(/[^0-9]/g, '');
                     const managerJid = `${cleanManager}@s.whatsapp.net`;
                     await sock.sendMessage(managerJid, { 
-                        text: `⚠️ *تنبيه تقييم سلبي*:\nالعميل: ${customerPhone}\nاختار "يحتاج تحسين".\nللتواصل معه: https://wa.me/${customerPhone}` 
+                        text: `⚠️ *تنبيه تقييم سلبي (تم إرسال كود خصم)*:\nالعميل: ${customerPhone}\nاختار "يحتاج تحسين".\nللتواصل معه: https://wa.me/${customerPhone}` 
                     });
                 }
             }
@@ -276,7 +279,6 @@ app.get('/health', (req, res) => {
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => {
     console.log(`🚀 [Server] يعمل الآن على المنفذ ${PORT}`);
-    // تحسين: ضمان انتهاء اتصال MongoDB قبل بدء محرك الواتساب لضمان استعادة الجلسة
     await initMongo();
     connectToWhatsApp();
 });
