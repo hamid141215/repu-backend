@@ -1,6 +1,6 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة v3.2 (التشغيل المستقر)
- * التحديث: تحسين بيئة التشغيل المحلية (VS Code) ومعالجة تنبيهات الاتصال.
+ * نظام سُمعة (RepuSystem) - النسخة v3.3 (الإصلاح التلقائي للجلسة)
+ * التحديث: معالجة خطأ 401 (Session Invalid) بمسح البيانات التالفة تلقائياً وطلب إعادة الربط.
  * الخصوصية: محتوى الرسائل محمي ولا يظهر في السجلات.
  */
 
@@ -30,18 +30,18 @@ app.use((req, res, next) => {
 
 // --- نظام مراقبة الأخطاء لمنع الانهيار ---
 process.on('unhandledRejection', (reason) => {
-    // تجاهل أخطاء الاتصال البسيطة لعدم ملء السجلات
+    // تجاهل أخطاء الاتصال البسيطة
 });
 process.on('uncaughtException', (err) => {
     console.error('❌ خطأ غير متوقع في النظام:', err.message);
 });
 
-// --- MongoDB Setup (تحسين التوافق مع VS Code) ---
+// --- MongoDB Setup ---
 let MongoClient;
 try { 
     MongoClient = require('mongodb').MongoClient; 
 } catch (e) {
-    console.warn("⚠️ مكتبة mongodb غير مثبتة. إذا كنت في VS Code، نفذ: npm install mongodb");
+    console.warn("⚠️ مكتبة mongodb غير مثبتة.");
 }
 
 const MONGO_URL = process.env.MONGO_URL;
@@ -60,7 +60,7 @@ const initMongo = async () => {
             client = null;
         }
     } else {
-        console.log("🏠 [System] يعمل بالوضع المحلي (لم يتم العثور على MONGO_URL في الإعدادات).");
+        console.log("🏠 [System] يعمل بالوضع المحلي.");
     }
 };
 
@@ -100,6 +100,23 @@ async function loadSessionFromMongo() {
     } catch (err) {}
 }
 
+// دالة لمسح الجلسة التالفة (تستخدم عند حدوث خطأ 401)
+async function clearInvalidSession() {
+    console.log("🧹 [System] جاري مسح بيانات الجلسة غير الصالحة...");
+    try {
+        if (fs.existsSync(SESSION_PATH)) {
+            fs.rmSync(SESSION_PATH, { recursive: true, force: true });
+        }
+        if (client && dbConnected) {
+            const db = client.db('whatsapp_bot');
+            await db.collection('session_data').deleteOne({ _id: 'whatsapp_creds' });
+            console.log("☁️ [MongoDB] تم حذف الجلسة التالفة من السحابة.");
+        }
+    } catch (err) {
+        console.error("❌ فشل مسح البيانات:", err.message);
+    }
+}
+
 // --- المحرك الرئيسي لاتصال واتساب ---
 let sock = null;
 let isReady = false;
@@ -127,7 +144,7 @@ async function connectToWhatsApp() {
             syncSessionToMongo();
         });
 
-        sock.ev.on('connection.update', (update) => {
+        sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             
             if (qr) {
@@ -140,14 +157,17 @@ async function connectToWhatsApp() {
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 isReady = false;
                 
-                // معالجة كود 515 (تحديث اتصال طبيعي) لكي لا يظهر كخطأ مخيف
-                if (statusCode === 515) {
+                if (statusCode === 401) {
+                    console.log("❌ [WhatsApp] الجلسة غير صالحة أو تم تسجيل الخروج. يرجى إعادة الربط.");
+                    await clearInvalidSession();
+                    setTimeout(connectToWhatsApp, 2000);
+                } else if (statusCode === 515) {
                     console.log("🔄 [WhatsApp] جاري تحديث الاتصال تلقائياً...");
-                } else if (statusCode !== 408 && statusCode !== 440) {
-                    console.log(`📡 [WhatsApp] انقطع الاتصال (كود: ${statusCode}). إعادة المحاولة: ${shouldReconnect}`);
+                    setTimeout(connectToWhatsApp, 5000);
+                } else if (shouldReconnect) {
+                    console.log(`📡 [WhatsApp] انقطع الاتصال (كود: ${statusCode}). إعادة المحاولة...`);
+                    setTimeout(connectToWhatsApp, 5000);
                 }
-                
-                if (shouldReconnect) setTimeout(connectToWhatsApp, 5000);
             } else if (connection === 'open') {
                 isReady = true;
                 lastQR = null;
@@ -215,18 +235,13 @@ app.post('/foodics-webhook', async (req, res) => {
 
 // --- صفحة الحالة الصحية ---
 app.get('/health', (req, res) => {
-    res.send(`<div style="font-family:sans-serif;text-align:center;padding-top:50px;direction:rtl;">${isReady ? '<h1 style="color:green;">✅ نظام سمعة آمن ونشط</h1><p>السيرفر متصل بالواتساب وجاهز.</p>' : (lastQR ? '<h1>📲 الربط مطلوب</h1><p>امسح الباركود لتفعيل الواتساب:</p><img src="'+lastQR+'" style="border:10px solid #eee; border-radius:15px;"/>' : '<h1>⏳ جاري التحميل...</h1>')}</div>`);
+    res.send(`<div style="font-family:sans-serif;text-align:center;padding-top:50px;direction:rtl;">${isReady ? '<h1 style="color:green;">✅ نظام سمعة آمن ونشط</h1><p>السيرفر متصل بالواتساب وجاهز.</p>' : (lastQR ? '<h1>📲 الربط مطلوب</h1><p>الجلسة السابقة انتهت صلاحيتها. يرجى إعادة مسح الباركود:</p><img src="'+lastQR+'" style="border:10px solid #eee; border-radius:15px;"/>' : '<h1>⏳ جاري التحميل...</h1>')}</div>`);
 });
 
 // --- تشغيل السيرفر ---
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => {
     console.log(`🚀 [Server] يعمل الآن على المنفذ ${PORT}`);
-    
-    // فحص المتغيرات الهامة في بيئة VS Code
-    if (!process.env.WEBHOOK_KEY) console.warn("⚠️ تنبيه: WEBHOOK_KEY غير معرف في ملف .env");
-    if (!process.env.MANAGER_PHONE) console.warn("⚠️ تنبيه: MANAGER_PHONE غير معرف في ملف .env");
-
     await initMongo();
     connectToWhatsApp();
 });
