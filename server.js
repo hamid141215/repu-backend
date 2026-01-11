@@ -1,6 +1,7 @@
 /**
  * نظام سُمعة (RepuSystem) - النسخة الاحترافية المستقرة
  * تم إصلاح خطأ startsWith ودعم المزامنة السحابية الكاملة
+ * تحديث: تحسين نظام اكتشاف الأخطاء في الربط السحابي
  */
 
 require('dotenv').config();
@@ -21,7 +22,8 @@ try {
     const mongodb = require('mongodb');
     MongoClient = mongodb.MongoClient;
 } catch (e) {
-    console.warn("⚠️ مكتبة mongodb غير مثبتة في المشروع. سيتم العمل بالوضع المحلي.");
+    console.error("❌ خطأ حرج: مكتبة mongodb غير موجودة في ملفات المشروع.");
+    console.warn("⚠️ سيتم العمل بالوضع المحلي فقط.");
 }
 
 const app = express();
@@ -32,24 +34,38 @@ let isReady = false;
 let lastQR = null;
 const SESSION_PATH = 'auth_new_session';
 
-// --- إدارة الاتصال بقاعدة البيانات (صمام أمان لمنع خطأ startsWith) ---
+// --- إدارة الاتصال بقاعدة البيانات (نظام تشخيص الأخطاء المطور) ---
 const MONGO_URL = process.env.MONGO_URL;
 let client = null;
+let dbError = null;
 
-// التحقق من أن الرابط موجود وهو نصي قبل استخدامه لمنع الانهيار (Status 1)
-if (typeof MONGO_URL === 'string' && MONGO_URL.trim().length > 0) {
-    if (MONGO_URL.startsWith('mongodb://') || MONGO_URL.startsWith('mongodb+srv://')) {
+console.log("🔍 جاري فحص إعدادات MongoDB...");
+
+if (!MONGO_URL) {
+    console.log("ℹ️ الحالة: MONGO_URL غير معرف في إعدادات البيئة.");
+    dbError = "الرابط غير معرف (Environment Variable Missing)";
+} else if (typeof MONGO_URL !== 'string' || MONGO_URL.trim().length === 0) {
+    console.log("ℹ️ الحالة: MONGO_URL موجود ولكنه فارغ.");
+    dbError = "الرابط فارغ";
+} else if (!MongoClient) {
+    console.log("ℹ️ الحالة: المكتبة (mongodb) غير محملة برمجياً.");
+    dbError = "مكتبة البرمجة مفقودة (Run: npm install mongodb)";
+} else {
+    // التحقق من تنسيق الرابط
+    const isValidFormat = MONGO_URL.startsWith('mongodb://') || MONGO_URL.startsWith('mongodb+srv://');
+    
+    if (!isValidFormat) {
+        console.error("❌ خطأ: تنسيق MONGO_URL غير صحيح. يجب أن يبدأ بـ mongodb:// أو mongodb+srv://");
+        dbError = "تنسيق الرابط خاطئ";
+    } else {
         try {
-            if (MongoClient) {
-                client = new MongoClient(MONGO_URL);
-                console.log("🔗 تم تهيئة محرك MongoDB بنجاح.");
-            }
+            client = new MongoClient(MONGO_URL);
+            console.log("🔗 تم تهيئة محرك MongoDB بنجاح.");
         } catch (e) {
-            console.error("❌ خطأ في تنسيق رابط MongoDB من Render:", e.message);
+            console.error("❌ خطأ في معالجة الرابط:", e.message);
+            dbError = e.message;
         }
     }
-} else {
-    console.log("ℹ️ تنبيه: MONGO_URL غير معرف في إعدادات Render. النظام يعمل بوضعية التخزين المحلي.");
 }
 
 const dbName = 'whatsapp_bot';
@@ -216,7 +232,8 @@ app.get('/health', (req, res) => {
     let html = '<div style="font-family:sans-serif; text-align:center; padding-top:50px; line-height:1.6;">';
     
     if (!client) {
-        html += '<p style="color:orange; font-weight:bold;">⚠️ النظام يعمل بالوضع المحلي (Local Mode).<br>يرجى إضافة MONGO_URL لضمان استقرار الجلسة.</p>';
+        html += `<p style="color:orange; font-weight:bold;">⚠️ النظام يعمل بالوضع المحلي (Local Mode).</p>`;
+        html += `<p style="color:red; font-size:12px;">السبب: ${dbError || 'غير معروف'}</p>`;
     } else {
         html += '<p style="color:blue; font-weight:bold;">🔗 الربط السحابي (MongoDB) مفعل ونشط.</p>';
     }
