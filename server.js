@@ -1,6 +1,6 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة v3.6 (نسخة تشخيص الإرسال)
- * التحديث: إضافة سجلات تفصيلية لتتبع مسار الويب هوك ومعالجة أسباب عدم وصول الرسائل.
+ * نظام سُمعة (RepuSystem) - النسخة v3.7 (نسخة استقرار البث)
+ * التحديث: معالجة الكود 440 (Stream Error) وتحسين استجابة الإصدار لتجنب انقطاع الاتصال المتكرر.
  * الخصوصية: نظام التشفير ومنع المجموعات لا يزال مفعلاً بأعلى المعايير.
  */
 
@@ -10,7 +10,8 @@ const {
     default: makeWASocket, 
     useMultiFileAuthState, 
     DisconnectReason, 
-    fetchLatestBaileysVersion 
+    fetchLatestBaileysVersion,
+    Browsers
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs');
@@ -137,17 +138,21 @@ async function connectToWhatsApp() {
         }
 
         const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
-        const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1015901307] }));
+        
+        // تحسين: جلب أحدث إصدار مع معالجة فشل الجلب لتجنب كود 440
+        const { version, isLatest } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1017531287], isLatest: false }));
+        console.log(`📡 [System] استخدام إصدار واتساب: ${version.join('.')} (الأحدث: ${isLatest})`);
 
         sock = makeWASocket({
             version,
             auth: state,
             logger: pino({ level: 'silent' }),
-            browser: ['RepuSystem', 'Chrome', '110.0'],
+            browser: Browsers.appropriate('Chrome'),
             printQRInTerminal: false,
             connectTimeoutMS: 60000,
             defaultQueryTimeoutMs: 0,
-            keepAliveIntervalMs: 20000
+            keepAliveIntervalMs: 30000, // زيادة فترة النبض لتقليل تضارب البث
+            generateHighQualityLinkPreview: false
         });
 
         sock.ev.on('creds.update', async () => {
@@ -172,6 +177,10 @@ async function connectToWhatsApp() {
                     console.log("❌ [WhatsApp] الجلسة تالفة. جاري الإصلاح التلقائي...");
                     await clearInvalidSession();
                     setTimeout(connectToWhatsApp, 3000);
+                } else if (statusCode === 440 || statusCode === 515) {
+                    // الكود 440 يعني تضارب في البث، سنقوم بإعادة الاتصال بعد تأخير بسيط
+                    console.log(`🔄 [WhatsApp] تضارب مؤقت في الاتصال (كود: ${statusCode}). إعادة المحاولة الذكية...`);
+                    setTimeout(connectToWhatsApp, 10000); // تأخير 10 ثوانٍ لفك التضارب
                 } else if (shouldReconnect) {
                     console.log(`📡 [WhatsApp] إعادة الاتصال (كود: ${statusCode})...`);
                     setTimeout(connectToWhatsApp, 5000);
@@ -219,7 +228,7 @@ async function connectToWhatsApp() {
         });
     } catch (error) {
         console.error("❌ خطأ في المحرك:", error.message);
-        setTimeout(connectToWhatsApp, 10000);
+        setTimeout(connectToWhatsApp, 15000);
     }
 }
 
