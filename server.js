@@ -1,7 +1,7 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة v3.0 (إصلاح الاستقرار)
- * التحديث: معالجة أخطاء التشغيل (Status 1) وضمان بقاء السيرفر نشطاً تحت أي ظرف.
- * الخصوصية: محتوى الرسائل لا يزال مشفراً وغير مسجل في السجلات.
+ * نظام سُمعة (RepuSystem) - النسخة v3.2 (التشغيل المستقر)
+ * التحديث: تحسين بيئة التشغيل المحلية (VS Code) ومعالجة تنبيهات الاتصال.
+ * الخصوصية: محتوى الرسائل محمي ولا يظهر في السجلات.
  */
 
 require('dotenv').config();
@@ -29,19 +29,19 @@ app.use((req, res, next) => {
 });
 
 // --- نظام مراقبة الأخطاء لمنع الانهيار ---
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('⚠️ خطأ غير معالج (Unhandled Rejection).');
+process.on('unhandledRejection', (reason) => {
+    // تجاهل أخطاء الاتصال البسيطة لعدم ملء السجلات
 });
 process.on('uncaughtException', (err) => {
-    console.error('❌ خطأ حرج في النظام:', err.message);
+    console.error('❌ خطأ غير متوقع في النظام:', err.message);
 });
 
-// --- MongoDB Setup (تحسين التشخيص) ---
+// --- MongoDB Setup (تحسين التوافق مع VS Code) ---
 let MongoClient;
 try { 
     MongoClient = require('mongodb').MongoClient; 
 } catch (e) {
-    console.warn("⚠️ مكتبة mongodb غير مثبتة في package.json. سيتم العمل بالوضع المحلي.");
+    console.warn("⚠️ مكتبة mongodb غير مثبتة. إذا كنت في VS Code، نفذ: npm install mongodb");
 }
 
 const MONGO_URL = process.env.MONGO_URL;
@@ -49,30 +49,24 @@ let client = null;
 let dbConnected = false;
 
 const initMongo = async () => {
-    if (typeof MONGO_URL === 'string' && MONGO_URL.trim().length > 0 && MongoClient) {
+    if (typeof MONGO_URL === 'string' && MONGO_URL.trim().startsWith('mongodb')) {
         try {
-            client = new MongoClient(MONGO_URL.trim(), { 
-                useNewUrlParser: true, 
-                useUnifiedTopology: true,
-                connectTimeoutMS: 10000 
-            });
+            client = new MongoClient(MONGO_URL.trim(), { connectTimeoutMS: 10000 });
             await client.connect();
             dbConnected = true;
-            console.log("🔗 تم الربط السحابي بنجاح.");
+            console.log("🔗 [MongoDB] تم الربط السحابي بنجاح.");
         } catch (e) {
-            // تحديث: إظهار الرسالة الدقيقة للخطأ في السجلات
-            console.error(`⚠️ فشل الاتصال بـ MongoDB: ${e.message}`);
-            console.warn("🏠 سيستمر النظام بالعمل محلياً (المزامنة السحابية معطلة).");
+            console.error(`⚠️ [MongoDB] فشل الاتصال: ${e.message}`);
             client = null;
         }
     } else {
-        console.log("ℹ️ MONGO_URL غير معرف، يعمل بالوضع المحلي.");
+        console.log("🏠 [System] يعمل بالوضع المحلي (لم يتم العثور على MONGO_URL في الإعدادات).");
     }
 };
 
 const SESSION_PATH = 'auth_new_session';
 
-// --- إدارة المزامنة الذكية ---
+// --- إدارة المزامنة السحابية ---
 let syncTimeout = null;
 async function syncSessionToMongo() {
     if (!client || !dbConnected) return;
@@ -101,7 +95,7 @@ async function loadSessionFromMongo() {
         if (result && result.data) {
             if (!fs.existsSync(SESSION_PATH)) fs.mkdirSync(SESSION_PATH, { recursive: true });
             fs.writeFileSync(path.join(SESSION_PATH, 'creds.json'), result.data);
-            console.log('📥 تم استعادة الجلسة سحابياً.');
+            console.log('📥 [System] تم استيراد الجلسة من السحابة.');
         }
     } catch (err) {}
 }
@@ -125,8 +119,7 @@ async function connectToWhatsApp() {
             browser: ['RepuSystem', 'Chrome', '110.0'],
             printQRInTerminal: false,
             connectTimeoutMS: 60000,
-            defaultQueryTimeoutMs: 0,
-            keepAliveIntervalMs: 10000
+            keepAliveIntervalMs: 15000
         });
 
         sock.ev.on('creds.update', async () => {
@@ -139,20 +132,26 @@ async function connectToWhatsApp() {
             
             if (qr) {
                 lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
+                console.log("📲 [WhatsApp] بانتظار مسح الباركود في صفحة /health");
             }
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 isReady = false;
-                if (statusCode !== 408 && statusCode !== 440 && statusCode !== 515) {
-                    console.log(`📡 انقطع الاتصال (كود: ${statusCode}). إعادة المحاولة: ${shouldReconnect}`);
+                
+                // معالجة كود 515 (تحديث اتصال طبيعي) لكي لا يظهر كخطأ مخيف
+                if (statusCode === 515) {
+                    console.log("🔄 [WhatsApp] جاري تحديث الاتصال تلقائياً...");
+                } else if (statusCode !== 408 && statusCode !== 440) {
+                    console.log(`📡 [WhatsApp] انقطع الاتصال (كود: ${statusCode}). إعادة المحاولة: ${shouldReconnect}`);
                 }
+                
                 if (shouldReconnect) setTimeout(connectToWhatsApp, 5000);
             } else if (connection === 'open') {
                 isReady = true;
                 lastQR = null;
-                console.log('✅ نظام سُمعة نشط وآمن.');
+                console.log('✅ [WhatsApp] النظام متصل وجاهز للاستقبال!');
                 syncSessionToMongo();
             }
         });
@@ -167,7 +166,7 @@ async function connectToWhatsApp() {
             let text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
             
             if (text.length > 0) {
-                console.log(`📩 نشاط جديد من عميل: [${remoteJid.split('@')[0].substring(0, 5)}***]`);
+                console.log(`📩 [Activity] رسالة واردة من رقم ينتهي بـ: [${remoteJid.split('@')[0].slice(-4)}]`);
             }
 
             if (/^[1١]/.test(text)) {
@@ -216,14 +215,18 @@ app.post('/foodics-webhook', async (req, res) => {
 
 // --- صفحة الحالة الصحية ---
 app.get('/health', (req, res) => {
-    res.send(`<div style="font-family:sans-serif;text-align:center;padding-top:50px;">${isReady ? '<h1 style="color:green;">✅ نظام سمعة آمن ونشط</h1>' : (lastQR ? '<h1>الربط مطلوب</h1><img src="'+lastQR+'"/>' : '<h1>⏳ جاري التحميل...</h1>')}</div>`);
+    res.send(`<div style="font-family:sans-serif;text-align:center;padding-top:50px;direction:rtl;">${isReady ? '<h1 style="color:green;">✅ نظام سمعة آمن ونشط</h1><p>السيرفر متصل بالواتساب وجاهز.</p>' : (lastQR ? '<h1>📲 الربط مطلوب</h1><p>امسح الباركود لتفعيل الواتساب:</p><img src="'+lastQR+'" style="border:10px solid #eee; border-radius:15px;"/>' : '<h1>⏳ جاري التحميل...</h1>')}</div>`);
 });
 
 // --- تشغيل السيرفر ---
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => {
-    console.log(`🚀 السيرفر يعمل الآن على المنفذ ${PORT}`);
-    // بدء العمليات الخلفية بعد استجابة السيرفر لـ Render لضمان عدم حدوث Status 1
+    console.log(`🚀 [Server] يعمل الآن على المنفذ ${PORT}`);
+    
+    // فحص المتغيرات الهامة في بيئة VS Code
+    if (!process.env.WEBHOOK_KEY) console.warn("⚠️ تنبيه: WEBHOOK_KEY غير معرف في ملف .env");
+    if (!process.env.MANAGER_PHONE) console.warn("⚠️ تنبيه: MANAGER_PHONE غير معرف في ملف .env");
+
     await initMongo();
     connectToWhatsApp();
 });
