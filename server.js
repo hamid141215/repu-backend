@@ -1,6 +1,6 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة v3.7 (نسخة استقرار البث)
- * التحديث: معالجة الكود 440 (Stream Error) وتحسين استجابة الإصدار لتجنب انقطاع الاتصال المتكرر.
+ * نظام سُمعة (RepuSystem) - النسخة v3.8 (نسخة استقرار التشفير والبث)
+ * التحديث: معالجة خطأ (Bad MAC) و (Code 440) عبر نظام التطهير التلقائي ومنع تعدد النسخ.
  * الخصوصية: نظام التشفير ومنع المجموعات لا يزال مفعلاً بأعلى المعايير.
  */
 
@@ -31,10 +31,16 @@ app.use((req, res, next) => {
 
 // --- نظام مراقبة الأخطاء الاستباقي ---
 process.on('unhandledRejection', (reason) => {
-    // تجاهل أخطاء الشبكة البسيطة
+    // في حال وجود خطأ Bad MAC عميق، نراقب هنا إذا كان السبب هو التشفير
+    if (reason && reason.toString().includes('Bad MAC')) {
+        console.error('⚠️ [Security] اكتشاف تلف في مفاتيح التشفير (Bad MAC).');
+    }
 });
 process.on('uncaughtException', (err) => {
     console.error('❌ خطأ غير متوقع:', err.message);
+    if (err.message.includes('Bad MAC')) {
+        clearInvalidSession().then(() => process.exit(1)); // إعادة تشغيل نظيفة
+    }
 });
 
 // --- إعدادات MongoDB الحديثة ---
@@ -132,6 +138,12 @@ let lastQR = null;
 const processedWebhooks = new Map();
 
 async function connectToWhatsApp() {
+    // منع تداخل النسخ (Fix for 440)
+    if (sock) {
+        try { sock.logout(); } catch(e) {}
+        sock = null;
+    }
+
     try {
         if (dbConnected) {
             await loadSessionFromMongo();
@@ -139,9 +151,8 @@ async function connectToWhatsApp() {
 
         const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
         
-        // تحسين: جلب أحدث إصدار مع معالجة فشل الجلب لتجنب كود 440
-        const { version, isLatest } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1017531287], isLatest: false }));
-        console.log(`📡 [System] استخدام إصدار واتساب: ${version.join('.')} (الأحدث: ${isLatest})`);
+        // استخدام إصدار ثابت وموثوق لتجنب مشاكل فك التشفير
+        const version = [2, 3000, 1017531287];
 
         sock = makeWASocket({
             version,
@@ -150,9 +161,10 @@ async function connectToWhatsApp() {
             browser: Browsers.appropriate('Chrome'),
             printQRInTerminal: false,
             connectTimeoutMS: 60000,
-            defaultQueryTimeoutMs: 0,
-            keepAliveIntervalMs: 30000, // زيادة فترة النبض لتقليل تضارب البث
-            generateHighQualityLinkPreview: false
+            keepAliveIntervalMs: 30000, 
+            generateHighQualityLinkPreview: false,
+            // تقليل احتمالية أخطاء فك التشفير
+            shouldIgnoreJid: (jid) => jid.endsWith('@g.us')
         });
 
         sock.ev.on('creds.update', async () => {
@@ -170,18 +182,21 @@ async function connectToWhatsApp() {
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const errorMessage = lastDisconnect?.error?.message || "";
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 isReady = false;
                 
-                if (statusCode === 401) {
-                    console.log("❌ [WhatsApp] الجلسة تالفة. جاري الإصلاح التلقائي...");
+                // التعامل مع تلف الجلسة (401 أو Bad MAC)
+                if (statusCode === 401 || errorMessage.includes('Bad MAC') || errorMessage.includes('decryption')) {
+                    console.log("❌ [WhatsApp] الجلسة تالفة (التشفير متضرر). جاري المسح وإعادة التشغيل...");
                     await clearInvalidSession();
                     setTimeout(connectToWhatsApp, 3000);
-                } else if (statusCode === 440 || statusCode === 515) {
-                    // الكود 440 يعني تضارب في البث، سنقوم بإعادة الاتصال بعد تأخير بسيط
-                    console.log(`🔄 [WhatsApp] تضارب مؤقت في الاتصال (كود: ${statusCode}). إعادة المحاولة الذكية...`);
-                    setTimeout(connectToWhatsApp, 10000); // تأخير 10 ثوانٍ لفك التضارب
-                } else if (shouldReconnect) {
+                } 
+                else if (statusCode === 440 || statusCode === 515) {
+                    console.log(`🔄 [WhatsApp] تضارب في البث (كود: ${statusCode}). إعادة محاولة هادئة...`);
+                    setTimeout(connectToWhatsApp, 15000); // تأخير أطول لفك التضارب
+                } 
+                else if (shouldReconnect) {
                     console.log(`📡 [WhatsApp] إعادة الاتصال (كود: ${statusCode})...`);
                     setTimeout(connectToWhatsApp, 5000);
                 }
@@ -228,6 +243,7 @@ async function connectToWhatsApp() {
         });
     } catch (error) {
         console.error("❌ خطأ في المحرك:", error.message);
+        if (error.message.includes('Bad MAC')) await clearInvalidSession();
         setTimeout(connectToWhatsApp, 15000);
     }
 }
@@ -236,25 +252,17 @@ async function connectToWhatsApp() {
 app.post('/foodics-webhook', async (req, res) => {
     const apiKey = req.query.key;
     if (apiKey !== process.env.WEBHOOK_KEY) {
-        console.warn("⚠️ محاولة وصول غير مصرح بها (مفتاح خاطئ)");
         return res.status(401).send('Unauthorized');
     }
     
     const { customer, status, id, hid } = req.body;
     
-    if (!customer?.phone) {
-        console.warn("⚠️ ويب هوك مستلم بدون رقم جوال للعميل.");
-        return res.status(400).send('Missing data');
-    }
+    if (!customer?.phone) return res.status(400).send('Missing data');
 
-    // سجل تشخيصي
     console.log(`⚙️ استلام طلب لـ: ${customer.name || 'مجهول'} | الحالة: ${status} | الربط: ${isReady ? 'متصل' : 'مقطوع'}`);
 
     const orderId = id || hid || customer.phone;
-    if (processedWebhooks.has(orderId)) {
-        console.log(`ℹ️ تجاهل ويب هوك مكرر للطلب: ${orderId}`);
-        return res.send('Duplicate ignored');
-    }
+    if (processedWebhooks.has(orderId)) return res.send('Duplicate ignored');
     
     processedWebhooks.set(orderId, Date.now());
     setTimeout(() => processedWebhooks.delete(orderId), 600000);
@@ -277,15 +285,9 @@ app.post('/foodics-webhook', async (req, res) => {
                         text: `مرحباً ${customer.name || 'عميلنا العزيز'}، نورتنا! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
                     }); 
                     console.log(`✅ تمت عملية الإرسال بنجاح إلى ${cleanPhone}`);
-                } else {
-                    console.error("❌ فشل الإرسال: فقد البوت الاتصال أثناء فترة الانتظار.");
                 }
-            } catch (e) { 
-                console.error(`❌ خطأ أثناء إرسال الرسالة لـ ${cleanPhone}:`, e.message); 
-            }
+            } catch (e) { console.error(`❌ خطأ إرسال: ${e.message}`); }
         }, 3000);
-    } else {
-        console.log(`ℹ️ تجاهل الطلب لأن الحالة ليست 'إغلاق' (الحالة الحالية: ${status})`);
     }
     res.send('OK');
 });
@@ -297,7 +299,7 @@ app.get('/health', (req, res) => {
             ${isReady ? 
                 '<h1 style="color:green;">✅ نظام سمعة متصل ونشط</h1><p>السيرفر جاهز لاستقبال الطلبات.</p>' : 
                 (lastQR ? 
-                    '<h1>📲 الربط مطلوب</h1><p>يرجى مسح الباركود لتفعيل الواتساب:</p><img src="'+lastQR+'" style="border:10px solid #eee; border-radius:15px;"/>' : 
+                    '<h1>📲 الربط مطلوب</h1><p>تم اكتشاف تلف في الجلسة السابقة لضمان أمنك. يرجى مسح الباركود الجديد:</p><img src="'+lastQR+'" style="border:10px solid #eee; border-radius:15px;"/>' : 
                     '<h1>⏳ جاري تجهيز المحرك...</h1>')
             }
             <p style="color:gray; font-size:12px; margin-top:30px;">
@@ -307,7 +309,6 @@ app.get('/health', (req, res) => {
     `);
 });
 
-// --- تشغيل السيرفر ---
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => {
     console.log(`🚀 [Server] يعمل الآن على المنفذ ${PORT}`);
