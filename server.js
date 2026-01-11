@@ -1,6 +1,6 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة المستقرة v2.1
- * تم إضافة دعم CORS للسماح للمحاكي بالاتصال بالسيرفر
+ * نظام سُمعة (RepuSystem) - النسخة الاحترافية v2.2
+ * تحديث: تحسين أداء المزامنة وتقليل ضجيج السجلات (Logs)
  */
 
 require('dotenv').config();
@@ -18,21 +18,18 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 
-// --- حماية وإصلاح CORS (ضروري لعمل المحاكي) ---
+// دعم CORS للمحاكي
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
 });
 
 let MongoClient;
 try {
-    const mongodb = require('mongodb');
-    MongoClient = mongodb.MongoClient;
+    MongoClient = require('mongodb').MongoClient;
 } catch (e) {
     console.warn("⚠️ مكتبة mongodb غير مثبتة.");
 }
@@ -49,34 +46,44 @@ if (typeof MONGO_URL === 'string' && MONGO_URL.trim().length > 0) {
     try {
         if (MongoClient) {
             client = new MongoClient(MONGO_URL.trim());
-            console.log("🔗 محرك MongoDB جاهز.");
+            console.log("🔗 محرك MongoDB جاهز للمزامنة.");
         }
     } catch (e) {
-        console.error("❌ خطأ في الرابط:", e.message);
+        console.error("❌ خطأ في رابط MongoDB.");
     }
 }
 
 const dbName = 'whatsapp_bot';
 const collectionName = 'session_data';
 
+// --- تحسين الخبير: وظيفة المزامنة الذكية لمنع التكرار المزعج ---
+let syncTimeout = null;
 async function syncSessionToMongo() {
     if (!client) return;
-    try {
-        const credsPath = path.join(SESSION_PATH, 'creds.json');
-        if (fs.existsSync(credsPath)) {
-            const credsData = fs.readFileSync(credsPath, 'utf-8');
-            await client.connect();
-            const db = client.db(dbName);
-            const collection = db.collection(collectionName);
-            await collection.updateOne(
-                { _id: 'whatsapp_creds' },
-                { $set: { data: credsData, updatedAt: new Date() } },
-                { upsert: true }
-            );
+    
+    // تأخير الحفظ لثانية واحدة لجمع كل التحديثات الصغيرة في عملية واحدة
+    if (syncTimeout) clearTimeout(syncTimeout);
+    
+    syncTimeout = setTimeout(async () => {
+        try {
+            const credsPath = path.join(SESSION_PATH, 'creds.json');
+            if (fs.existsSync(credsPath)) {
+                const credsData = fs.readFileSync(credsPath, 'utf-8');
+                await client.connect();
+                const db = client.db(dbName);
+                const collection = db.collection(collectionName);
+                await collection.updateOne(
+                    { _id: 'whatsapp_creds' },
+                    { $set: { data: credsData, updatedAt: new Date() } },
+                    { upsert: true }
+                );
+                // تقليل تكرار الرسالة في السجلات
+                console.log('☁️ تم تأمين نسخة الجلسة سحابياً.');
+            }
+        } catch (err) {
+            console.error('❌ خطأ في المزامنة السحابية.');
         }
-    } catch (err) {
-        console.error('❌ خطأ مزامنة:', err.message);
-    }
+    }, 2000); // انتظر ثانيتين قبل الحفظ
 }
 
 async function loadSessionFromMongo() {
@@ -89,9 +96,11 @@ async function loadSessionFromMongo() {
         if (result && result.data) {
             if (!fs.existsSync(SESSION_PATH)) fs.mkdirSync(SESSION_PATH, { recursive: true });
             fs.writeFileSync(path.join(SESSION_PATH, 'creds.json'), result.data);
-            console.log('📥 تم استعادة الجلسة سحابياً.');
+            console.log('📥 تم استعادة الجلسة من السحابة بنجاح.');
         }
-    } catch (err) {}
+    } catch (err) {
+        console.log('ℹ️ لا توجد بيانات سحابية سابقة.');
+    }
 }
 
 async function connectToWhatsApp() {
@@ -110,18 +119,26 @@ async function connectToWhatsApp() {
 
         sock.ev.on('creds.update', async () => {
             await saveCreds();
-            if (client) await syncSessionToMongo();
+            if (client) syncSessionToMongo();
         });
 
         sock.ev.on('connection.update', (update) => {
             const { connection, lastDisconnect, qr } = update;
             if (qr) lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
+            
             if (connection === 'close') {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 isReady = false;
+                
+                // تجاهل الأخطاء البسيطة في السجلات
+                if (statusCode !== 408 && statusCode !== 440) {
+                    console.log(`📡 انقطع الاتصال (كود: ${statusCode}). إعادة المحاولة...`);
+                }
+                
                 if (shouldReconnect) connectToWhatsApp();
             } else if (connection === 'open') {
-                console.log('✅ البوت جاهز!');
+                console.log('✅ نظام سُمعة متصل الآن وجاهز!');
                 isReady = true;
                 lastQR = null;
                 if (client) syncSessionToMongo();
@@ -141,7 +158,7 @@ async function connectToWhatsApp() {
                 const managerPhone = process.env.MANAGER_PHONE;
                 if (managerPhone && isReady) {
                     const managerJid = `${managerPhone.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
-                    await sock.sendMessage(managerJid, { text: `⚠️ تقييم سلبي من: ${remoteJid.split('@')[0]}` });
+                    await sock.sendMessage(managerJid, { text: `⚠️ تنبيه: تقييم سلبي من الرقم ${remoteJid.split('@')[0]}` });
                 }
             }
         });
@@ -157,7 +174,7 @@ app.post('/foodics-webhook', async (req, res) => {
         const jid = `${cleanPhone}@s.whatsapp.net`;
         setTimeout(async () => {
             try { await sock.sendMessage(jid, { text: `مرحباً ${customer.name || 'عميلنا العزيز'}، كيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` }); } 
-            catch (e) { console.error("Webhook Send Error:", e.message); }
+            catch (e) { console.error("Webhook Send Error."); }
         }, 3000);
     }
     res.send('OK');
@@ -165,7 +182,7 @@ app.post('/foodics-webhook', async (req, res) => {
 
 app.get('/health', (req, res) => {
     let html = '<div style="font-family:sans-serif; text-align:center; padding-top:50px;">';
-    html += isReady ? '<h1 style="color:green;">✅ نظام سمعة متصل</h1>' : (lastQR ? `<h1>الربط مطلوب</h1><img src="${lastQR}" />` : '<h1>⏳ جاري التحميل...</h1>');
+    html += isReady ? '<h1 style="color:green;">✅ نظام سمعة نشط</h1>' : (lastQR ? `<h1>الربط مطلوب</h1><img src="${lastQR}" />` : '<h1>⏳ جاري التحميل...</h1>');
     html += '</div>';
     res.send(html);
 });
