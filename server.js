@@ -1,6 +1,6 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة الاحترافية v2.2
- * تحديث: تحسين أداء المزامنة وتقليل ضجيج السجلات (Logs)
+ * نظام سُمعة (RepuSystem) - النسخة الاحترافية v2.3
+ * تحديث: تحسين معالجة الردود (1/2) وإضافة سجلات مراقبة الرسائل
  */
 
 require('dotenv').config();
@@ -56,14 +56,11 @@ if (typeof MONGO_URL === 'string' && MONGO_URL.trim().length > 0) {
 const dbName = 'whatsapp_bot';
 const collectionName = 'session_data';
 
-// --- تحسين الخبير: وظيفة المزامنة الذكية لمنع التكرار المزعج ---
+// --- المزامنة الذكية ---
 let syncTimeout = null;
 async function syncSessionToMongo() {
     if (!client) return;
-    
-    // تأخير الحفظ لثانية واحدة لجمع كل التحديثات الصغيرة في عملية واحدة
     if (syncTimeout) clearTimeout(syncTimeout);
-    
     syncTimeout = setTimeout(async () => {
         try {
             const credsPath = path.join(SESSION_PATH, 'creds.json');
@@ -77,13 +74,12 @@ async function syncSessionToMongo() {
                     { $set: { data: credsData, updatedAt: new Date() } },
                     { upsert: true }
                 );
-                // تقليل تكرار الرسالة في السجلات
                 console.log('☁️ تم تأمين نسخة الجلسة سحابياً.');
             }
         } catch (err) {
             console.error('❌ خطأ في المزامنة السحابية.');
         }
-    }, 2000); // انتظر ثانيتين قبل الحفظ
+    }, 2000);
 }
 
 async function loadSessionFromMongo() {
@@ -130,12 +126,9 @@ async function connectToWhatsApp() {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 isReady = false;
-                
-                // تجاهل الأخطاء البسيطة في السجلات
                 if (statusCode !== 408 && statusCode !== 440) {
                     console.log(`📡 انقطع الاتصال (كود: ${statusCode}). إعادة المحاولة...`);
                 }
-                
                 if (shouldReconnect) connectToWhatsApp();
             } else if (connection === 'open') {
                 console.log('✅ نظام سُمعة متصل الآن وجاهز!');
@@ -148,17 +141,41 @@ async function connectToWhatsApp() {
         sock.ev.on('messages.upsert', async (m) => {
             const msg = m.messages[0];
             if (!msg.message || msg.key.fromMe) return;
+
             const remoteJid = msg.key.remoteJid;
-            const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
             
+            // تحسين استخراج النص للتعامل مع مختلف أنواع الرسائل
+            let text = "";
+            if (msg.message.conversation) {
+                text = msg.message.conversation;
+            } else if (msg.message.extendedTextMessage) {
+                text = msg.message.extendedTextMessage.text;
+            } else if (msg.message.buttonsResponseMessage) {
+                text = msg.message.buttonsResponseMessage.selectedButtonId;
+            } else if (msg.message.listResponseMessage) {
+                text = msg.message.listResponseMessage.singleSelectReply.selectedRowId;
+            }
+            
+            text = text.trim();
+
+            if (text) {
+                console.log(`📩 رسالة واردة من [${remoteJid.split('@')[0]}]: ${text}`);
+            }
+
+            // الاستجابة للتقييم
             if (/^[1١]/.test(text)) {
-                await sock.sendMessage(remoteJid, { text: "يسعدنا جداً أن التجربة كانت ممتازة! 😍 كرمًا شاركنا تقييمك هنا:\n📍 [رابط جوجل ماب]" });
-            } else if (/^[2٢]/.test(text)) {
-                await sock.sendMessage(remoteJid, { text: "نعتذر منك جداً 😔، سيتم التواصل معك من قبل الإدارة فوراً." });
+                console.log("⭐ العميل اختار تقييم ممتاز (1)");
+                await sock.sendMessage(remoteJid, { text: "يسعدنا جداً أن التجربة كانت ممتازة! 😍 كرمًا منك شاركنا تقييمك هنا لتصل تجربتك للجميع:\n📍 [رابط جوجل ماب الخاص بك]" });
+            } 
+            else if (/^[2٢]/.test(text)) {
+                console.log("⚠️ العميل اختار يحتاج تحسين (2)");
+                await sock.sendMessage(remoteJid, { text: "نعتذر منك جداً 😔، هدفنا رضاك التام. سيتم التواصل معك من قبل الإدارة فوراً لحل أي مشكلة واجهتها." });
+                
                 const managerPhone = process.env.MANAGER_PHONE;
                 if (managerPhone && isReady) {
                     const managerJid = `${managerPhone.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
-                    await sock.sendMessage(managerJid, { text: `⚠️ تنبيه: تقييم سلبي من الرقم ${remoteJid.split('@')[0]}` });
+                    await sock.sendMessage(managerJid, { text: `⚠️ *تنبيه تقييم سلبي*:\nالعميل: ${remoteJid.split('@')[0]}\nاختار "يحتاج تحسين". يرجى التواصل معه فوراً.` });
+                    console.log(`📢 تم إرسال تنبيه للمدير على الرقم: ${managerPhone}`);
                 }
             }
         });
@@ -172,6 +189,7 @@ app.post('/foodics-webhook', async (req, res) => {
     if ((status === 4 || status === 'closed' || status === 'completed') && isReady) {
         const cleanPhone = customer.phone.replace(/[^0-9]/g, '');
         const jid = `${cleanPhone}@s.whatsapp.net`;
+        console.log(`📤 جاري إرسال طلب التقييم للعميل: ${customer.name || cleanPhone}`);
         setTimeout(async () => {
             try { await sock.sendMessage(jid, { text: `مرحباً ${customer.name || 'عميلنا العزيز'}، كيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` }); } 
             catch (e) { console.error("Webhook Send Error."); }
