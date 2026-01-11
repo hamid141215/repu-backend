@@ -1,6 +1,6 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة v4.6 (النسخة العالمية الهجينة)
- * التحديث: إضافة واجهة إرسال يدوية مدمجة في صفحة الحالة لخدمة المطاعم التي لا تملك نظام ربط آلي.
+ * نظام سُمعة (RepuSystem) - النسخة v4.7 (نسخة الجدولة الذكية)
+ * التحديث: إضافة نظام تأخير (Delay) لإرسال الرسائل بعد فترة تجهيز الطلب وتجربته.
  * الخصوصية: نظام التشفير ومنع المجموعات لا يزال مفعلاً بأعلى المعايير.
  */
 
@@ -19,6 +19,9 @@ const path = require('path');
 
 const app = express();
 app.use(express.json());
+
+// --- إعدادات الوقت الافتراضية (بالدقائق) ---
+const EVALUATION_DELAY_MINUTES = parseInt(process.env.DELAY_MINUTES) || 20; // الافتراضي 20 دقيقة
 
 // --- إعدادات CORS الشاملة ---
 app.use((req, res, next) => {
@@ -188,19 +191,31 @@ async function connectToWhatsApp() {
     }
 }
 
-// --- دالة الإرسال المركزية ---
-const sendEvaluationMessage = async (phone, name) => {
-    if (!isReady || !sock) return { success: false, error: 'البوت غير متصل حالياً' };
+// --- دالة الإرسال المركزية مع نظام الجدولة ---
+const scheduleEvaluationMessage = async (phone, name, delayMins = EVALUATION_DELAY_MINUTES) => {
+    const delayMs = delayMins * 60 * 1000;
     const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const jid = `${cleanPhone}@s.whatsapp.net`;
-    try {
-        await sock.sendMessage(jid, { 
-            text: `مرحباً ${name || 'عميلنا العزيز'}، نورتنا! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
-        });
-        return { success: true };
-    } catch (e) {
-        return { success: false, error: e.message };
-    }
+    
+    console.log(`🕒 [Scheduler] تمت جدولة رسالة لـ ${cleanPhone} بعد ${delayMins} دقيقة.`);
+
+    setTimeout(async () => {
+        if (!isReady || !sock) {
+            console.error(`❌ [Scheduler] تعذر الإرسال لـ ${cleanPhone}: البوت غير متصل حالياً.`);
+            return;
+        }
+        
+        const jid = `${cleanPhone}@s.whatsapp.net`;
+        try {
+            await sock.sendMessage(jid, { 
+                text: `مرحباً ${name || 'عميلنا العزيز'}، نورتنا! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
+            });
+            console.log(`✅ [Scheduler] تم إرسال الرسالة المجدولة إلى: ${cleanPhone}`);
+        } catch (e) {
+            console.error(`❌ [Scheduler] فشل الإرسال لـ ${cleanPhone}:`, e.message);
+        }
+    }, delayMs);
+
+    return { success: true, scheduledFor: delayMins };
 };
 
 // --- [1] استقبال بيانات فودكس ---
@@ -213,8 +228,10 @@ app.post('/foodics-webhook', async (req, res) => {
     if (processedWebhooks.has(orderId)) return res.send('Duplicate');
     processedWebhooks.set(orderId, Date.now());
     setTimeout(() => processedWebhooks.delete(orderId), 600000);
+
     if (status == 4 || status === 'closed' || status === 'completed') {
-        setTimeout(() => sendEvaluationMessage(customer.phone, customer.name), 3000);
+        // جدولة الإرسال التلقائي بعد تأكيد الطلب بفترة (مثلاً 20 دقيقة)
+        scheduleEvaluationMessage(customer.phone, customer.name);
     }
     res.send('OK');
 });
@@ -225,9 +242,10 @@ app.post('/send-evaluation', async (req, res) => {
     if (apiKey !== process.env.WEBHOOK_KEY) return res.status(401).send('Unauthorized');
     const { phone, name } = req.body;
     if (!phone) return res.status(400).json({ error: 'رقم الجوال مطلوب' });
-    const result = await sendEvaluationMessage(phone, name);
-    if (result.success) res.json({ message: 'تم الإرسال بنجاح' });
-    else res.status(500).json({ error: result.error });
+    
+    // جدولة الإرسال اليدوي
+    const result = await scheduleEvaluationMessage(phone, name);
+    res.json({ message: `تمت الجدولة بنجاح، ستصل الرسالة بعد ${result.scheduledFor} دقيقة.` });
 });
 
 app.get('/health', (req, res) => {
@@ -238,12 +256,12 @@ app.get('/health', (req, res) => {
             ${statusHtml}
             <hr style="margin:30px 0; border:0; border-top:1px solid #eee;">
             <div style="background:#f9f9f9; padding:20px; border-radius:15px; border:1px solid #eee;">
-                <h3>🚀 إرسال تقييم يدوي</h3>
-                <p style="font-size:12px; color:gray;">(للمطاعم بدون فودكس أو لطلبات هنقرستيشن)</p>
+                <h3>🚀 إرسال تقييم (جدولة ذكية)</h3>
+                <p style="font-size:12px; color:gray;">(سيتم إرسال الرسالة بعد ${EVALUATION_DELAY_MINUTES} دقيقة من الآن)</p>
                 <input type="text" id="phone" placeholder="9665xxxxxxxx" style="width:90%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ccc;">
                 <input type="text" id="name" placeholder="اسم العميل (اختياري)" style="width:90%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ccc;">
-                <button onclick="send()" id="btn" style="width:90%; padding:12px; background:#10b981; color:white; border:none; border-radius:8px; cursor:pointer; font-bold;">إرسال الآن</button>
-                <p id="msg" style="margin-top:10px; font-weight:bold;"></p>
+                <button onclick="send()" id="btn" style="width:90%; padding:12px; background:#10b981; color:white; border:none; border-radius:8px; cursor:pointer; font-bold;">إرسال للعميل</button>
+                <p id="msg" style="margin-top:15px; font-weight:bold; font-size:14px;"></p>
             </div>
             <script>
                 async function send() {
@@ -252,17 +270,23 @@ app.get('/health', (req, res) => {
                     const btn = document.getElementById('btn');
                     const msg = document.getElementById('msg');
                     if(!phone) return alert('ضع رقم الجوال');
-                    btn.disabled = true; btn.innerText = 'جاري الإرسال...';
+                    btn.disabled = true; btn.innerText = 'جاري الجدولة...';
                     try {
                         const res = await fetch('/send-evaluation?key=${process.env.WEBHOOK_KEY}', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({phone, name})
                         });
-                        if(res.ok) { msg.style.color='green'; msg.innerText='✅ تم الإرسال!'; }
-                        else { msg.style.color='red'; msg.innerText='❌ فشل الإرسال'; }
+                        const data = await res.json();
+                        if(res.ok) { 
+                            msg.style.color='green'; 
+                            msg.innerText='✅ ' + data.message; 
+                            document.getElementById('phone').value = '';
+                            document.getElementById('name').value = '';
+                        }
+                        else { msg.style.color='red'; msg.innerText='❌ فشل الجدولة'; }
                     } catch(e) { msg.innerText='خطأ في الاتصال'; }
-                    btn.disabled = false; btn.innerText = 'إرسال الآن';
+                    btn.disabled = false; btn.innerText = 'إرسال للعميل';
                 }
             </script>
         </div>
