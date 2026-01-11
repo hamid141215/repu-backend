@@ -1,6 +1,6 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة v3.5 (نسخة التعويض التلقائي)
- * التحديث: إضافة ميزة إرسال كود خصم آلي للعملاء عند التقييم السلبي لامتصاص الغضب.
+ * نظام سُمعة (RepuSystem) - النسخة v3.6 (نسخة تشخيص الإرسال)
+ * التحديث: إضافة سجلات تفصيلية لتتبع مسار الويب هوك ومعالجة أسباب عدم وصول الرسائل.
  * الخصوصية: نظام التشفير ومنع المجموعات لا يزال مفعلاً بأعلى المعايير.
  */
 
@@ -30,7 +30,7 @@ app.use((req, res, next) => {
 
 // --- نظام مراقبة الأخطاء الاستباقي ---
 process.on('unhandledRejection', (reason) => {
-    // تجاهل أخطاء الشبكة البسيطة لمنع امتلاء السجلات
+    // تجاهل أخطاء الشبكة البسيطة
 });
 process.on('uncaughtException', (err) => {
     console.error('❌ خطأ غير متوقع:', err.message);
@@ -200,10 +200,8 @@ async function connectToWhatsApp() {
                 await sock.sendMessage(remoteJid, { text: "يسعدنا جداً أن التجربة كانت ممتازة! 😍 كرمًا منك شاركنا تقييمك هنا لتصل تجربتك للجميع:\n📍 [رابط جوجل ماب الخاص بك]" });
             } 
             else if (/^[2٢]/.test(text)) {
-                // جلب كود الخصم من متغيرات البيئة أو استخدام كود افتراضي
                 const discountCode = process.env.DISCOUNT_CODE || "WELCOME10";
                 
-                // إرسال رسالة الاعتذار والتعويض التلقائي للعميل
                 await sock.sendMessage(remoteJid, { 
                     text: `نعتذر منك جداً 😔، هدفنا رضاك التام. وتقديراً منا لصدقك، نهديك كود خصم خاص بطلبك القادم:\n\n🎫 كود الخصم: *${discountCode}*\n\nسيتم التواصل معك من قبل الإدارة فوراً لحل أي ملاحظة واجهتها.` 
                 });
@@ -228,22 +226,40 @@ async function connectToWhatsApp() {
 // --- استقبال بيانات فودكس (Webhook) ---
 app.post('/foodics-webhook', async (req, res) => {
     const apiKey = req.query.key;
-    if (apiKey !== process.env.WEBHOOK_KEY) return res.status(401).send('Unauthorized');
+    if (apiKey !== process.env.WEBHOOK_KEY) {
+        console.warn("⚠️ محاولة وصول غير مصرح بها (مفتاح خاطئ)");
+        return res.status(401).send('Unauthorized');
+    }
     
     const { customer, status, id, hid } = req.body;
-    if (!customer?.phone) return res.status(400).send('Missing data');
+    
+    if (!customer?.phone) {
+        console.warn("⚠️ ويب هوك مستلم بدون رقم جوال للعميل.");
+        return res.status(400).send('Missing data');
+    }
+
+    // سجل تشخيصي
+    console.log(`⚙️ استلام طلب لـ: ${customer.name || 'مجهول'} | الحالة: ${status} | الربط: ${isReady ? 'متصل' : 'مقطوع'}`);
 
     const orderId = id || hid || customer.phone;
-    if (processedWebhooks.has(orderId)) return res.send('Duplicate ignored');
+    if (processedWebhooks.has(orderId)) {
+        console.log(`ℹ️ تجاهل ويب هوك مكرر للطلب: ${orderId}`);
+        return res.send('Duplicate ignored');
+    }
     
     processedWebhooks.set(orderId, Date.now());
     setTimeout(() => processedWebhooks.delete(orderId), 600000);
 
-    if ((status === 4 || status === 'closed' || status === 'completed') && isReady) {
+    if ((status === 4 || status === 'closed' || status === 'completed')) {
+        if (!isReady) {
+            console.error("❌ تعذر الإرسال: البوت غير متصل بالواتساب حالياً.");
+            return res.send('Bot not ready');
+        }
+
         const cleanPhone = customer.phone.replace(/[^0-9]/g, '');
         const jid = `${cleanPhone}@s.whatsapp.net`;
         
-        console.log(`📤 إرسال طلب تقييم: ${customer.name || cleanPhone}`);
+        console.log(`📤 جاري معالجة إرسال الرسالة إلى: ${jid}`);
         
         setTimeout(async () => {
             try { 
@@ -251,9 +267,16 @@ app.post('/foodics-webhook', async (req, res) => {
                     await sock.sendMessage(jid, { 
                         text: `مرحباً ${customer.name || 'عميلنا العزيز'}، نورتنا! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
                     }); 
+                    console.log(`✅ تمت عملية الإرسال بنجاح إلى ${cleanPhone}`);
+                } else {
+                    console.error("❌ فشل الإرسال: فقد البوت الاتصال أثناء فترة الانتظار.");
                 }
-            } catch (e) {}
+            } catch (e) { 
+                console.error(`❌ خطأ أثناء إرسال الرسالة لـ ${cleanPhone}:`, e.message); 
+            }
         }, 3000);
+    } else {
+        console.log(`ℹ️ تجاهل الطلب لأن الحالة ليست 'إغلاق' (الحالة الحالية: ${status})`);
     }
     res.send('OK');
 });
