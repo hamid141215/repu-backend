@@ -1,17 +1,10 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة الماستر v5.4 المستقرة
- * التحسينات: معالجة ذرية للإحصائيات، تنظيف الأرقام تلقائياً، ثبات الإعدادات.
+ * نظام سُمعة (RepuSystem) - النسخة v5.5 (إصلاح توافق ESM)
+ * تم تعديل طريقة استيراد Baileys لتجنب خطأ ERR_REQUIRE_ESM
  */
 
 require('dotenv').config();
 const express = require('express');
-const { 
-    default: makeWASocket, 
-    useMultiFileAuthState, 
-    DisconnectReason, 
-    fetchLatestBaileysVersion,
-    Browsers
-} = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs');
 const path = require('path');
@@ -63,8 +56,17 @@ async function updateStats(type) {
     } catch (e) {}
 }
 
-// --- محرك الواتساب ---
+// --- محرك الواتساب (نسخة ESM المتوافقة) ---
 async function connectToWhatsApp() {
+    // استيراد المكتبة ديناميكياً لحل مشكلة ERR_REQUIRE_ESM
+    const { 
+        default: makeWASocket, 
+        useMultiFileAuthState, 
+        DisconnectReason, 
+        fetchLatestBaileysVersion,
+        Browsers 
+    } = await import('@whiskeysockets/baileys');
+
     if (sock) {
         try { sock.terminate(); } catch (e) {}
         sock = null;
@@ -123,7 +125,10 @@ async function connectToWhatsApp() {
                 await sock.sendMessage(remoteJid, { text: "في خدمتك دائماً، نورتنا! ❤️" });
             }
         });
-    } catch (e) { setTimeout(connectToWhatsApp, 10000); }
+    } catch (e) { 
+        console.error("WhatsApp Error:", e);
+        setTimeout(connectToWhatsApp, 10000); 
+    }
 }
 
 // --- الجدولة ---
@@ -188,20 +193,20 @@ app.get('/admin', async (req, res) => {
             <header class="flex justify-between items-center mb-8">
                 <h1 class="text-3xl font-black italic tracking-tighter text-gray-800">REPU<span class="text-green-600 font-normal">SYSTEM</span></h1>
                 <div class="px-4 py-2 rounded-full shadow-sm bg-white border font-bold text-xs uppercase">
-                    الحالة: ${isReady ? '<span class="text-green-600">نشط ✅</span>' : '<span class="text-red-500">جاري الربط ⏳</span>'}
+                    الحالة: ${isReady ? '<span class="text-green-600 font-bold">نشط ✅</span>' : '<span class="text-red-500 font-bold">جاري الربط ⏳</span>'}
                 </div>
             </header>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-blue-500">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-blue-500 text-center">
                     <p class="text-xs text-gray-400 font-bold mb-1">إجمالي الطلبات</p>
                     <h2 class="text-3xl font-black">${stats.totalOrders}</h2>
                 </div>
-                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-green-500">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-green-500 text-center">
                     <p class="text-xs text-gray-400 font-bold mb-1">ممتاز (1)</p>
                     <h2 class="text-3xl font-black text-green-600">${stats.positive}</h2>
                 </div>
-                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-red-500">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-red-500 text-center">
                     <p class="text-xs text-gray-400 font-bold mb-1">شكاوى (2)</p>
                     <h2 class="text-3xl font-black text-red-600">${stats.negative}</h2>
                 </div>
@@ -209,24 +214,24 @@ app.get('/admin', async (req, res) => {
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                 <div class="bg-white p-8 rounded-3xl shadow-sm border">
-                    <h3 class="font-bold mb-6 text-blue-600 italic border-b pb-2"><i class="fas fa-paper-plane ml-2"></i>إرسال سريع (هايبرد)</h3>
+                    <h3 class="font-bold mb-6 text-blue-600 italic border-b pb-2"><i class="fas fa-paper-plane ml-2"></i>إرسال يدوي سريع</h3>
                     <input id="p" type="text" placeholder="رقم الجوال (9665...)" class="w-full p-4 mb-3 bg-gray-50 rounded-2xl outline-none border focus:border-blue-400 font-bold">
                     <input id="n" type="text" placeholder="اسم العميل (اختياري)" class="w-full p-4 mb-6 bg-gray-50 rounded-2xl outline-none border focus:border-blue-400 font-bold">
                     <button onclick="send()" id="btnS" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold hover:bg-blue-700 transition">جدولة الرسالة الآن</button>
                 </div>
 
-                <div class="bg-white p-8 rounded-3xl shadow-sm border">
+                <div class="bg-white p-8 rounded-3xl shadow-sm border text-right">
                     <h3 class="font-bold mb-6 text-green-600 italic border-b pb-2"><i class="fas fa-cog ml-2"></i>إعدادات النظام</h3>
                     <label class="text-xs font-bold text-gray-400 mr-2 italic">رابط جوجل ماب</label>
-                    <input id="gl" type="text" value="${settings.googleLink}" class="w-full p-3 mb-4 bg-gray-50 rounded-xl outline-none border text-sm">
+                    <input id="gl" type="text" value="${settings.googleLink}" class="w-full p-3 mb-4 bg-gray-50 rounded-xl outline-none border text-sm text-left font-mono">
                     <div class="flex gap-4">
                         <div class="w-1/2">
                             <label class="text-xs font-bold text-gray-400 mr-2 italic">كود الخصم</label>
-                            <input id="dc" type="text" value="${settings.discountCode}" class="w-full p-3 bg-gray-50 rounded-xl outline-none border text-sm font-bold uppercase">
+                            <input id="dc" type="text" value="${settings.discountCode}" class="w-full p-3 bg-gray-50 rounded-xl outline-none border text-sm font-bold uppercase text-center">
                         </div>
                         <div class="w-1/2">
                             <label class="text-xs font-bold text-gray-400 mr-2 italic">الانتظار (دقيقة)</label>
-                            <input id="dl" type="number" value="${settings.delay}" class="w-full p-3 bg-gray-50 rounded-xl outline-none border text-sm font-bold text-center">
+                            <input id="dl" type="number" value="${settings.delay}" class="w-full p-3 bg-gray-50 rounded-xl outline-none border text-sm font-bold text-center font-mono">
                         </div>
                     </div>
                     <button onclick="save()" id="btnV" class="w-full bg-green-600 text-white p-4 mt-6 rounded-2xl font-bold hover:bg-green-700 transition">تحديث الإعدادات</button>
@@ -282,6 +287,6 @@ app.get('/admin', async (req, res) => {
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => {
     await initMongo();
-    connectToWhatsApp();
-    console.log(`🚀 RepuSystem v5.4 Ready on Port ${PORT}`);
+    await connectToWhatsApp();
+    console.log(`🚀 RepuSystem v5.5 Ready on Port ${PORT}`);
 });
