@@ -134,20 +134,31 @@ async function connectToWhatsApp() {
     }
 }
 
-// --- الجدولة والـ Webhooks ---
+// --- الجدولة الذكية مع منع التدفق المفاجئ ---
 const scheduleMessage = async (phone, name) => {
     const settings = await getSettings();
     const cleanP = phone.replace(/[^0-9]/g, '');
-    const delayMs = (settings.delay || 20) * 60 * 1000;
+    
+    // إضافة "تفاوت عشوائي" بين دقيقة و 5 دقائق فوق الوقت الأصلي
+    // لمنع إرسال رسائل كثيرة في نفس اللحظة وقت الذروة
+    const randomJitter = Math.floor(Math.random() * (5 * 60 * 1000)); 
+    const baseDelay = (settings.delay || 20) * 60 * 1000;
+    const finalDelay = baseDelay + randomJitter;
+
+    console.log(`🕒 Scheduled: ${cleanP} | Delay: ${Math.round(finalDelay/60000)} mins (with jitter)`);
+
     setTimeout(async () => {
         if (isReady && sock) {
             try {
+                // إضافة تأخير إضافي بسيط جداً (ثوانٍ) قبل الإرسال الفعلي
+                await new Promise(res => setTimeout(res, Math.random() * 5000));
+                
                 await sock.sendMessage(`${cleanP}@s.whatsapp.net`, { 
                     text: `مرحباً ${name || 'عميلنا العزيز'}، نورتنا! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
                 });
-            } catch (e) {}
+            } catch (e) { console.error("Send Error:", e); }
         }
-    }, delayMs);
+    }, finalDelay);
 };
 
 app.post('/send-evaluation', async (req, res) => {
