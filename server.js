@@ -1,7 +1,11 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة v5.5 (إصلاح توافق ESM)
- * تم تعديل طريقة استيراد Baileys لتجنب خطأ ERR_REQUIRE_ESM
+ * نظام سُمعة (RepuSystem) - النسخة v5.6 (إصلاح مشكلة Crypto & Subtle)
  */
+
+// --- إصلاح مشكلة Crypto لنسخ Node القديمة ---
+if (!globalThis.crypto) {
+    globalThis.crypto = require('crypto').webcrypto;
+}
 
 require('dotenv').config();
 const express = require('express');
@@ -56,9 +60,8 @@ async function updateStats(type) {
     } catch (e) {}
 }
 
-// --- محرك الواتساب (نسخة ESM المتوافقة) ---
+// --- محرك الواتساب ---
 async function connectToWhatsApp() {
-    // استيراد المكتبة ديناميكياً لحل مشكلة ERR_REQUIRE_ESM
     const { 
         default: makeWASocket, 
         useMultiFileAuthState, 
@@ -131,12 +134,11 @@ async function connectToWhatsApp() {
     }
 }
 
-// --- الجدولة ---
+// --- الجدولة والـ Webhooks ---
 const scheduleMessage = async (phone, name) => {
     const settings = await getSettings();
     const cleanP = phone.replace(/[^0-9]/g, '');
     const delayMs = (settings.delay || 20) * 60 * 1000;
-    
     setTimeout(async () => {
         if (isReady && sock) {
             try {
@@ -148,7 +150,6 @@ const scheduleMessage = async (phone, name) => {
     }, delayMs);
 };
 
-// --- Webhooks ---
 app.post('/send-evaluation', async (req, res) => {
     if (req.query.key !== process.env.WEBHOOK_KEY) return res.sendStatus(401);
     const { phone, name } = req.body;
@@ -178,7 +179,6 @@ app.get('/admin', async (req, res) => {
     if (dbConnected) {
         stats = await client.db('whatsapp_bot').collection('analytics').findOne({ _id: 'daily_stats' }) || stats;
     }
-    
     res.send(`
     <!DOCTYPE html>
     <html lang="ar" dir="rtl">
@@ -196,87 +196,44 @@ app.get('/admin', async (req, res) => {
                     الحالة: ${isReady ? '<span class="text-green-600 font-bold">نشط ✅</span>' : '<span class="text-red-500 font-bold">جاري الربط ⏳</span>'}
                 </div>
             </header>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-blue-500 text-center">
-                    <p class="text-xs text-gray-400 font-bold mb-1">إجمالي الطلبات</p>
-                    <h2 class="text-3xl font-black">${stats.totalOrders}</h2>
-                </div>
-                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-green-500 text-center">
-                    <p class="text-xs text-gray-400 font-bold mb-1">ممتاز (1)</p>
-                    <h2 class="text-3xl font-black text-green-600">${stats.positive}</h2>
-                </div>
-                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-red-500 text-center">
-                    <p class="text-xs text-gray-400 font-bold mb-1">شكاوى (2)</p>
-                    <h2 class="text-3xl font-black text-red-600">${stats.negative}</h2>
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-center">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-blue-500"><p class="text-xs text-gray-400 font-bold mb-1 uppercase">الطلبات</p><h2 class="text-3xl font-black">${stats.totalOrders}</h2></div>
+                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-green-500"><p class="text-xs text-gray-400 font-bold mb-1 uppercase">ممتاز</p><h2 class="text-3xl font-black text-green-600">${stats.positive}</h2></div>
+                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-red-500"><p class="text-xs text-gray-400 font-bold mb-1 uppercase">شكاوى</p><h2 class="text-3xl font-black text-red-600">${stats.negative}</h2></div>
             </div>
-
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                 <div class="bg-white p-8 rounded-3xl shadow-sm border">
-                    <h3 class="font-bold mb-6 text-blue-600 italic border-b pb-2"><i class="fas fa-paper-plane ml-2"></i>إرسال يدوي سريع</h3>
-                    <input id="p" type="text" placeholder="رقم الجوال (9665...)" class="w-full p-4 mb-3 bg-gray-50 rounded-2xl outline-none border focus:border-blue-400 font-bold">
-                    <input id="n" type="text" placeholder="اسم العميل (اختياري)" class="w-full p-4 mb-6 bg-gray-50 rounded-2xl outline-none border focus:border-blue-400 font-bold">
-                    <button onclick="send()" id="btnS" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold hover:bg-blue-700 transition">جدولة الرسالة الآن</button>
+                    <h3 class="font-bold mb-6 text-blue-600 border-b pb-2 italic"><i class="fas fa-paper-plane ml-2"></i>إرسال يدوي</h3>
+                    <input id="p" type="text" placeholder="9665..." class="w-full p-4 mb-3 bg-gray-50 rounded-2xl border font-bold">
+                    <input id="n" type="text" placeholder="الاسم (اختياري)" class="w-full p-4 mb-6 bg-gray-50 rounded-2xl border font-bold">
+                    <button onclick="send()" id="btnS" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold hover:bg-blue-700 transition">إرسال الآن</button>
                 </div>
-
-                <div class="bg-white p-8 rounded-3xl shadow-sm border text-right">
-                    <h3 class="font-bold mb-6 text-green-600 italic border-b pb-2"><i class="fas fa-cog ml-2"></i>إعدادات النظام</h3>
-                    <label class="text-xs font-bold text-gray-400 mr-2 italic">رابط جوجل ماب</label>
-                    <input id="gl" type="text" value="${settings.googleLink}" class="w-full p-3 mb-4 bg-gray-50 rounded-xl outline-none border text-sm text-left font-mono">
+                <div class="bg-white p-8 rounded-3xl shadow-sm border">
+                    <h3 class="font-bold mb-6 text-green-600 border-b pb-2 italic"><i class="fas fa-cog ml-2"></i>الإعدادات</h3>
+                    <label class="text-xs font-bold text-gray-400">رابط جوجل</label>
+                    <input id="gl" type="text" value="${settings.googleLink}" class="w-full p-3 mb-4 bg-gray-50 rounded-xl border text-sm">
                     <div class="flex gap-4">
-                        <div class="w-1/2">
-                            <label class="text-xs font-bold text-gray-400 mr-2 italic">كود الخصم</label>
-                            <input id="dc" type="text" value="${settings.discountCode}" class="w-full p-3 bg-gray-50 rounded-xl outline-none border text-sm font-bold uppercase text-center">
-                        </div>
-                        <div class="w-1/2">
-                            <label class="text-xs font-bold text-gray-400 mr-2 italic">الانتظار (دقيقة)</label>
-                            <input id="dl" type="number" value="${settings.delay}" class="w-full p-3 bg-gray-50 rounded-xl outline-none border text-sm font-bold text-center font-mono">
-                        </div>
+                        <div class="w-1/2"><label class="text-xs font-bold text-gray-400 uppercase text-center block">الكود</label><input id="dc" type="text" value="${settings.discountCode}" class="w-full p-3 bg-gray-50 rounded-xl border text-sm font-bold uppercase text-center"></div>
+                        <div class="w-1/2"><label class="text-xs font-bold text-gray-400 uppercase text-center block">الدقائق</label><input id="dl" type="number" value="${settings.delay}" class="w-full p-3 bg-gray-50 rounded-xl border text-sm font-bold text-center"></div>
                     </div>
-                    <button onclick="save()" id="btnV" class="w-full bg-green-600 text-white p-4 mt-6 rounded-2xl font-bold hover:bg-green-700 transition">تحديث الإعدادات</button>
+                    <button onclick="save()" id="btnV" class="w-full bg-green-600 text-white p-4 mt-6 rounded-2xl font-bold hover:bg-green-700 transition">حفظ</button>
                 </div>
             </div>
-            
             <div class="bg-white p-10 rounded-3xl shadow-sm border text-center">
-                 ${lastQR ? `
-                    <p class="mb-6 font-bold text-amber-600 italic underline decoration-amber-200">⚠️ يرجى مسح الرمز للربط</p>
-                    <div class="bg-white p-4 inline-block rounded-2xl border-8 border-gray-50 shadow-inner">
-                        <img src="${lastQR}" class="mx-auto w-48">
-                    </div>
-                 ` : isReady ? `
-                    <div class="text-green-600 py-6">
-                        <i class="fas fa-check-circle text-7xl mb-4"></i>
-                        <p class="text-xl font-black">الواتساب متصل ونشط</p>
-                    </div>
-                 ` : '<p class="py-10 text-gray-400 animate-pulse font-bold italic text-lg">⏳ جاري تحميل المحرك...</p>'}
+                 ${lastQR ? `<p class="mb-6 font-bold text-amber-600 animate-pulse italic">⚠️ يرجى مسح الرمز للربط</p><div class="p-4 inline-block bg-white rounded-2xl shadow-inner border-8 border-gray-50"><img src="${lastQR}" class="mx-auto w-48"></div>` : isReady ? `<div class="text-green-600 py-6"><i class="fas fa-check-circle text-7xl mb-4"></i><p class="text-xl font-black">الواتساب متصل</p></div>` : '<p class="py-10 text-gray-400 animate-pulse font-bold italic">⏳ جاري التحميل...</p>'}
             </div>
         </div>
-
         <script>
             async function send() {
-                const phone = document.getElementById('p').value;
-                const name = document.getElementById('n').value;
-                if(!phone) return alert('الرجاء إدخال الرقم');
-                document.getElementById('btnS').disabled = true;
-                const res = await fetch('/send-evaluation?key=${process.env.WEBHOOK_KEY}', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({phone, name})
-                });
-                if(res.ok) alert('✅ تمت الجدولة بنجاح'); else alert('❌ فشل الإرسال');
-                document.getElementById('btnS').disabled = false;
+                const phone = document.getElementById('p').value; const name = document.getElementById('n').value;
+                if(!phone) return alert('أدخل الرقم');
+                const res = await fetch('/send-evaluation?key=${process.env.WEBHOOK_KEY}', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({phone, name}) });
+                if(res.ok) alert('✅ تمت الجدولة'); else alert('❌ خطأ');
             }
             async function save() {
-                const googleLink = document.getElementById('gl').value;
-                const discountCode = document.getElementById('dc').value;
-                const delay = document.getElementById('dl').value;
-                document.getElementById('btnV').disabled = true;
-                const res = await fetch('/update-settings?key=${process.env.WEBHOOK_KEY}', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({googleLink, discountCode, delay})
-                });
-                if(res.ok) { alert('✅ تم تحديث الإعدادات'); location.reload(); } else alert('❌ فشل الحفظ');
-                document.getElementById('btnV').disabled = false;
+                const googleLink = document.getElementById('gl').value; const discountCode = document.getElementById('dc').value; const delay = document.getElementById('dl').value;
+                const res = await fetch('/update-settings?key=${process.env.WEBHOOK_KEY}', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({googleLink, discountCode, delay}) });
+                if(res.ok) { alert('✅ تم التحديث'); location.reload(); } else alert('❌ فشل الحفظ');
             }
         </script>
     </body>
@@ -288,5 +245,5 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => {
     await initMongo();
     await connectToWhatsApp();
-    console.log(`🚀 RepuSystem v5.5 Ready on Port ${PORT}`);
+    console.log(`🚀 RepuSystem v5.6 Ready on Port ${PORT}`);
 });
