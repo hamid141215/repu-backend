@@ -102,14 +102,16 @@ async function connectToWhatsApp() {
     const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1017531287] }));
 
     sock = makeWASocket({
-        version, auth: state,
+        version,
+        auth: state,
         logger: pino({ level: 'silent' }),
         browser: Browsers.macOS('Desktop'),
-        printQRInTerminal: false,
-        // تحسينات المزامنة لتقليل ضغط الرام والمعالج
-        shouldSyncHistoryMessage: () => false,
-        syncFullHistory: false,
-        markOnlineOnConnect: true
+        // هذه الخيارات تقلل من احتمالية حدوث خطأ Connection Closed
+        shouldSyncHistoryMessage: () => false, // منع مزامنة الرسائل القديمة المزعجة
+        syncFullHistory: false, // تحميل الأساسيات فقط
+        linkPreviewHighQuality: false, // تقليل حجم البيانات المرسلة
+        connectTimeoutMs: 60000, // إعطاء وقت أطول للاتصال (دقيقة كاملة)
+        defaultQueryTimeoutMs: 0 // منع انتهاء وقت الطلبات أثناء الزحام
     });
 
     sock.ev.on('creds.update', async () => { await saveCreds(); await syncSessionToMongo(); });
