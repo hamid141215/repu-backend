@@ -7,10 +7,10 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 
-const SESSION_PATH = 'auth_new_session';
+const SESSION_PATH = 'session_v9_final'; // مسار جديد لضمان ظهور الباركود
 let sock = null, isReady = false, lastQR = null;
 
-// --- MongoDB ---
+// --- MongoDB Setup ---
 const { MongoClient } = require('mongodb');
 const MONGO_URL = process.env.MONGO_URL;
 let client = null, dbConnected = false;
@@ -29,19 +29,19 @@ async function syncSession() {
     const credsPath = path.join(SESSION_PATH, 'creds.json');
     if (fs.existsSync(credsPath)) {
         const data = fs.readFileSync(credsPath, 'utf-8');
-        await client.db('whatsapp_bot').collection('session').updateOne({ _id: 'creds' }, { $set: { data } }, { upsert: true });
+        await client.db('whatsapp_bot').collection('session_v9').updateOne({ _id: 'creds' }, { $set: { data } }, { upsert: true });
     }
 }
 async function restoreSession() {
     if (!dbConnected) return;
-    const res = await client.db('whatsapp_bot').collection('session').findOne({ _id: 'creds' });
+    const res = await client.db('whatsapp_bot').collection('session_v9').findOne({ _id: 'creds' });
     if (res) {
         if (!fs.existsSync(SESSION_PATH)) fs.mkdirSync(SESSION_PATH, { recursive: true });
         fs.writeFileSync(path.join(SESSION_PATH, 'creds.json'), res.data);
     }
 }
 
-// --- WhatsApp Logic ---
+// --- WhatsApp Core ---
 async function connectToWhatsApp() {
     const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = await import('@whiskeysockets/baileys');
     await restoreSession();
@@ -50,7 +50,7 @@ async function connectToWhatsApp() {
     sock = makeWASocket({
         auth: state,
         logger: pino({ level: 'error' }),
-        browser: Browsers.macOS('Desktop'),
+        browser: Browsers.macOS('MawjatSystem'),
         printQRInTerminal: false,
         shouldSyncHistoryMessage: () => false
     });
@@ -59,18 +59,12 @@ async function connectToWhatsApp() {
 
     sock.ev.on('connection.update', (u) => {
         const { connection, lastDisconnect, qr } = u;
-        if (qr) {
-            lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
-        }
+        if (qr) lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
         if (connection === 'open') { isReady = true; lastQR = null; console.log("✅ Ready."); }
         if (connection === 'close') {
             isReady = false;
             const code = lastDisconnect?.error?.output?.statusCode;
-            if (code === DisconnectReason.loggedOut || code === 401) {
-                fs.rmSync(SESSION_PATH, { recursive: true, force: true });
-                if(dbConnected) client.db('whatsapp_bot').collection('session').deleteOne({ _id: 'creds' });
-            }
-            setTimeout(connectToWhatsApp, 5000);
+            if (code !== DisconnectReason.loggedOut) setTimeout(connectToWhatsApp, 5000);
         }
     });
 
@@ -99,17 +93,19 @@ async function connectToWhatsApp() {
     });
 }
 
-// --- API ---
-app.get('/api/status', (req, res) => {
-    res.json({ isReady, lastQR });
+// --- UI: Landing Page ---
+app.get('/', (req, res) => {
+    res.send(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>موجة الصمت</title><script src="https://cdn.tailwindcss.com"></script><style>body{font-family:'Cairo',sans-serif;}</style></head><body><nav class="p-6 flex justify-between items-center max-w-6xl mx-auto"><h1 class="text-2xl font-black italic">MAWJAT <span class="text-blue-600 font-normal">ALSAMT</span></h1><a href="/admin" class="bg-gray-100 px-5 py-2 rounded-full font-bold text-sm">دخول العملاء</a></nav><header class="py-20 text-center px-4"><h2 class="text-5xl md:text-7xl font-black mb-6 leading-tight">سيطر على سمعة مطعمك <br><span class="text-blue-600">بصمت واحترافية</span></h2><p class="text-xl text-gray-500 max-w-2xl mx-auto mb-10">حوّل تجارب عملائك إلى تقييمات 5 نجوم على جوجل ماب، واستقبل الشكاوى داخلياً قبل أن يراها الجميع.</p><a href="/admin" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl shadow-blue-100 transition hover:scale-105">ابدأ الآن</a></header></body></html>`);
 });
 
-// --- UI: Admin Dashboard (With Auto-Refresh) ---
+// --- UI: Admin Dashboard ---
+app.get('/api/status', (req, res) => res.json({ isReady, lastQR }));
+
 app.get('/admin', async (req, res) => {
     const s = dbConnected ? await client.db('whatsapp_bot').collection('config').findOne({ _id: 'global_settings' }) : { googleLink: "#", discountCode: "OFFER10", delay: 0 };
     const evals = dbConnected ? await client.db('whatsapp_bot').collection('evaluations').find().sort({ sentAt: -1 }).limit(10).toArray() : [];
 
-    res.send(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>لوحة التحكم</title><script src="https://cdn.tailwindcss.com"></script><style>body{font-family:'Cairo',sans-serif;background-color:#f8fafc;}</style></head><body class="p-4 md:p-8 text-right"><div class="max-w-5xl mx-auto space-y-8">
+    res.send(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>لوحة التحكم</title><script src="https://cdn.tailwindcss.com"></script><style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');body{font-family:'Cairo',sans-serif;background-color:#f8fafc;}</style></head><body class="p-4 md:p-8 text-right"><div class="max-w-5xl mx-auto space-y-8">
         <header class="flex justify-between items-center">
             <h1 class="text-2xl font-black italic uppercase">MAWJAT <span class="text-blue-600">ALSAMT</span></h1>
             <div id="status-badge" class="bg-white px-5 py-2 rounded-2xl border text-[10px] font-bold flex items-center gap-2">
@@ -120,73 +116,62 @@ app.get('/admin', async (req, res) => {
 
         <div class="grid md:grid-cols-2 gap-8">
             <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border text-center space-y-4">
-                <h3 class="font-bold text-blue-600 italic">📥 إرسال تقييم جديد</h3>
-                <input id="p" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border font-bold text-center outline-none">
-                <input id="n" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 rounded-2xl border font-bold text-center outline-none">
-                <button onclick="send()" id="sb" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold shadow-lg">إرسال الآن</button>
+                <h3 class="font-bold text-blue-600 italic uppercase">📥 إرسال تقييم جديد</h3>
+                <input id="p" placeholder="رقم الجوال 05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border font-bold text-center outline-none">
+                <input id="n" placeholder="اسم العميل (اختياري)" class="w-full p-4 bg-gray-50 rounded-2xl border font-bold text-center outline-none">
+                <button onclick="send()" id="sb" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold shadow-lg transition active:scale-95">إرسال الآن</button>
             </div>
-            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border text-center space-y-4">
-                <h3 class="font-bold text-green-600 italic text-right">⚙️ الإعدادات</h3>
+            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border text-center space-y-4 text-right">
+                <h3 class="font-bold text-green-600 italic">⚙️ الإعدادات</h3>
                 <input id="gl" value="${s.googleLink}" class="w-full p-3 bg-gray-50 rounded-xl text-[10px] border text-center">
                 <div class="flex gap-2">
                     <input id="dc" value="${s.discountCode}" class="w-1/2 p-3 bg-gray-50 rounded-xl text-center font-bold text-blue-600 border">
                     <input id="dl" value="${s.delay}" class="w-1/2 p-3 bg-gray-50 rounded-xl text-center font-bold border">
                 </div>
-                <button onclick="save()" class="w-full bg-black text-white p-4 rounded-2xl font-bold">حفظ</button>
+                <button onclick="save()" class="w-full bg-black text-white p-4 rounded-2xl font-bold active:scale-95 transition">حفظ الإعدادات</button>
             </div>
         </div>
 
-        <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border overflow-hidden">
-            <h3 class="font-bold mb-6 text-gray-800">📊 التقارير</h3>
-            <div class="overflow-x-auto"><table class="w-full text-right text-sm"><thead><tr class="border-b text-gray-400"><th class="pb-4">العميل</th><th class="pb-4 text-center">الحالة</th><th class="pb-4 text-left">الرد</th></tr></thead><tbody>
-            ${evals.map(e => `<tr class="border-b hover:bg-gray-50"><td class="py-4 font-bold text-gray-700">${e.phone}</td><td class="py-4 text-center"><span class="px-2 py-1 rounded-lg text-[10px] font-bold ${e.status === 'replied' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}">${e.status === 'replied' ? 'تم الرد' : 'بانتظار الرد'}</span></td><td class="py-4 font-black text-left ${e.answer === '1' ? 'text-green-500' : 'text-red-500'}">${e.answer ? (e.answer === '1' ? 'ممتاز 😍' : 'تحسين 😔') : '-'}</td></tr>`).join('')}
-            </tbody></table></div>
+        <div id="qr-container" class="bg-white p-8 rounded-[2.5rem] border-2 border-dashed border-gray-100 flex flex-col items-center justify-center min-h-[250px]">
+            <p class="text-gray-400 animate-pulse font-bold">بانتظار استجابة السيرفر...</p>
         </div>
 
-        <div id="qr-container" class="bg-white p-8 rounded-[2.5rem] border-2 border-dashed border-gray-100 flex flex-col items-center justify-center min-h-[250px]">
-            <p class="text-gray-400 animate-pulse font-bold text-xs">جاري الاتصال بالسحابة...</p>
+        <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border overflow-hidden">
+            <h3 class="font-bold mb-6 text-gray-800">📊 التقرير المباشر لرضا العملاء</h3>
+            <div class="overflow-x-auto"><table class="w-full text-right text-sm"><thead><tr class="border-b text-gray-400"><th class="pb-4">العميل</th><th class="pb-4 text-center">الحالة</th><th class="pb-4 text-left">الرد</th></tr></thead><tbody>
+            ${evals.map(e => `<tr class="border-b hover:bg-gray-50"><td class="py-4 font-bold text-gray-700">${e.phone}</td><td class="py-4 text-center"><span class="px-2 py-1 rounded-lg text-[10px] font-bold ${e.status === 'replied' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}">${e.status === 'replied' ? 'تم الرد' : 'بانتظار الرد'}</span></td><td class="py-4 font-black text-left ${e.answer === '1' ? 'text-green-500' : 'text-red-500'}">${e.answer ? (e.answer === '1' ? 'ممتاز 😍' : 'يحتاج تحسين 😔') : '-'}</td></tr>`).join('')}
+            </tbody></table></div>
         </div>
     </div>
     <script>
     async function checkStatus() {
-        const res = await fetch('/api/status');
-        const data = await res.json();
-        const dot = document.getElementById('status-dot');
-        const text = document.getElementById('status-text');
+        const res = await fetch('/api/status'); const data = await res.json();
+        const dot = document.getElementById('status-dot'); const text = document.getElementById('status-text');
         const qrContainer = document.getElementById('qr-container');
-
         if(data.isReady) {
-            dot.className = 'w-2 h-2 rounded-full bg-green-500 animate-pulse';
-            text.innerText = 'متصل بنجاح';
+            dot.className = 'w-2 h-2 rounded-full bg-green-500 animate-pulse'; text.innerText = 'متصل';
             qrContainer.innerHTML = '<p class="text-green-600 font-black tracking-widest text-lg">System Active ✅</p>';
         } else if(data.lastQR) {
-            dot.className = 'w-2 h-2 rounded-full bg-amber-500';
-            text.innerText = 'بانتظار المسح';
-            qrContainer.innerHTML = '<div><img src="' + data.lastQR + '" class="mx-auto w-44 rounded-xl shadow-2xl border-4 border-white"><p class="text-amber-600 font-bold mt-4 animate-bounce text-center">امسح الكود الآن</p></div>';
-        } else {
-            dot.className = 'w-2 h-2 rounded-full bg-red-500 animate-pulse';
-            text.innerText = 'جاري التحميل...';
+            dot.className = 'w-2 h-2 rounded-full bg-amber-500'; text.innerText = 'بانتظار المسح';
+            qrContainer.innerHTML = '<div><img src="' + data.lastQR + '" class="mx-auto w-44 rounded-xl shadow-2xl border-4 border-white"><p class="text-amber-600 font-bold mt-4 animate-bounce text-center uppercase text-xs">Scan Now</p></div>';
         }
     }
-    setInterval(checkStatus, 3000); // تحديث الحالة كل 3 ثوانٍ
-    
+    setInterval(checkStatus, 3000);
     async function send(){const p=document.getElementById('p').value;const n=document.getElementById('n').value;if(!p)return alert('أدخل الرقم');const res=await fetch('/send-evaluation?key=${process.env.WEBHOOK_KEY}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:p,name:n})});if(res.ok){alert('✅ تم الإرسال');location.reload();}}
     async function save(){const d={googleLink:document.getElementById('gl').value,discountCode:document.getElementById('dc').value,delay:document.getElementById('dl').value};const res=await fetch('/update-settings?key=${process.env.WEBHOOK_KEY}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(res.ok)alert('✅ تم الحفظ');}
     </script></body></html>`);
 });
 
-// المسارات الأخرى (Landing Page, Send-evaluation, Update-settings) تبقى كما هي في الكود السابق v8.8
-app.get('/', (req, res) => {
-    res.send(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>موجة الصمت</title><script src="https://cdn.tailwindcss.com"></script><style>body{font-family:'Cairo',sans-serif;}</style></head><body><nav class="p-6 flex justify-between items-center max-w-6xl mx-auto"><h1 class="text-2xl font-black italic">MAWJAT <span class="text-blue-600 font-normal">ALSAMT</span></h1><a href="/admin" class="bg-gray-100 px-5 py-2 rounded-full font-bold text-sm">دخول العملاء</a></nav><header class="py-20 text-center px-4"><h2 class="text-5xl md:text-7xl font-black mb-6 leading-tight">سيطر على سمعة مطعمك <br><span class="text-blue-600">بصمت واحترافية</span></h2><p class="text-xl text-gray-500 max-w-2xl mx-auto mb-10">حوّل تجارب عملائك إلى تقييمات 5 نجوم على جوجل ماب، واستقبل الشكاوى داخلياً قبل أن يراها الجميع.</p><a href="/admin" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl shadow-blue-100">ابدأ الآن</a></header></body></html>`);
-});
-
+// --- API Endpoints ---
 app.post('/send-evaluation', async (req, res) => {
     if (req.query.key !== process.env.WEBHOOK_KEY) return res.sendStatus(401);
     const { phone, name } = req.body;
     if (dbConnected) await client.db('whatsapp_bot').collection('evaluations').insertOne({ phone, status: 'sent', sentAt: new Date() });
+    
     const greetings = [`مرحباً ${name || 'عزيزنا'}، نورتنا اليوم! ✨`,`أهلاً بك ${name || 'يا غالي'}، سعدنا بزيارتك لنا. 😊`,`حيّاك الله ${name || 'عميلنا العزيز'}، نشكرك على اختيارك لنا. 🌸`];
     const randomMsg = greetings[Math.floor(Math.random() * greetings.length)];
     const s = dbConnected ? await client.db('whatsapp_bot').collection('config').findOne({ _id: 'global_settings' }) : { delay: 0 };
+
     setTimeout(async () => {
         if (isReady && sock) {
             let p = phone.replace(/[^0-9]/g, '');
