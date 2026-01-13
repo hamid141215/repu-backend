@@ -112,14 +112,18 @@ async function connectToWhatsApp() {
         shouldSyncHistoryMessage: () => false,
         syncFullHistory: false,
         markOnlineOnConnect: false,
-        connectTimeoutMs: 60000
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 0
     });
 
     sock.ev.on('creds.update', async () => { await saveCreds(); await syncSessionToMongo(); });
     
     sock.ev.on('connection.update', async (u) => {
         const { connection, lastDisconnect, qr } = u;
-        if (qr) lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
+        if (qr) {
+            // إضافة v=Date لضمان تحديث الكود فوراً في لوحة التحكم الخاصة بك
+            lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300&v=${Date.now()}`;
+        }
         if (connection === 'open') { isReady = true; lastQR = null; console.log('✅ WhatsApp Active.'); await syncSessionToMongo(); }
         if (connection === 'close') {
             isReady = false;
@@ -142,7 +146,6 @@ async function connectToWhatsApp() {
         const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
         const settings = await getSettings();
 
-        // إعداد رقم المدير من ملف .env
         const manager = process.env.MANAGER_PHONE ? process.env.MANAGER_PHONE.replace(/[^0-9]/g, '') + "@s.whatsapp.net" : null;
 
         if (/^[1١]/.test(text)) {
@@ -234,7 +237,7 @@ app.get('/admin', async (req, res) => {
                     <p class="text-xs opacity-80">إجمالي الراضين</p>
                     <h3 class="text-2xl font-black">${stats?.positive || 0} 😍</h3>
                 </div>
-                <div class="bg-red-500 text-white p-5 rounded-3xl shadow-lg">
+                <div class="bg-red-50 text-white p-5 rounded-3xl shadow-lg">
                     <p class="text-xs opacity-80">يحتاج تحسين</p>
                     <h3 class="text-2xl font-black">${stats?.negative || 0} 😔</h3>
                 </div>
