@@ -149,9 +149,24 @@ async function connectToWhatsApp() {
 // --- الجدولة والأمان ---
 const scheduleMessage = async (phone, name) => {
     const settings = await getSettings();
-    const cleanP = phone.replace(/[^0-9]/g, '');
+    
+    // تنظيف الرقم من أي مسافات أو رموز
+    let cleanP = phone.replace(/[^0-9]/g, '');
+
+    // ذكاء اصطناعي بسيط: إذا بدأ الرقم بـ 05، حوله فوراً إلى 9665
+    if (cleanP.startsWith('05')) {
+        cleanP = '966' + cleanP.substring(1);
+    }
+    
+    // إذا كان العميل أدخل الرقم ناقصاً (مثلاً 56...)، أضف له 966
+    if (cleanP.startsWith('5') && cleanP.length === 9) {
+        cleanP = '966' + cleanP;
+    }
+
     const jitter = Math.floor(Math.random() * (5 * 60 * 1000));
     const delayMs = ((parseInt(settings.delay) || 20) * 60 * 1000) + jitter;
+
+    console.log(`⏳ Scheduled message for ${cleanP} in ${settings.delay} minutes.`);
 
     setTimeout(async () => {
         if (isReady && sock) {
@@ -160,7 +175,10 @@ const scheduleMessage = async (phone, name) => {
                 await sock.sendMessage(`${cleanP}@s.whatsapp.net`, { 
                     text: `مرحباً ${name || 'عميلنا العزيز'}، نورتنا! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
                 });
-            } catch (e) {}
+                console.log(`✅ Message sent to ${cleanP}`);
+            } catch (e) {
+                console.error(`❌ Failed to send to ${cleanP}:`, e);
+            }
         }
     }, delayMs);
 };
