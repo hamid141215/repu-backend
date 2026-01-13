@@ -1,6 +1,6 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة الاحترافية v5.9
- * (Persistence + Anti-Ban + Fixed Admin Dashboard)
+ * نظام سُمعة (RepuSystem) - النسخة المستقرة v6.0
+ * تشمل: ثبات الجلسة، منع الحظر، ومعالجة الأرقام الذكية.
  */
 
 if (!globalThis.crypto) {
@@ -19,7 +19,7 @@ app.use(express.json());
 const SESSION_PATH = 'auth_new_session';
 let sock = null, isReady = false, lastQR = null;
 
-// --- إعداد MongoDB ---
+// --- إعداد MongoDB Atlas ---
 let MongoClient;
 try { MongoClient = require('mongodb').MongoClient; } catch (e) {}
 const MONGO_URL = process.env.MONGO_URL;
@@ -36,7 +36,7 @@ const initMongo = async () => {
     }
 };
 
-// --- مزامنة الجلسة مع السحاب ---
+// --- وظائف ثبات الجلسة ---
 async function syncSessionToMongo() {
     if (!client || !dbConnected) return;
     try {
@@ -90,7 +90,9 @@ async function updateStats(type) {
 async function connectToWhatsApp() {
     const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers } = await import('@whiskeysockets/baileys');
 
-    if (!fs.existsSync(path.join(SESSION_PATH, 'creds.json'))) { await loadSessionFromMongo(); }
+    if (!fs.existsSync(path.join(SESSION_PATH, 'creds.json'))) { 
+        await loadSessionFromMongo(); 
+    }
 
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
     const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1017531287] }));
@@ -104,12 +106,19 @@ async function connectToWhatsApp() {
         printQRInTerminal: false
     });
 
-    sock.ev.on('creds.update', async () => { await saveCreds(); await syncSessionToMongo(); });
+    sock.ev.on('creds.update', async () => { 
+        await saveCreds(); 
+        await syncSessionToMongo(); 
+    });
 
     sock.ev.on('connection.update', async (u) => {
         const { connection, lastDisconnect, qr } = u;
         if (qr) lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
-        if (connection === 'open') { isReady = true; lastQR = null; console.log('✅ WhatsApp Active.'); await syncSessionToMongo(); }
+        if (connection === 'open') { 
+            isReady = true; lastQR = null; 
+            console.log('✅ WhatsApp Active.'); 
+            await syncSessionToMongo(); 
+        }
         if (connection === 'close') {
             isReady = false;
             if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) setTimeout(connectToWhatsApp, 5000);
@@ -123,20 +132,15 @@ async function connectToWhatsApp() {
         const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
         const settings = await getSettings();
 
-        // --- منطق الرد الذكي على العميل ---
         if (/^[1١]/.test(text)) {
             await updateStats('positive');
-            // النص الجديد والمحفز للعميل الراضي
             const successMsg = `يسعدنا جداً أن التجربة نالت إعجابك! 😍\n\nتقييمك بـ 5 نجوم يعني لنا الكثير ويستغرق ثانية واحدة فقط:\n📍 ${settings.googleLink}`;
             await sock.sendMessage(remoteJid, { text: successMsg });
-
         } else if (/^[2٢]/.test(text)) {
             await updateStats('negative');
-            // نص العميل المستاء مع كود الخصم
             const sorryMsg = `نعتذر منك جداً 😔، نعدك بأن تجربتك القادمة ستكون أفضل.\n\nنهديك كود خصم لطلبك القادم:\n🎫 كود: *${settings.discountCode}*`;
             await sock.sendMessage(remoteJid, { text: sorryMsg });
 
-            // تنبيه المدير (إذا كان الرقم مضافاً في الإعدادات)
             if (process.env.MANAGER_PHONE) {
                 const manager = process.env.MANAGER_PHONE.replace(/[^0-9]/g, '');
                 const alertMsg = `⚠️ *تنبيه: تقييم سلبي جديد*\n\nالعميل: ${remoteJid.split('@')[0]}\nالحالة: اختار "يحتاج تحسين"\n\nيرجى التواصل معه للاحتواء: https://wa.me/${remoteJid.split('@')[0]}`;
@@ -146,22 +150,14 @@ async function connectToWhatsApp() {
     });
 }
 
-// --- الجدولة والأمان ---
+// --- الجدولة والتحقق من الأرقام ---
 const scheduleMessage = async (phone, name) => {
     const settings = await getSettings();
-    
-    // تنظيف الرقم من أي مسافات أو رموز
     let cleanP = phone.replace(/[^0-9]/g, '');
 
-    // ذكاء اصطناعي بسيط: إذا بدأ الرقم بـ 05، حوله فوراً إلى 9665
-    if (cleanP.startsWith('05')) {
-        cleanP = '966' + cleanP.substring(1);
-    }
-    
-    // إذا كان العميل أدخل الرقم ناقصاً (مثلاً 56...)، أضف له 966
-    if (cleanP.startsWith('5') && cleanP.length === 9) {
-        cleanP = '966' + cleanP;
-    }
+    // تصحيح الرقم آلياً (05 -> 9665)
+    if (cleanP.startsWith('05')) cleanP = '966' + cleanP.substring(1);
+    if (cleanP.startsWith('5') && cleanP.length === 9) cleanP = '966' + cleanP;
 
     const jitter = Math.floor(Math.random() * (5 * 60 * 1000));
     const delayMs = ((parseInt(settings.delay) || 20) * 60 * 1000) + jitter;
@@ -176,9 +172,7 @@ const scheduleMessage = async (phone, name) => {
                     text: `مرحباً ${name || 'عميلنا العزيز'}، نورتنا! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
                 });
                 console.log(`✅ Message sent to ${cleanP}`);
-            } catch (e) {
-                console.error(`❌ Failed to send to ${cleanP}:`, e);
-            }
+            } catch (e) { console.error(`❌ Failed to send to ${cleanP}:`, e); }
         }
     }, delayMs);
 };
@@ -212,55 +206,71 @@ app.get('/admin', async (req, res) => {
     <!DOCTYPE html>
     <html lang="ar" dir="rtl">
     <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script></head>
-    <body class="bg-gray-100 p-5 md:p-10 text-right font-sans">
-        <div class="max-w-4xl mx-auto text-gray-800">
+    <body class="bg-gray-100 p-5 md:p-10 text-right font-sans text-gray-800">
+        <div class="max-w-4xl mx-auto">
             <header class="flex justify-between items-center mb-10">
-                <h1 class="text-3xl font-black italic">REPU<span class="text-green-600 font-normal">SYSTEM</span></h1>
-                <div class="bg-white px-5 py-2 rounded-full shadow-sm font-bold text-xs uppercase border">
-                    ${isReady ? '<span class="text-green-600">نشط ✅</span>' : '<span class="text-red-500 animate-pulse font-bold">جاري الربط...</span>'}
+                <h1 class="text-3xl font-black italic uppercase text-gray-900">REPU<span class="text-green-600 font-normal">SYSTEM</span></h1>
+                <div class="bg-white px-4 py-2 rounded-full shadow-sm font-bold text-xs border uppercase">
+                    الحالة: ${isReady ? '<span class="text-green-600">نشط ✅</span>' : '<span class="text-red-500 animate-pulse font-bold">جاري الربط...</span>'}
                 </div>
             </header>
 
             <div class="grid grid-cols-3 gap-6 mb-10">
                 <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-blue-500"><p class="text-[10px] font-bold text-gray-400">إجمالي الطلبات</p><h2 class="text-2xl font-black">${stats.totalOrders}</h2></div>
-                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-green-500"><p class="text-[10px] font-bold text-gray-400">تقييم ممتاز</p><h2 class="text-2xl font-black text-green-600">${stats.positive}</h2></div>
-                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-red-500"><p class="text-[10px] font-bold text-gray-400">تقييم سلبي</p><h2 class="text-2xl font-black text-red-600">${stats.negative}</h2></div>
+                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-green-500"><p class="text-[10px] font-bold text-gray-400">راضي</p><h2 class="text-2xl font-black text-green-600">${stats.positive}</h2></div>
+                <div class="bg-white p-6 rounded-3xl shadow-sm border-b-4 border-red-500"><p class="text-[10px] font-bold text-gray-400">مستاء</p><h2 class="text-2xl font-black text-red-600">${stats.negative}</h2></div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
                 <div class="bg-white p-8 rounded-3xl shadow-sm border">
                     <h3 class="font-bold mb-6 text-blue-600 border-b pb-2 italic">إرسال يدوي للطلبات</h3>
-                    <input id="p" type="text" placeholder="رقم الجوال (966...)" class="w-full p-4 mb-3 bg-gray-50 rounded-2xl border font-bold text-center">
+                    <input id="p" type="text" placeholder="رقم الجوال (05xxxx)" class="w-full p-4 mb-3 bg-gray-50 rounded-2xl border font-bold text-center">
                     <input id="n" type="text" placeholder="اسم العميل (اختياري)" class="w-full p-4 mb-6 bg-gray-50 rounded-2xl border font-bold text-center">
-                    <button onclick="send()" id="sb" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold shadow-lg">جدولة الرسالة</button>
+                    <button onclick="send()" id="sb" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold shadow-lg active:scale-95 transition">جدولة الرسالة</button>
                 </div>
                 <div class="bg-white p-8 rounded-3xl shadow-sm border">
                     <h3 class="font-bold mb-6 text-green-600 border-b pb-2 italic">إعدادات النظام</h3>
                     <label class="text-[10px] font-bold text-gray-400">رابط جوجل ماب</label>
                     <input id="gl" type="text" value="${settings.googleLink}" class="w-full p-3 mb-4 bg-gray-50 rounded-xl border text-xs font-mono">
                     <div class="flex gap-4">
-                        <div class="w-1/2 text-center"><label class="text-[10px] font-bold text-gray-400 block">كود الخصم</label><input id="dc" type="text" value="${settings.discountCode}" class="w-full p-3 bg-gray-50 rounded-xl border text-sm font-bold text-center uppercase"></div>
-                        <div class="w-1/2 text-center"><label class="text-[10px] font-bold text-gray-400 block">التأخير (د)</label><input id="dl" type="number" value="${settings.delay}" class="w-full p-3 bg-gray-50 rounded-xl border text-sm font-bold text-center"></div>
+                        <div class="w-1/2 text-center"><label class="text-[10px] font-bold text-gray-400 block mb-1">كود الخصم</label><input id="dc" type="text" value="${settings.discountCode}" class="w-full p-3 bg-gray-50 rounded-xl border font-bold text-center uppercase"></div>
+                        <div class="w-1/2 text-center"><label class="text-[10px] font-bold text-gray-400 block mb-1">التأخير (د)</label><input id="dl" type="number" value="${settings.delay}" class="w-full p-3 bg-gray-50 rounded-xl border font-bold text-center"></div>
                     </div>
-                    <button onclick="save()" id="vb" class="w-full bg-green-600 text-white p-4 mt-6 rounded-2xl font-bold shadow-lg">حفظ الإعدادات</button>
+                    <button onclick="save()" id="vb" class="w-full bg-green-600 text-white p-4 mt-6 rounded-2xl font-bold shadow-lg">حفظ البيانات</button>
                 </div>
             </div>
 
-            <div class="bg-white p-10 rounded-3xl shadow-sm border text-center">
-                 ${lastQR ? `<img src="${lastQR}" class="mx-auto w-40 mb-4 border-4 p-2 rounded-xl"><p class="text-amber-600 font-bold">امسح الكود لتفعيل الواتساب</p>` : isReady ? '<p class="text-green-600 font-black text-xl italic">نظام سُمعة مؤمن ويعمل بالكامل ✅</p>' : '<p class="text-gray-400 animate-pulse">جاري الاتصال بالسحاب...</p>'}
+            <div class="bg-white p-8 rounded-3xl shadow-sm border text-center">
+                 ${lastQR ? `<img src="${lastQR}" class="mx-auto w-44 mb-4 border rounded-xl shadow-inner"><p class="text-amber-600 font-bold">امسح الكود لتفعيل الواتساب</p>` : isReady ? '<p class="text-green-600 font-black text-xl italic">نظام سُمعة مؤمن ويعمل بالكامل ✅</p>' : '<p class="text-gray-400 animate-pulse">جاري الاتصال بالسحاب...</p>'}
             </div>
         </div>
         <script>
             async function send() {
-                const p = document.getElementById('p').value; const n = document.getElementById('n').value;
-                if(!p) return alert('أدخل الرقم');
-                const res = await fetch('/send-evaluation?key=${process.env.WEBHOOK_KEY}', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({phone:p, name:n}) });
-                if(res.ok) alert('✅ تمت الجدولة');
+                let p = document.getElementById('p').value.trim(); const n = document.getElementById('n').value.trim();
+                const btn = document.getElementById('sb');
+                if(!p) return alert('يرجى إدخال الرقم');
+                
+                // تحسين: تنظيف ومعالجة الرقم في المتصفح قبل الإرسال
+                p = p.replace(/[^0-9]/g, '');
+                if (p.startsWith('05')) p = '966' + p.substring(1);
+                else if (p.startsWith('5') && p.length === 9) p = '966' + p;
+
+                btn.disabled = true; btn.innerHTML = "جاري الجدولة...";
+                try {
+                    const res = await fetch('/send-evaluation?key=${process.env.WEBHOOK_KEY}', { 
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'}, 
+                        body: JSON.stringify({phone:p, name:n}) 
+                    });
+                    if(res.ok) alert('✅ تمت الجدولة للرقم: ' + p);
+                    else alert('❌ فشل، تأكد من اتصال الواتساب');
+                } catch(e) { alert('❌ خطأ في الاتصال بالسيرفر'); }
+                btn.disabled = false; btn.innerHTML = "جدولة الرسالة";
             }
             async function save() {
                 const d = { googleLink: document.getElementById('gl').value, discountCode: document.getElementById('dc').value, delay: document.getElementById('dl').value };
                 const res = await fetch('/update-settings?key=${process.env.WEBHOOK_KEY}', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(d) });
-                if(res.ok) { alert('✅ تم التحديث'); location.reload(); }
+                if(res.ok) { alert('✅ تم الحفظ'); location.reload(); }
             }
         </script>
     </body>
@@ -269,4 +279,8 @@ app.get('/admin', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, async () => { await initMongo(); await connectToWhatsApp(); console.log('🚀 System v5.9 Live'); });
+app.listen(PORT, async () => { 
+    await initMongo(); 
+    await connectToWhatsApp(); 
+    console.log('🚀 System v6.0 Live & Mapped'); 
+});
