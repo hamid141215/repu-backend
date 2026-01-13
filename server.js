@@ -59,14 +59,25 @@ async function connectToWhatsApp() {
 
     sock.ev.on('connection.update', (u) => {
         const { connection, lastDisconnect, qr } = u;
+        
+        // تحديث الباركود فوراً في حال صدوره
         if (qr) {
             lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
+            console.log("🚀 New QR Generated");
         }
-        if (connection === 'open') { isReady = true; lastQR = null; console.log("✅ Ready."); }
+        
+        if (connection === 'open') {
+            isReady = true;
+            lastQR = null;
+            console.log("✅ Ready.");
+        }
+
         if (connection === 'close') {
             isReady = false;
             const code = lastDisconnect?.error?.output?.statusCode;
-            if (code === DisconnectReason.loggedOut || code === 401) {
+            // إذا كان الخطأ تعارض أو انتهاء جلسة، نصفر المجلد المحلي ونحاول من جديد
+            if (code === DisconnectReason.loggedOut || code === 401 || code === 409) {
+                console.log("⚠️ Refreshing session to force new QR...");
                 fs.rmSync(SESSION_PATH, { recursive: true, force: true });
                 if(dbConnected) client.db('whatsapp_bot').collection('session').deleteOne({ _id: 'creds' });
             }
