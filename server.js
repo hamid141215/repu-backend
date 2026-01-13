@@ -24,7 +24,6 @@ const initMongo = async () => {
     } catch (e) { console.error("❌ MongoDB Fail"); }
 };
 
-// --- Session Logic ---
 async function syncSession() {
     if (!dbConnected) return;
     const credsPath = path.join(SESSION_PATH, 'creds.json');
@@ -44,13 +43,12 @@ async function restoreSession() {
 
 // --- WhatsApp Core ---
 async function connectToWhatsApp() {
-    const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers } = await import('@whiskeysockets/baileys');
+    const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = await import('@whiskeysockets/baileys');
     await restoreSession();
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
-    const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1017531287] }));
 
     sock = makeWASocket({
-        version, auth: state,
+        auth: state,
         logger: pino({ level: 'error' }),
         browser: Browsers.macOS('Desktop'),
         printQRInTerminal: false,
@@ -93,55 +91,65 @@ async function connectToWhatsApp() {
     });
 }
 
-// --- Landing Page ---
+// --- UI: Landing Page ---
 app.get('/', (req, res) => {
-    res.send(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>موجة الصمت | الحل الذكي</title><script src="https://cdn.tailwindcss.com"></script><style>body{font-family:'Cairo',sans-serif;}</style></head><body class="bg-white"><nav class="p-6 flex justify-between items-center max-w-6xl mx-auto"><h1 class="text-2xl font-black italic">MAWJAT <span class="text-blue-600 font-normal">ALSAMT</span></h1><a href="/admin" class="bg-gray-100 px-5 py-2 rounded-full font-bold text-sm">دخول العملاء</a></nav><header class="py-20 text-center px-4"><h2 class="text-5xl md:text-6xl font-black mb-6">سيطر على سمعة مطعمك <br><span class="text-blue-600">بصمت واحترافية</span></h2><p class="text-xl text-gray-500 max-w-2xl mx-auto mb-10">حوّل تجارب عملائك إلى تقييمات 5 نجوم على جوجل ماب، واستقبل الشكاوى داخلياً.</p><div class="flex gap-4 justify-center"><a href="/admin" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold shadow-xl shadow-blue-100">ابدأ الآن</a></div></header></body></html>`);
+    res.send(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>موجة الصمت</title><script src="https://cdn.tailwindcss.com"></script><style>body{font-family:'Cairo',sans-serif;}</style></head><body class="bg-white"><nav class="p-6 flex justify-between items-center max-w-6xl mx-auto"><h1 class="text-2xl font-black italic">MAWJAT <span class="text-blue-600 font-normal">ALSAMT</span></h1><a href="/admin" class="bg-gray-100 px-5 py-2 rounded-full font-bold text-sm">دخول العملاء</a></nav><header class="py-20 text-center px-4"><h2 class="text-5xl md:text-7xl font-black mb-6 leading-tight text-gray-900">سيطر على سمعة مطعمك <br><span class="text-blue-600">بصمت واحترافية</span></h2><p class="text-xl text-gray-500 max-w-2xl mx-auto mb-10">حوّل تجارب عملائك إلى تقييمات 5 نجوم على جوجل ماب، واستقبل الشكاوى داخلياً قبل أن يراها الجميع.</p><a href="/admin" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl shadow-blue-100">ابدأ الآن</a></header></body></html>`);
 });
 
-// --- Admin Dashboard ---
+// --- UI: Admin Dashboard ---
 app.get('/admin', async (req, res) => {
     const s = dbConnected ? await client.db('whatsapp_bot').collection('config').findOne({ _id: 'global_settings' }) : { googleLink: "#", discountCode: "OFFER10", delay: 0 };
     const evals = dbConnected ? await client.db('whatsapp_bot').collection('evaluations').find().sort({ sentAt: -1 }).limit(10).toArray() : [];
-    
-    res.send(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>لوحة التحكم</title><script src="https://cdn.tailwindcss.com"></script><style>body{font-family:'Cairo',sans-serif;background-color:#f8fafc;}</style></head><body class="p-4 md:p-8"><div class="max-w-5xl mx-auto space-y-8"><header class="flex justify-between items-center"><h1 class="text-2xl font-black italic uppercase">MAWJAT <span class="text-blue-600">ALSAMT</span></h1><div class="bg-white px-4 py-2 rounded-xl border text-xs font-bold flex items-center gap-2"><div class="w-2 h-2 rounded-full ${isReady ? 'bg-green-500 animate-pulse' : 'bg-red-500'}"></div>${isReady ? 'متصل ✅' : 'جاري الربط...'}</div></header>
-    <div class="grid md:grid-cols-2 gap-8">
+
+    res.send(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>لوحة التحكم</title><script src="https://cdn.tailwindcss.com"></script><style>body{font-family:'Cairo',sans-serif;background-color:#f8fafc;}</style></head><body class="p-4 md:p-8"><div class="max-w-5xl mx-auto space-y-8"><header class="flex justify-between items-center"><h1 class="text-2xl font-black italic">MAWJAT <span class="text-blue-600">ALSAMT</span></h1><div class="bg-white px-4 py-2 rounded-xl border text-xs font-bold flex items-center gap-2"><div class="w-2 h-2 rounded-full ${isReady ? 'bg-green-500 animate-pulse' : 'bg-red-500'}"></div>${isReady ? 'متصل ✅' : 'جاري الربط...'}</div></header>
+    <div class="grid md:grid-cols-2 gap-8 text-right">
         <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border text-center space-y-4">
             <h3 class="font-bold text-blue-600 italic">📥 إرسال تقييم جديد</h3>
-            <input id="p" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border-none ring-1 ring-gray-100 font-bold text-center outline-none">
-            <button onclick="send()" id="sb" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold shadow-lg transition active:scale-95">إرسال التقييم</button>
+            <input id="p" placeholder="رقم الجوال 05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border-none ring-1 ring-gray-100 font-bold text-center outline-none">
+            <input id="n" placeholder="اسم العميل (اختياري)" class="w-full p-4 bg-gray-50 rounded-2xl border-none ring-1 ring-gray-100 font-bold text-center outline-none">
+            <button onclick="send()" id="sb" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold active:scale-95 transition">إرسال الآن</button>
         </div>
         <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border text-center space-y-4">
             <h3 class="font-bold text-green-600 italic text-right">⚙️ الإعدادات</h3>
-            <input id="gl" value="${s.googleLink}" class="w-full p-3 bg-gray-50 rounded-xl text-center text-[10px] outline-none border-none ring-1 ring-gray-100">
+            <input id="gl" value="${s.googleLink}" class="w-full p-3 bg-gray-50 rounded-xl text-xs text-center border-none ring-1 ring-gray-100">
             <div class="flex gap-2">
-                <input id="dc" value="${s.discountCode}" class="w-1/2 p-3 bg-gray-50 rounded-xl text-center font-bold text-blue-600 outline-none">
-                <input id="dl" value="${s.delay}" class="w-1/2 p-3 bg-gray-50 rounded-xl text-center font-bold outline-none">
+                <input id="dc" value="${s.discountCode}" class="w-1/2 p-3 bg-gray-50 rounded-xl text-center font-bold text-blue-600 border-none ring-1 ring-gray-100">
+                <input id="dl" value="${s.delay}" class="w-1/2 p-3 bg-gray-50 rounded-xl text-center font-bold border-none ring-1 ring-gray-100">
             </div>
-            <button onclick="save()" class="w-full bg-black text-white p-4 rounded-2xl font-bold">حفظ التغييرات</button>
+            <button onclick="save()" class="w-full bg-black text-white p-4 rounded-2xl font-bold">حفظ</button>
         </div>
     </div>
     <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border">
-        <h3 class="font-bold mb-6 text-gray-800 text-right">📊 تقارير رضا العملاء</h3>
+        <h3 class="font-bold mb-6 text-gray-800 text-right">📊 التقرير المباشر</h3>
         <div class="overflow-x-auto"><table class="w-full text-right text-sm"><thead><tr class="border-b text-gray-400"><th class="pb-4">العميل</th><th class="pb-4">الحالة</th><th class="pb-4">الرد</th></tr></thead><tbody>
         ${evals.map(e => `<tr class="border-b hover:bg-gray-50"><td class="py-4 font-bold text-gray-700">${e.phone}</td><td class="py-4"><span class="px-2 py-1 rounded-lg text-[10px] font-bold ${e.status === 'replied' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}">${e.status === 'replied' ? 'تم الرد' : 'بالانتظار'}</span></td><td class="py-4 font-black">${e.answer ? (e.answer === '1' ? 'ممتاز 😍' : 'تحسين 😔') : '-'}</td></tr>`).join('')}
         </tbody></table></div>
     </div>
-    <div class="bg-white p-6 rounded-[2.5rem] text-center border-2 border-dashed border-gray-100">${lastQR ? `<img src="${lastQR}" class="mx-auto w-32 rounded-xl">` : isReady ? '<p class="text-green-600 font-bold uppercase tracking-widest text-xs">Connected SCloud</p>' : '<p class="animate-pulse">Loading QR...</p>'}</div></div>
+    <div class="bg-white p-6 rounded-[2.5rem] text-center border-2 border-dashed border-gray-100">${lastQR ? `<img src="${lastQR}" class="mx-auto w-32 rounded-xl">` : isReady ? '<p class="text-green-600 font-bold uppercase tracking-widest text-xs">System Live Cloud ✅</p>' : '<p class="animate-pulse">Loading QR...</p>'}</div></div>
     <script>
-    async function send(){const p=document.getElementById('p').value;if(!p)return alert('أدخل الرقم');const res=await fetch('/send-evaluation?key=${process.env.WEBHOOK_KEY}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:p})});if(res.ok){alert('✅ تم الإرسال');location.reload();}}
+    async function send(){const p=document.getElementById('p').value;const n=document.getElementById('n').value;if(!p)return alert('أدخل الرقم');const res=await fetch('/send-evaluation?key=${process.env.WEBHOOK_KEY}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:p, name:n})});if(res.ok){alert('✅ تم الإرسال');location.reload();}}
     async function save(){const d={googleLink:document.getElementById('gl').value,discountCode:document.getElementById('dc').value,delay:document.getElementById('dl').value};const res=await fetch('/update-settings?key=${process.env.WEBHOOK_KEY}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(res.ok)alert('✅ تم الحفظ');}
     </script></body></html>`);
 });
 
+// --- API Endpoints ---
 app.post('/send-evaluation', async (req, res) => {
     if (req.query.key !== process.env.WEBHOOK_KEY) return res.sendStatus(401);
-    const { phone } = req.body;
+    const { phone, name } = req.body;
     if (dbConnected) await client.db('whatsapp_bot').collection('evaluations').insertOne({ phone, status: 'sent', sentAt: new Date() });
+    
+    const greetings = [
+        `مرحباً ${name || 'عزيزنا'}، نورتنا اليوم! ✨`,
+        `أهلاً بك ${name || 'يا غالي'}، سعدنا بزيارتك لنا. 😊`,
+        `حيّاك الله ${name || 'عميلنا العزيز'}، نشكرك على اختيارك لنا. 🌸`
+    ];
+    const randomMsg = greetings[Math.floor(Math.random() * greetings.length)];
+
     setTimeout(async () => {
         if (isReady && sock) {
             let p = phone.replace(/[^0-9]/g, '');
             if (p.startsWith('05')) p = '966' + p.substring(1);
-            await sock.sendMessage(p + "@s.whatsapp.net", { text: "مرحباً بك! ✨ كيف كانت تجربتك معنا اليوم؟\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين" });
+            await sock.sendMessage(p + "@s.whatsapp.net", { text: `${randomMsg}\n\nكيف كانت تجربتك معنا؟\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` });
         }
     }, 2000);
     res.json({ success: true });
@@ -156,5 +164,3 @@ app.post('/update-settings', async (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => { await initMongo(); await connectToWhatsApp(); });
-
-process.on('uncaughtException', (err) => { console.error('💥 Exception:', err.message); });
