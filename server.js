@@ -98,9 +98,9 @@ app.post('/send-evaluation', async (req, res) => {
 
     // 2. مصفوفة من التحيات المختلفة لجعل كل رسالة فريدة (تجنب الحظر)
     const greetings = [
-        `مرحباً ${name || 'عميلنا العزيز'}، نورتنا في (${branch || 'فرعنا'})! 🌸`,
-        `أهلاً بك ${name || 'يا غالي'}، سعدنا بزيارتك لـ (${branch || 'الفرع'}) اليوم. ✨`,
-        `حيّاك الله ${name || 'عزيزنا'}، نشكرك على اختيارك (${branch || 'فرعنا'}). 😊`
+        `مرحباً ${name || 'عميلنا العزيز'}، نورتنا في ${branch || 'فرعنا'}! 🌸`,
+        `أهلاً بك ${name || 'يا غالي'}، سعدنا بزيارتك لـ ${branch || 'مطعمنا'} اليوم. ✨`,
+        `حيّاك الله ${name || 'عزيزنا'}، نشكرك على اختيارك ${branch || 'لنا'}. 😊`
     ];
     const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
 
@@ -114,9 +114,10 @@ app.post('/send-evaluation', async (req, res) => {
                 let p = phone.replace(/[^0-9]/g, '');
                 if (p.startsWith('05')) p = '966' + p.substring(1);
                 
-                await sock.sendMessage(p + "@s.whatsapp.net", { 
-                    text: `${randomGreeting}\n\nكيف كانت تجربتك معنا؟ نرجو منك اختيار رقم:\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
-                });
+                // 3. تأكد من استخدام علامة ` (Backtick) وليس ' (Single Quote)
+await sock.sendMessage(p + "@s.whatsapp.net", { 
+    text: `${randomGreeting}\n\nكيف كانت تجربتك معنا؟ نرجو منك اختيار رقم:\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
+});
                 console.log(`✅ Message sent to ${p} with randomized content.`);
             } catch (e) { console.error("❌ Failed to send:", e.message); }
         }
@@ -178,12 +179,24 @@ app.get('/admin', async (req, res) => {
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border space-y-4 text-center">
-                    <h3 class="font-bold text-blue-600 italic">📥 إرسال طلب جديد</h3>
-                    <input id="p" placeholder="رقم الجوال 05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border-none ring-1 ring-gray-100 font-bold text-center outline-none">
-                    <input id="n" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 rounded-2xl border-none ring-1 ring-gray-100 font-bold text-center outline-none">
-                    <button onclick="send()" id="sb" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold shadow-lg shadow-blue-50 transition active:scale-95">إرسال التقييم</button>
-                </div>
+            // ابحث عن الجزء الخاص بـ <div class="bg-white p-8 rounded-[2.5rem] ..."> الخاص بجدولة الطلب
+            // واستبدله بهذا الكود المطور:
+            
+            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border space-y-4 text-center">
+                <h3 class="font-bold text-blue-600 italic">📥 إرسال طلب جديد</h3>
+                
+                <select id="branch" class="w-full p-4 bg-gray-50 rounded-2xl border-none ring-1 ring-gray-100 font-bold outline-none focus:ring-2 focus:ring-blue-500 transition">
+                    <option value="الفرع الرئيسي">الفرع الرئيسي</option>
+                    <option value="فرع مكة">فرع مكة</option>
+                    <option value="فرع جدة">فرع جدة</option>
+                    <option value="فرع الرياض">فرع الرياض</option>
+                </select>
+            
+                <input id="p" placeholder="رقم الجوال 05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border-none ring-1 ring-gray-100 font-bold text-center outline-none">
+                <input id="n" placeholder="اسم العميل (اختياري)" class="w-full p-4 bg-gray-50 rounded-2xl border-none ring-1 ring-gray-100 font-bold text-center outline-none">
+                
+                <button onclick="send()" id="sb" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold shadow-lg shadow-blue-50 transition active:scale-95">إرسال التقييم</button>
+            </div>
 
                 <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border space-y-4 text-center">
                     <h3 class="font-bold text-green-600 italic">⚙️ الإعدادات الذكية</h3>
