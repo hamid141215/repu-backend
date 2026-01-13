@@ -68,11 +68,14 @@ async function loadSessionFromMongo() {
 
 // --- الإعدادات والإحصائيات ---
 async function getSettings() {
-    if (!dbConnected) return { googleLink: "#", discountCode: "REPU10", delay: 20 };
+    // جعلنا الافتراضي 0 بدلاً من 20 ليعطيك حرية التحكم
+    const defaultSettings = { googleLink: "#", discountCode: "REPU10", delay: 0 };
+    if (!dbConnected) return defaultSettings;
     try {
         const settings = await client.db('whatsapp_bot').collection('config').findOne({ _id: 'global_settings' });
-        return settings || { googleLink: "#", discountCode: "REPU10", delay: 20 };
-    } catch (e) { return { googleLink: "#", discountCode: "REPU10", delay: 20 }; }
+        // استخدام عامل التحقق الجديد لضمان قبول رقم 0
+        return settings ? settings : defaultSettings;
+    } catch (e) { return defaultSettings; }
 }
 
 async function updateStats(type) {
@@ -159,22 +162,34 @@ const scheduleMessage = async (phone, name) => {
     if (cleanP.startsWith('05')) cleanP = '966' + cleanP.substring(1);
     if (cleanP.startsWith('5') && cleanP.length === 9) cleanP = '966' + cleanP;
 
-    const jitter = Math.floor(Math.random() * (5 * 60 * 1000));
-    const delayMs = ((parseInt(settings.delay) || 20) * 60 * 1000) + jitter;
+    // --- تعديل منطق الحساب هنا ---
+    // نستخدم شرطاً يتأكد هل القيمة موجودة فعلاً، وإذا كانت 0 نعتمدها 0
+    const baseDelay = (settings.delay === undefined || settings.delay === null) ? 0 : parseInt(settings.delay);
+    
+    let finalDelayMs = 0;
+    if (baseDelay > 0) {
+        // إذا كان هناك تأخير، نضيف jitter للأمان
+        const jitter = Math.floor(Math.random() * (2 * 60 * 1000)); 
+        finalDelayMs = (baseDelay * 60 * 1000) + jitter;
+    } else {
+        // إذا كان التأخير 0، نرسل بعد 5 ثوانٍ فقط (تأخير تقني بسيط جداً)
+        finalDelayMs = 5000;
+    }
 
-    console.log(`⏳ Scheduled message for ${cleanP} in ${settings.delay} minutes.`);
+    console.log(`⏳ Scheduled message for ${cleanP} in ${baseDelay} minutes.`);
 
     setTimeout(async () => {
         if (isReady && sock) {
             try {
-                await new Promise(r => setTimeout(r, Math.random() * 10000));
+                // تأخير عشوائي بسيط جداً بالثواني (أمان إضافي)
+                await new Promise(r => setTimeout(r, Math.random() * 5000));
                 await sock.sendMessage(`${cleanP}@s.whatsapp.net`, { 
                     text: `مرحباً ${name || 'عميلنا العزيز'}، نورتنا! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
                 });
                 console.log(`✅ Message sent to ${cleanP}`);
             } catch (e) { console.error(`❌ Failed to send to ${cleanP}:`, e); }
         }
-    }, delayMs);
+    }, finalDelayMs);
 };
 
 // --- الروابط (Endpoints) ---
@@ -187,15 +202,31 @@ app.post('/send-evaluation', async (req, res) => {
 
 app.post('/update-settings', async (req, res) => {
     if (req.query.key !== process.env.WEBHOOK_KEY) return res.sendStatus(401);
+    
     const { googleLink, discountCode, delay } = req.body;
+    
     if (dbConnected) {
-        await client.db('whatsapp_bot').collection('config').updateOne(
-            { _id: 'global_settings' },
-            { $set: { googleLink, discountCode, delay: parseInt(delay) || 20 } },
-            { upsert: true }
-        );
-        res.json({ success: true });
-    } else res.sendStatus(500);
+        try {
+            await client.db('whatsapp_bot').collection('config').updateOne(
+                { _id: 'global_settings' },
+                { 
+                    $set: { 
+                        googleLink: googleLink, 
+                        discountCode: discountCode, 
+                        // هذا التعديل يضمن أن الصفر يُعامل كرقم وليس كقيمة فارغة
+                        delay: (delay === "" || delay === null) ? 0 : parseInt(delay) 
+                    } 
+                }, // إغلاق قوس الـ $set هنا
+                { upsert: true } // الـ upsert يأتي في كائن مستقل
+            );
+            res.json({ success: true });
+        } catch (e) {
+            console.error("Update Error:", e);
+            res.status(500).json({ error: "Failed to update" });
+        }
+    } else {
+        res.sendStatus(500);
+    }
 });
 
 app.get('/admin', async (req, res) => {
