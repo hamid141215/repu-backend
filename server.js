@@ -210,11 +210,18 @@ app.get('/admin', async (req, res) => {
     <!DOCTYPE html>
     <html lang="ar" dir="rtl">
     <head>
-        <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>RepuSystem v7.3</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap'); body{font-family:'Cairo',sans-serif;}</style>
-    </head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAWJAT AL SAMT | لوحة التحكم</title>
+    
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3159/3159066.png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style> 
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap'); 
+        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; } 
+    </style>
+</head>
     <body class="bg-gray-50 p-4 md:p-8">
         <div class="max-w-5xl mx-auto">
             <header class="flex justify-between items-center mb-8">
