@@ -133,12 +133,20 @@ async function connectToWhatsApp() {
         if (connection === 'close') {
             isReady = false;
             const code = lastDisconnect?.error?.output?.statusCode;
-            // إذا كانت الجلسة معطوبة، امسحها وابدأ من جديد
+            
+            // إذا كانت الجلسة معطوبة (401 أو Logged Out)
             if (code === DisconnectReason.loggedOut || code === 401) {
-                console.log("⚠️ Session Corrupted, Clearing...");
-                fs.rmSync(SESSION_PATH, { recursive: true, force: true });
-                setTimeout(connectToWhatsApp, 3000);
+                console.log("⚠️ Session Corrupted, Clearing and Waiting...");
+                
+                // مسح المجلد فعلياً
+                if (fs.existsSync(SESSION_PATH)) {
+                    fs.rmSync(SESSION_PATH, { recursive: true, force: true });
+                }
+                
+                // إعطاء وقت أطول (10 ثوانٍ) قبل محاولة البدء من جديد لضمان المسح
+                setTimeout(connectToWhatsApp, 10000); 
             } else {
+                // إعادة اتصال عادية (خطأ شبكة مثلاً)
                 setTimeout(connectToWhatsApp, 5000);
             }
         }
