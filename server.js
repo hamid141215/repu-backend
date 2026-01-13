@@ -123,15 +123,24 @@ async function connectToWhatsApp() {
         const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
         const settings = await getSettings();
 
+        // --- منطق الرد الذكي على العميل ---
         if (/^[1١]/.test(text)) {
             await updateStats('positive');
-            await sock.sendMessage(remoteJid, { text: `يسعدنا جداً! 😍 تقييمك يدعمنا:\n📍 ${settings.googleLink}` });
+            // النص الجديد والمحفز للعميل الراضي
+            const successMsg = `يسعدنا جداً أن التجربة نالت إعجابك! 😍\n\nتقييمك بـ 5 نجوم يعني لنا الكثير ويستغرق ثانية واحدة فقط:\n📍 ${settings.googleLink}`;
+            await sock.sendMessage(remoteJid, { text: successMsg });
+
         } else if (/^[2٢]/.test(text)) {
             await updateStats('negative');
-            await sock.sendMessage(remoteJid, { text: `نعتذر منك 😔، نهديك كود خصم لطلبك القادم:\n🎫 كود: *${settings.discountCode}*` });
+            // نص العميل المستاء مع كود الخصم
+            const sorryMsg = `نعتذر منك جداً 😔، نعدك بأن تجربتك القادمة ستكون أفضل.\n\nنهديك كود خصم لطلبك القادم:\n🎫 كود: *${settings.discountCode}*`;
+            await sock.sendMessage(remoteJid, { text: sorryMsg });
+
+            // تنبيه المدير (إذا كان الرقم مضافاً في الإعدادات)
             if (process.env.MANAGER_PHONE) {
                 const manager = process.env.MANAGER_PHONE.replace(/[^0-9]/g, '');
-                await sock.sendMessage(`${manager}@s.whatsapp.net`, { text: `⚠️ تقييم سلبي من: ${remoteJid.split('@')[0]}\nتواصل معه: https://wa.me/${remoteJid.split('@')[0]}` });
+                const alertMsg = `⚠️ *تنبيه: تقييم سلبي جديد*\n\nالعميل: ${remoteJid.split('@')[0]}\nالحالة: اختار "يحتاج تحسين"\n\nيرجى التواصل معه للاحتواء: https://wa.me/${remoteJid.split('@')[0]}`;
+                await sock.sendMessage(`${manager}@s.whatsapp.net`, { text: alertMsg });
             }
         }
     });
