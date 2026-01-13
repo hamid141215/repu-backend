@@ -89,43 +89,58 @@ async function getSettings() {
 // --- WhatsApp Logic ---
 async function connectToWhatsApp() {
     const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers } = await import('@whiskeysockets/baileys');
-    if (!fs.existsSync(path.join(SESSION_PATH, 'creds.json'))) { await loadSessionFromMongo(); }
+    
+    // محاولة تحميل الجلسة من مونجو
+    await loadSessionFromMongo(); 
+
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
     const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1017531287] }));
 
     if (sock) { try { sock.terminate(); } catch (e) {} sock = null; }
 
     sock = makeWASocket({
-        version, auth: state,
+        version,
+        auth: state,
         logger: pino({ level: 'silent' }),
         browser: Browsers.macOS('Desktop'),
         printQRInTerminal: false,
+        // إعدادات لضمان ظهور الكود وتخفيف الحمل
         shouldSyncHistoryMessage: () => false,
         syncFullHistory: false,
         markOnlineOnConnect: false,
-        connectTimeoutMs: 60000
+        connectTimeoutMs: 60000,
+        // منع تعليق الاتصال القديم
+        retryRequestDelayMs: 5000 
     });
 
     sock.ev.on('creds.update', async () => { await saveCreds(); await syncSessionToMongo(); });
+    
     sock.ev.on('connection.update', async (u) => {
         const { connection, lastDisconnect, qr } = u;
-        if (qr) lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
-        if (connection === 'open') { isReady = true; lastQR = null; console.log('✅ WhatsApp Active.'); await syncSessionToMongo(); }
-        if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) setTimeout(connectToWhatsApp, 5000);
-    });
-
-    sock.ev.on('messages.upsert', async (m) => {
-        const msg = m.messages[0];
-        if (!msg.message || msg.key.fromMe) return;
-        const remoteJid = msg.key.remoteJid;
-        const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
-        const settings = await getSettings();
-        if (text === "1") {
-            await updateStats('positive');
-            await sock.sendMessage(remoteJid, { text: `يسعدنا تقييمك! 😍\n📍 ${settings.googleLink}` });
-        } else if (text === "2") {
-            await updateStats('negative');
-            await sock.sendMessage(remoteJid, { text: `نعتذر منك 😔\n🎫 كود الخصم: ${settings.discountCode}` });
+        
+        // تحديث الرابط فور توليد الكود
+        if (qr) {
+            lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
+            console.log("🆕 New QR Generated");
+        }
+        
+        if (connection === 'open') { 
+            isReady = true; lastQR = null; 
+            console.log('✅ WhatsApp Active.'); 
+            await syncSessionToMongo(); 
+        }
+        
+        if (connection === 'close') {
+            isReady = false;
+            const code = lastDisconnect?.error?.output?.statusCode;
+            // إذا كانت الجلسة معطوبة، امسحها وابدأ من جديد
+            if (code === DisconnectReason.loggedOut || code === 401) {
+                console.log("⚠️ Session Corrupted, Clearing...");
+                fs.rmSync(SESSION_PATH, { recursive: true, force: true });
+                setTimeout(connectToWhatsApp, 3000);
+            } else {
+                setTimeout(connectToWhatsApp, 5000);
+            }
         }
     });
 }
