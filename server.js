@@ -287,4 +287,6 @@ app.get('/admin', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
+// توجيه الزائر من الرابط الرئيسي إلى لوحة التحكم تلقائياً
+app.get('/', (req, res) => res.redirect('/admin'));
 app.listen(PORT, async () => { await initMongo(); await connectToWhatsApp(); console.log('🚀 Mawjat Al Samt v7.3 Online'); });
