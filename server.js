@@ -155,6 +155,7 @@ app.get('/admin', async (req, res) => {
     <head>
         <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>MAWJAT AL SAMT | لوحة التحكم</title>
+        <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3159/3159066.png">
         <script src="https://cdn.tailwindcss.com"></script>
         <style> @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap'); body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; } </style>
     </head>
