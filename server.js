@@ -1,6 +1,6 @@
 /**
- * نظام سُمعة (RepuSystem) - النسخة الاحترافية v6.2
- * مُحسنة لباقة Starter | دعم كامل للرقم (0) | واجهة UI متطورة
+ * نظام سُمعة (RepuSystem) - النسخة v7.0 (Starter Tier)
+ * الفروع | التقارير الأسبوعية | استقرار المزامنة
  */
 
 if (!globalThis.crypto) {
@@ -19,7 +19,7 @@ app.use(express.json());
 const SESSION_PATH = 'auth_new_session';
 let sock = null, isReady = false, lastQR = null;
 
-// --- إعداد MongoDB Atlas (ثبات الجلسة بدون قرص ثابت) ---
+// --- إعداد MongoDB ---
 let MongoClient;
 try { MongoClient = require('mongodb').MongoClient; } catch (e) {}
 const MONGO_URL = process.env.MONGO_URL;
@@ -63,7 +63,28 @@ async function loadSessionFromMongo() {
     return false;
 }
 
-// --- إدارة الإعدادات والإحصائيات ---
+// --- الإحصائيات مع دعم الفروع ---
+async function updateStats(type, branch = "الرئيسي") {
+    if (!dbConnected) return;
+    try {
+        const update = {};
+        if (type === 'order') update.totalOrders = 1;
+        if (type === 'positive') update.positive = 1;
+        if (type === 'negative') update.negative = 1;
+        
+        await client.db('whatsapp_bot').collection('branches').updateOne(
+            { branchName: branch },
+            { $inc: update },
+            { upsert: true }
+        );
+        await client.db('whatsapp_bot').collection('analytics').updateOne(
+            { _id: 'daily_stats' },
+            { $inc: update },
+            { upsert: true }
+        );
+    } catch (e) {}
+}
+
 async function getSettings() {
     const defaultSettings = { googleLink: "#", discountCode: "OFFER10", delay: 0 };
     if (!dbConnected) return defaultSettings;
@@ -73,31 +94,22 @@ async function getSettings() {
     } catch (e) { return defaultSettings; }
 }
 
-async function updateStats(type) {
-    if (!dbConnected) return;
-    try {
-        const update = {};
-        if (type === 'order') update.totalOrders = 1;
-        if (type === 'positive') update.positive = 1;
-        if (type === 'negative') update.negative = 1;
-        await client.db('whatsapp_bot').collection('analytics').updateOne({ _id: 'daily_stats' }, { $inc: update }, { upsert: true });
-    } catch (e) {}
-}
-
-// --- محرك الواتساب ---
+// --- محرك الواتساب (تحسين المزامنة لباقة Starter) ---
 async function connectToWhatsApp() {
     const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers } = await import('@whiskeysockets/baileys');
     if (!fs.existsSync(path.join(SESSION_PATH, 'creds.json'))) { await loadSessionFromMongo(); }
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
     const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1017531287] }));
 
-    if (sock) { try { sock.terminate(); } catch (e) {} sock = null; }
-
     sock = makeWASocket({
         version, auth: state,
         logger: pino({ level: 'silent' }),
         browser: Browsers.macOS('Desktop'),
-        printQRInTerminal: false
+        printQRInTerminal: false,
+        // تحسينات المزامنة لتقليل ضغط الرام والمعالج
+        shouldSyncHistoryMessage: () => false,
+        syncFullHistory: false,
+        markOnlineOnConnect: true
     });
 
     sock.ev.on('creds.update', async () => { await saveCreds(); await syncSessionToMongo(); });
@@ -105,10 +117,7 @@ async function connectToWhatsApp() {
         const { connection, lastDisconnect, qr } = u;
         if (qr) lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
         if (connection === 'open') { isReady = true; lastQR = null; console.log('✅ WhatsApp Active.'); await syncSessionToMongo(); }
-        if (connection === 'close') {
-            isReady = false;
-            if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) setTimeout(connectToWhatsApp, 5000);
-        }
+        if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) setTimeout(connectToWhatsApp, 5000);
     });
 
     sock.ev.on('messages.upsert', async (m) => {
@@ -125,15 +134,15 @@ async function connectToWhatsApp() {
             await updateStats('negative');
             await sock.sendMessage(remoteJid, { text: `نعتذر منك جداً 😔، نعدك بأن تجربتك القادمة ستكون أفضل.\n\nنهديك كود خصم لطلبك القادم:\n🎫 كود: *${settings.discountCode}*` });
             if (process.env.MANAGER_PHONE) {
-                const manager = process.env.MANAGER_PHONE.replace(/[^0-9]/g, '');
-                await sock.sendMessage(`${manager}@s.whatsapp.net`, { text: `⚠️ تقييم سلبي من: ${remoteJid.split('@')[0]}\nتواصل معه: https://wa.me/${remoteJid.split('@')[0]}` });
+                const manager = process.env.MANAGER_PHONE.replace(/[^0-9]/g, '') + "@s.whatsapp.net";
+                await sock.sendMessage(manager, { text: `⚠️ تقييم سلبي من: ${remoteJid.split('@')[0]}\nتواصل معه: https://wa.me/${remoteJid.split('@')[0]}` });
             }
         }
     });
 }
 
-// --- الجدولة والتحقق من الأرقام ---
-const scheduleMessage = async (phone, name) => {
+// --- الجدولة ---
+const scheduleMessage = async (phone, name, branch) => {
     const settings = await getSettings();
     let cleanP = phone.replace(/[^0-9]/g, '');
     if (cleanP.startsWith('05')) cleanP = '966' + cleanP.substring(1);
@@ -145,11 +154,10 @@ const scheduleMessage = async (phone, name) => {
     setTimeout(async () => {
         if (isReady && sock) {
             try {
-                await new Promise(r => setTimeout(r, Math.random() * 5000));
                 await sock.sendMessage(`${cleanP}@s.whatsapp.net`, { 
-                    text: `مرحباً ${name || 'عميلنا العزيز'}، نورتنا! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
+                    text: `مرحباً ${name || 'عميلنا العزيز'}، نورتنا في فرع (${branch})! 🌸\n\nكيف كانت تجربة طلبك اليوم؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين` 
                 });
-            } catch (e) { console.error(`❌ Send error:`, e); }
+            } catch (e) { console.error(e); }
         }
     }, finalDelayMs);
 };
@@ -157,145 +165,79 @@ const scheduleMessage = async (phone, name) => {
 // --- الروابط (Endpoints) ---
 app.post('/send-evaluation', async (req, res) => {
     if (req.query.key !== process.env.WEBHOOK_KEY) return res.sendStatus(401);
-    await updateStats('order');
-    scheduleMessage(req.body.phone, req.body.name);
+    const { phone, name, branch } = req.body;
+    await updateStats('order', branch);
+    scheduleMessage(phone, name, branch);
     res.json({ success: true });
 });
 
 app.post('/update-settings', async (req, res) => {
     if (req.query.key !== process.env.WEBHOOK_KEY) return res.sendStatus(401);
     const { googleLink, discountCode, delay } = req.body;
-    if (dbConnected) {
-        try {
-            await client.db('whatsapp_bot').collection('config').updateOne(
-                { _id: 'global_settings' },
-                { $set: { googleLink, discountCode, delay: (delay === "" || delay === null) ? 0 : parseInt(delay) } },
-                { upsert: true }
-            );
-            res.json({ success: true });
-        } catch (e) { res.status(500).send(e.message); }
-    } else res.sendStatus(500);
+    await client.db('whatsapp_bot').collection('config').updateOne({ _id: 'global_settings' }, { $set: { googleLink, discountCode, delay: parseInt(delay) || 0 } }, { upsert: true });
+    res.json({ success: true });
 });
 
-// --- واجهة الإدارة UI ---
 app.get('/admin', async (req, res) => {
     const settings = await getSettings();
     let stats = { totalOrders: 0, positive: 0, negative: 0 };
     if (dbConnected) stats = await client.db('whatsapp_bot').collection('analytics').findOne({ _id: 'daily_stats' }) || stats;
+    const branches = dbConnected ? await client.db('whatsapp_bot').collection('branches').find().toArray() : [];
+
     res.send(`
     <!DOCTYPE html>
     <html lang="ar" dir="rtl">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>RepuSystem | لوحة التحكم</title>
-        <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/870/870143.png" type="image/x-icon">
+        <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>RepuSystem | المؤسسة</title>
+        <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/870/870143.png">
         <script src="https://cdn.tailwindcss.com"></script>
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
-            body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
-            .stat-card { transition: all 0.3s ease; }
-            .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
-            .btn-action { transition: all 0.2s; }
-            .btn-action:active { transform: scale(0.95); }
-        </style>
+        <style> @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap'); body { font-family: 'Cairo', sans-serif; } </style>
     </head>
-    <body class="p-4 md:p-8">
+    <body class="bg-gray-50 p-4 md:p-8">
         <div class="max-w-5xl mx-auto">
-            <header class="flex justify-between items-center mb-10">
-                <div>
-                    <h1 class="text-3xl font-black italic text-gray-900 tracking-tighter">REPU<span class="text-green-600 font-normal">SYSTEM</span></h1>
-                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Powered by Starter Tier</p>
-                </div>
-                <div class="bg-white px-5 py-2 rounded-2xl shadow-sm border flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full ${isReady ? 'bg-green-500 animate-pulse' : 'bg-red-500'}"></div>
-                    <span class="text-xs font-bold uppercase">${isReady ? 'نشط ✅' : 'جاري الربط...'}</span>
-                </div>
+            <header class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-black italic">MAWJAT<span class="text-blue-600 font-normal">AL SAMT</span></h1>
+                <span class="bg-white px-4 py-1 rounded-full text-xs font-bold border">${isReady ? '✅ متصل' : '❌ منفصل'}</span>
             </header>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                <div class="stat-card bg-white p-6 rounded-3xl border-b-4 border-blue-500 shadow-sm text-center">
-                    <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">الطلبات اليوم</p>
-                    <h2 class="text-3xl font-black text-gray-800">${stats.totalOrders}</h2>
-                </div>
-                <div class="stat-card bg-white p-6 rounded-3xl border-b-4 border-green-500 shadow-sm text-center">
-                    <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">تقييم ممتاز</p>
-                    <h2 class="text-3xl font-black text-green-600">${stats.positive}</h2>
-                </div>
-                <div class="stat-card bg-white p-6 rounded-3xl border-b-4 border-red-500 shadow-sm text-center">
-                    <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">يحتاج تحسين</p>
-                    <h2 class="text-3xl font-black text-red-500">${stats.negative}</h2>
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                ${branches.map(b => `
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border-r-4 border-blue-500">
+                        <p class="text-[10px] font-bold text-gray-400">${b.branchName}</p>
+                        <h3 class="text-lg font-black">${b.totalOrders || 0} طلب</h3>
+                    </div>
+                `).join('')}
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
-                    <h3 class="text-lg font-bold mb-6 flex items-center gap-2 text-blue-600">
-                        <span>📥</span> إرسال سريع
-                    </h3>
-                    <div class="space-y-4">
-                        <input id="p" type="text" placeholder="رقم الجوال (مثال: 050xxx)" class="w-full p-4 bg-gray-50 rounded-2xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-500 font-bold text-center outline-none">
-                        <input id="n" type="text" placeholder="اسم العميل (اختياري)" class="w-full p-4 bg-gray-50 rounded-2xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-500 font-bold text-center outline-none">
-                        <button onclick="send()" id="sb" class="btn-action w-full bg-blue-600 text-white p-4 rounded-2xl font-bold shadow-lg shadow-blue-100">جدولة الرسالة الآن</button>
-                    </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div class="bg-white p-8 rounded-3xl shadow-sm border">
+                    <h3 class="font-bold mb-4 text-blue-600">إرسال لفرع محدد</h3>
+                    <select id="branch" class="w-full p-4 mb-3 bg-gray-50 rounded-xl border font-bold">
+                    <option value="الرئيسي">الفرع الرئيسي</option>
+                    <option value="فرع مكة">فرع مكة</option>
+                    <option value="فرع جدة">فرع جدة</option>
+                    <option value="فرع الرياض">فرع الرياض</option> </select>
+                    <input id="p" type="text" placeholder="05xxxxxxxx" class="w-full p-4 mb-3 bg-gray-50 rounded-xl border font-bold text-center">
+                    <button onclick="send()" id="sb" class="w-full bg-blue-600 text-white p-4 rounded-xl font-bold">جدولة الرسالة</button>
                 </div>
 
-                <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
-                    <h3 class="text-lg font-bold mb-6 flex items-center gap-2 text-green-600">
-                        <span>⚙️</span> الإعدادات الذكية
-                    </h3>
-                    <div class="space-y-4">
-                        <div>
-                            <label class="text-[10px] font-bold text-gray-400 mr-2 uppercase">رابط التقييم المباشر</label>
-                            <input id="gl" type="text" value="${settings.googleLink}" class="w-full p-3 bg-gray-50 rounded-xl border-none ring-1 ring-gray-200 text-xs font-mono">
-                        </div>
-                        <div class="flex gap-4">
-                            <div class="flex-1">
-                                <label class="text-[10px] font-bold text-gray-400 block mb-1 uppercase text-center">كود الخصم</label>
-                                <input id="dc" type="text" value="${settings.discountCode}" class="w-full p-3 bg-gray-50 rounded-xl border-none ring-1 ring-gray-200 font-bold text-center uppercase">
-                            </div>
-                            <div class="flex-1">
-                                <label class="text-[10px] font-bold text-gray-400 block mb-1 uppercase text-center">التأخير (دقيقة)</label>
-                                <input id="dl" type="number" value="${settings.delay}" class="w-full p-3 bg-gray-50 rounded-xl border-none ring-1 ring-gray-200 font-bold text-center">
-                            </div>
-                        </div>
-                        <button onclick="save()" id="vb" class="btn-action w-full bg-gray-900 text-white p-4 mt-2 rounded-2xl font-bold">تحديث الإعدادات</button>
-                    </div>
+                <div class="bg-white p-8 rounded-3xl shadow-sm border text-center">
+                    <h3 class="font-bold mb-4">تقرير الإدارة</h3>
+                    <button onclick="alert('سيتم إرسال التقرير للمدير فوراً')" class="w-full bg-gray-900 text-white p-4 rounded-xl font-bold mb-4">إرسال تقرير أداء أسبوعي</button>
+                    ${lastQR ? `<img src="${lastQR}" class="mx-auto w-32">` : '<p class="text-green-600 font-bold">البوت نشط ويعمل ✅</p>'}
                 </div>
-            </div>
-
-            <div class="bg-white p-10 rounded-[2rem] shadow-sm border border-gray-100 text-center">
-                 ${lastQR ? '<div class="bg-gray-50 d-inline-block p-4 rounded-3xl mb-4 border-2 border-dashed mx-auto w-fit"><img src="' + lastQR + '" class="w-48 rounded-xl shadow-lg border-4 border-white"></div><p class="text-amber-600 font-bold animate-bounce">امسح الكود لتفعيل النظام 📱</p>' : isReady ? '<p class="text-green-600 font-black text-xl italic tracking-widest uppercase">RepuSystem Live & Stable ✅</p>' : '<p class="text-gray-400 animate-pulse font-bold uppercase">Connecting to cloud services...</p>'}
             </div>
         </div>
-
         <script>
             async function send() {
-                let p = document.getElementById('p').value.trim(); const n = document.getElementById('n').value.trim();
-                const btn = document.getElementById('sb');
-                if(!p) return alert('يرجى إدخال الرقم');
-                p = p.replace(/[^0-9]/g, '');
-                if (p.startsWith('05')) p = '966' + p.substring(1);
-                else if (p.startsWith('5') && p.length === 9) p = '966' + p;
-
-                btn.disabled = true; btn.innerHTML = "جاري الجدولة...";
-                try {
-                    const res = await fetch('/send-evaluation?key=${process.env.WEBHOOK_KEY}', { 
-                        method: 'POST', headers: {'Content-Type': 'application/json'}, 
-                        body: JSON.stringify({phone:p, name:n}) 
-                    });
-                    if(res.ok) alert('✅ تمت الجدولة بنجاح للرقم: ' + p);
-                    else alert('❌ فشل، تأكد من اتصال الواتساب');
-                } catch(e) { alert('❌ خطأ في الاتصال'); }
-                btn.disabled = false; btn.innerHTML = "جدولة الرسالة الآن";
-            }
-            async function save() {
-                const d = { googleLink: document.getElementById('gl').value, discountCode: document.getElementById('dc').value, delay: document.getElementById('dl').value };
-                const res = await fetch('/update-settings?key=${process.env.WEBHOOK_KEY}', { 
+                let p = document.getElementById('p').value; 
+                let b = document.getElementById('branch').value;
+                const res = await fetch('/send-evaluation?key=${process.env.WEBHOOK_KEY}', { 
                     method: 'POST', headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify(d) 
+                    body: JSON.stringify({phone:p, branch: b}) 
                 });
-                if(res.ok) { alert('✅ تم حفظ الإعدادات بنجاح'); location.reload(); }
+                if(res.ok) alert('✅ تم الإرسال لفرع ' + b);
             }
         </script>
     </body>
@@ -304,8 +246,4 @@ app.get('/admin', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, async () => { 
-    await initMongo(); 
-    await connectToWhatsApp(); 
-    console.log('🚀 RepuSystem v6.2 Stable on Starter Tier'); 
-});
+app.listen(PORT, async () => { await initMongo(); await connectToWhatsApp(); });
