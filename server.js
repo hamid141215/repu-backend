@@ -25,8 +25,38 @@ const initMongo = async () => {
         db = client.db('whatsapp_bot');
         dbConnected = true;
         console.log("🔗 MongoDB Connected.");
+        
+        // بدء نظام الأتمتة (فحص كل ساعة)
+        setInterval(checkAutomation, 3600000);
     } catch (e) { console.error("❌ MongoDB Fail:", e.message); }
 };
+
+// --- نظام الأتمتة (Follow-up Automation) ---
+async function checkAutomation() {
+    if (!dbConnected || !isReady || !sock) return;
+    try {
+        const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+        
+        // البحث عن العملاء المهتمين الذين لم يتم التواصل معهم منذ 48 ساعة
+        const pendingLeads = await db.collection('leads').find({
+            status: 'مهتم',
+            lastFollowUp: { $exists: false },
+            createdAt: { $lt: fortyEightHoursAgo }
+        }).toArray();
+
+        for (const lead of pendingLeads) {
+            const message = `مرحباً ${lead.name || 'عزيزنا'}،\nلقد مر يومان منذ تواصلنا الأخير بخصوص نظام موجة الصمت. هل لديك أي استفسارات إضافية تود منا الإجابة عليها؟ نحن هنا لخدمتك! ✨`;
+            await sock.sendMessage(lead.phone + "@s.whatsapp.net", { text: message });
+            
+            // تحديث حالة المتابعة
+            await db.collection('leads').updateOne(
+                { _id: lead._id },
+                { $set: { lastFollowUp: new Date() } }
+            );
+            console.log(`🤖 Follow-up sent to: ${lead.phone}`);
+        }
+    } catch (e) { console.error("Automation Error:", e.message); }
+}
 
 async function syncSession() {
     if (!dbConnected) return;
@@ -77,14 +107,13 @@ async function connectToWhatsApp() {
         if (connection === 'open') { 
             isReady = true; 
             lastQR = null; 
-            console.log("✅ WhatsApp Connected v11.1"); 
+            console.log("✅ WhatsApp Connected v12.0 CRM"); 
         }
         
         if (connection === 'close') {
             isReady = false;
             const code = lastDisconnect?.error?.output?.statusCode;
             if (code === DisconnectReason.loggedOut) {
-                console.log("❌ Session Logged Out. Clearing local data...");
                 fs.rmSync(SESSION_PATH, { recursive: true, force: true });
                 setTimeout(connectToWhatsApp, 5000);
             } else {
@@ -123,97 +152,163 @@ async function connectToWhatsApp() {
     });
 }
 
-// --- الواجهة ولوحة التحكم ---
+// --- مسارات الـ API ---
 app.get('/api/status', (req, res) => res.json({ isReady, lastQR }));
-app.get('/', (req, res) => res.redirect('/admin'));
 
-app.post('/api/logout', async (req, res) => {
+// إضافة عميل محتمل جديد
+app.post('/api/leads/add', async (req, res) => {
     if (req.query.key !== WEBHOOK_KEY) return res.sendStatus(401);
-    try {
-        if (sock) sock.logout();
-        isReady = false;
-        lastQR = null;
-        fs.rmSync(SESSION_PATH, { recursive: true, force: true });
-        if (dbConnected) await db.collection('final_v111').deleteOne({ _id: 'creds' });
-        res.json({ success: true });
-        setTimeout(() => process.exit(0), 1000); 
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    const { name, phone, branch, amount } = req.body;
+    if (dbConnected) {
+        await db.collection('leads').insertOne({
+            name,
+            phone: phone.replace(/\D/g, ''),
+            branch,
+            amount: parseFloat(amount) || 0,
+            status: 'محتمل',
+            createdAt: new Date()
+        });
+    }
+    res.json({ success: true });
 });
+
+// تحديث حالة العميل
+app.post('/api/leads/update-status', async (req, res) => {
+    if (req.query.key !== WEBHOOK_KEY) return res.sendStatus(401);
+    const { phone, status } = req.body;
+    if (dbConnected) {
+        await db.collection('leads').updateOne(
+            { phone: phone.replace(/\D/g, '') },
+            { $set: { status, updatedAt: new Date() } }
+        );
+    }
+    res.json({ success: true });
+});
+
+app.get('/', (req, res) => res.redirect('/admin'));
 
 app.get('/admin', async (req, res) => {
     const defaultBranches = "فرع جدة, فرع الرياض, فرع الخبر";
     const s = dbConnected ? await db.collection('config').findOne({ _id: 'global_settings' }) : null;
-    
-    // تأكد من وجود الفروع حتى لو كانت الإعدادات فارغة
     const branchesString = (s && s.branches) ? s.branches : defaultBranches;
-    const googleLink = (s && s.googleLink) ? s.googleLink : "#";
-    const discountCode = (s && s.discountCode) ? s.discountCode : "OFFER10";
-    const delay = (s && s.delay !== undefined) ? s.delay : 0;
-
-    const evals = dbConnected ? await db.collection('evaluations').find().sort({ sentAt: -1 }).limit(20).toArray() : [];
     const branchList = branchesString.split(',').map(b => b.trim()).filter(b => b.length > 0);
 
-    res.send(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>نظام الفروع - موجة الصمت</title><script src="https://cdn.tailwindcss.com"></script><style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');body{font-family:'Cairo',sans-serif;background-color:#f8fafc;}</style></head>
+    // بيانات المبيعات (CRM)
+    const leads = dbConnected ? await db.collection('leads').find().sort({ createdAt: -1 }).toArray() : [];
+    const evals = dbConnected ? await db.collection('evaluations').find().sort({ sentAt: -1 }).limit(10).toArray() : [];
+
+    // تقارير مالية
+    const realizedSales = leads.filter(l => l.status === 'تم الإغلاق').reduce((sum, l) => sum + (l.amount || 0), 0);
+    const expectedRevenue = leads.filter(l => l.status !== 'تم الإغلاق').reduce((sum, l) => sum + (l.amount || 0), 0);
+    const conversionRate = leads.length > 0 ? ((leads.filter(l => l.status === 'تم الإغلاق').length / leads.length) * 100).toFixed(1) : 0;
+
+    res.send(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>CRM موجة الصمت v12</title><script src="https://cdn.tailwindcss.com"></script><style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');body{font-family:'Cairo',sans-serif;background-color:#f8fafc;}</style></head>
     <body class="p-4 md:p-8 text-right">
-        <div class="max-w-6xl mx-auto space-y-8">
+        <div class="max-w-7xl mx-auto space-y-8">
             <header class="flex justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-sm border">
-                <div><h1 class="text-2xl font-black italic text-slate-800">MAWJAT <span class="text-blue-600">ALSAMT</span></h1><p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Multi-Branch SaaS Panel</p></div>
+                <div><h1 class="text-2xl font-black italic text-slate-800 tracking-tighter">MAWJAT <span class="text-blue-600">CRM</span></h1><p class="text-[9px] text-gray-400 font-bold uppercase">Automated Sales & Reputation System</p></div>
                 <div class="flex items-center gap-4">
-                    <button onclick="logout()" class="text-[10px] bg-red-50 text-red-600 px-3 py-2 rounded-xl border border-red-100 font-bold hover:bg-red-600 hover:text-white transition-all">إعادة ضبط الاتصال 🔄</button>
                     <input type="password" id="accessKey" placeholder="مفتاح الوصول" class="text-xs p-3 border rounded-2xl outline-none focus:border-blue-500 bg-gray-50">
                     <div class="bg-gray-50 px-4 py-2 rounded-2xl border text-[10px] font-bold flex items-center gap-2"><div id="dot" class="w-3 h-3 rounded-full bg-red-500"></div><span id="stat">Checking...</span></div>
                 </div>
             </header>
 
-            <div class="grid lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2 bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 space-y-6">
-                    <h3 class="font-black text-blue-600 flex items-center gap-2"><span>📤</span> إرسال تقييم جديد</h3>
-                    <div class="grid md:grid-cols-2 gap-4">
-                        <input id="p" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border font-bold text-center outline-none focus:ring-4 ring-blue-50">
-                        <input id="n" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 rounded-2xl border font-bold text-center outline-none focus:ring-4 ring-blue-50">
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-gray-400 mr-2 uppercase tracking-tighter">اختر الفرع من القائمة</label>
-                        <select id="br" class="w-full p-4 bg-blue-50 text-blue-900 rounded-2xl border border-blue-100 font-black outline-none appearance-none cursor-pointer">
-                            ${branchList.map(b => `<option value="${b}">${b}</option>`).join('')}
-                        </select>
-                    </div>
-                    <button onclick="send()" id="sb" class="w-full bg-blue-600 text-white p-5 rounded-2xl font-black text-lg shadow-xl hover:bg-blue-700 active:scale-95 transition">إرسال لفرع <span id="selBr">${branchList[0] || '...'}</span></button>
+            <!-- لوحة التقارير المالية -->
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-blue-600 text-white p-6 rounded-[2rem] shadow-xl">
+                    <p class="text-xs opacity-80 mb-1">إجمالي المبيعات المحققة</p>
+                    <h2 class="text-3xl font-black">${realizedSales.toLocaleString()} <span class="text-sm font-normal">ر.س</span></h2>
                 </div>
-
-                <div class="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 space-y-4">
-                    <h3 class="font-black text-green-600 flex items-center gap-2"><span>⚙️</span> إعدادات النظام</h3>
-                    <div class="space-y-3">
-                        <div><label class="block text-[10px] font-bold text-gray-400 mr-2">رابط قوقل ماب</label><input id="gl" value="${googleLink}" class="w-full p-3 bg-gray-50 rounded-xl text-xs border outline-none"></div>
-                        <div><label class="block text-[10px] font-bold text-blue-600 mr-2 uppercase">إدارة الفروع (افصل بـ ,)</label><input id="bl" value="${branchesString}" class="w-full p-3 bg-gray-50 rounded-xl text-xs border font-bold text-blue-900"></div>
-                        <div class="flex gap-2">
-                            <div class="w-1/2"><label class="block text-[10px] font-bold text-gray-400 mr-2">كود الخصم</label><input id="dc" value="${discountCode}" class="w-full p-3 bg-gray-50 rounded-xl text-center font-bold text-blue-600 border"></div>
-                            <div class="w-1/2"><label class="block text-[10px] font-bold text-gray-400 mr-2">تأخير (د)</label><input id="dl" value="${delay}" class="w-full p-3 bg-gray-50 rounded-xl text-center font-bold border"></div>
-                        </div>
-                    </div>
-                    <button onclick="save()" class="w-full bg-slate-900 text-white p-4 rounded-2xl font-black hover:bg-black transition">حفظ التغييرات</button>
+                <div class="bg-white p-6 rounded-[2rem] border shadow-sm">
+                    <p class="text-xs text-gray-400 mb-1">إيرادات متوقعة (In Pipeline)</p>
+                    <h2 class="text-3xl font-black text-slate-800">${expectedRevenue.toLocaleString()} <span class="text-sm font-normal">ر.س</span></h2>
+                </div>
+                <div class="bg-green-500 text-white p-6 rounded-[2rem] shadow-xl">
+                    <p class="text-xs opacity-80 mb-1">نسبة التحويل (Conversion)</p>
+                    <h2 class="text-3xl font-black">${conversionRate}%</h2>
                 </div>
             </div>
 
-            <div id="qrc" class="bg-white p-8 rounded-[3rem] border-2 border-dashed border-blue-100 flex items-center justify-center min-h-[150px]"></div>
+            <div class="grid lg:grid-cols-3 gap-8">
+                <!-- إدارة العملاء المحتملين -->
+                <div class="lg:col-span-2 bg-white p-8 rounded-[3rem] shadow-sm border space-y-6">
+                    <h3 class="font-black text-blue-600 flex items-center gap-2"><span>👥</span> إضافة عميل محتمل (Lead)</h3>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <input id="ln" placeholder="اسم العميل" class="p-4 bg-gray-50 rounded-2xl border font-bold text-center">
+                        <input id="lp" placeholder="رقم الجوال" class="p-4 bg-gray-50 rounded-2xl border font-bold text-center">
+                        <input id="la" type="number" placeholder="قيمة الصفقة" class="p-4 bg-gray-50 rounded-2xl border font-bold text-center">
+                        <select id="lbr" class="p-4 bg-blue-50 text-blue-900 rounded-2xl border border-blue-100 font-bold">
+                            ${branchList.map(b => `<option value="${b}">${b}</option>`).join('')}
+                        </select>
+                    </div>
+                    <button onclick="addLead()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition">إضافة العميل لبدء المتابعة</button>
 
-            <div class="bg-white p-8 rounded-[3rem] shadow-sm border overflow-hidden">
-                <h3 class="font-black mb-6 text-slate-800 flex justify-between items-center">📊 سجل المتابعة الذكي <span class="text-[10px] bg-blue-50 px-3 py-1 rounded-full text-blue-600 uppercase tracking-widest">Reports v11.1</span></h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-right text-sm">
-                        <thead><tr class="border-b text-gray-400 text-[10px] font-black uppercase"><th class="pb-4">العميل</th><th class="pb-4">الفرع</th><th class="pb-4 text-center">الحالة</th><th class="pb-4 text-left">الرد</th></tr></thead>
-                        <tbody>${evals.map(e => `<tr class="border-b hover:bg-gray-50 transition"><td class="py-4 font-bold text-slate-700">${e.phone}</td><td class="py-4 font-bold text-blue-500 text-[11px]">${e.branch || '-'}</td><td class="py-4 text-center"><span class="px-3 py-1 rounded-full text-[9px] font-black ${e.status === 'replied' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}">${e.status === 'replied' ? 'تم الرد' : 'بانتظار'}</span></td><td class="py-4 font-black text-left ${e.answer === '1' ? 'text-green-500' : (e.answer === '2' ? 'text-red-500' : 'text-gray-200')}">${e.answer ? (e.answer === '1' ? 'ممتاز 😍' : 'تحسين 😔') : '-'}</td></tr>`).join('')}</tbody>
-                    </table>
+                    <div class="pt-8">
+                        <h4 class="font-black mb-4 text-slate-800">قائمة المبيعات الجارية</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right text-xs">
+                                <tr class="border-b text-gray-400 font-bold"><th class="pb-3">العميل</th><th class="pb-3">الفرع</th><th class="pb-3">القيمة</th><th class="pb-3">الحالة</th><th class="pb-3">إجراء</th></tr>
+                                ${leads.map(l => `
+                                <tr class="border-b hover:bg-gray-50 transition">
+                                    <td class="py-3 font-bold">${l.name}<br><span class="text-[9px] text-gray-400 font-normal">${l.phone}</span></td>
+                                    <td class="py-3 font-bold text-blue-500">${l.branch}</td>
+                                    <td class="py-3 font-black">${l.amount} ر.س</td>
+                                    <td class="py-3">
+                                        <select onchange="updateLeadStatus('${l.phone}', this.value)" class="bg-gray-100 p-2 rounded-lg font-bold">
+                                            <option ${l.status === 'محتمل' ? 'selected' : ''}>محتمل</option>
+                                            <option ${l.status === 'مهتم' ? 'selected' : ''}>مهتم</option>
+                                            <option ${l.status === 'تم التواصل' ? 'selected' : ''}>تم التواصل</option>
+                                            <option ${l.status === 'تم الإغلاق' ? 'selected' : ''}>تم الإغلاق</option>
+                                        </select>
+                                    </td>
+                                    <td class="py-3">
+                                        ${l.status === 'تم الإغلاق' ? `<button onclick="genInvoice('${l.name}', ${l.amount})" class="bg-green-100 text-green-600 px-3 py-1 rounded-full font-bold">🧾 فاتورة</button>` : ''}
+                                    </td>
+                                </tr>`).join('')}
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- الإعدادات والواتساب -->
+                <div class="space-y-6">
+                    <div class="bg-white p-8 rounded-[3rem] shadow-sm border space-y-4">
+                        <h3 class="font-black text-green-600 italic">⚙️ إعدادات البوت</h3>
+                        <input id="bl" value="${branchesString}" class="w-full p-3 bg-gray-50 rounded-xl text-xs border font-bold text-blue-900" placeholder="الفروع">
+                        <input id="gl" value="${(s && s.googleLink) || '#'}" class="w-full p-3 bg-gray-50 rounded-xl text-xs border" placeholder="رابط قوقل">
+                        <button onclick="save()" class="w-full bg-slate-900 text-white p-4 rounded-2xl font-black">حفظ الإعدادات</button>
+                    </div>
+                    <div id="qrc" class="bg-white p-6 rounded-[3rem] border-2 border-dashed border-blue-100 flex items-center justify-center min-h-[200px]"></div>
                 </div>
             </div>
         </div>
 
         <script>
-            document.getElementById('accessKey').value = localStorage.getItem('bot_key') || '';
-            document.getElementById('br').addEventListener('change', (e) => {
-                const sel = document.getElementById('selBr');
-                if(sel) sel.innerText = e.target.value;
-            });
+            localStorage.setItem('bot_key', document.getElementById('accessKey').value || localStorage.getItem('bot_key') || '');
+            document.getElementById('accessKey').value = localStorage.getItem('bot_key');
+
+            async function addLead() {
+                const key = document.getElementById('accessKey').value;
+                const body = {
+                    name: document.getElementById('ln').value,
+                    phone: document.getElementById('lp').value,
+                    amount: document.getElementById('la').value,
+                    branch: document.getElementById('lbr').value
+                };
+                const res = await fetch('/api/leads/add?key=' + key, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+                if(res.ok) location.reload();
+            }
+
+            async function updateLeadStatus(phone, status) {
+                const key = document.getElementById('accessKey').value;
+                await fetch('/api/leads/update-status?key=' + key, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({phone, status}) });
+                if(status === 'تم الإغلاق') location.reload();
+            }
+
+            function genInvoice(name, amount) {
+                // توجيه لصفحة مولد الفواتير مع تعبئة البيانات في الرابط
+                window.location.href = '/gen?clientName=' + encodeURIComponent(name) + '&baseAmount=' + amount;
+            }
 
             async function chk(){
                 try {
@@ -223,106 +318,34 @@ app.get('/admin', async (req, res) => {
                     const t = document.getElementById('stat');
                     const q = document.getElementById('qrc');
                     if(d.isReady){
-                        o.className='w-3 h-3 rounded-full bg-green-500 animate-pulse'; t.innerText='متصل الآن';
-                        q.innerHTML='<div class="text-center font-black text-green-600 tracking-tighter uppercase italic text-xl">System Active ✅</div>';
+                        o.className='w-3 h-3 rounded-full bg-green-500 animate-pulse'; t.innerText='متصل';
+                        q.innerHTML='<p class="text-green-600 font-black text-xl italic uppercase">System Online ✅</p>';
                     } else if(d.lastQR){
                         o.className='w-3 h-3 rounded-full bg-amber-500'; t.innerText='بانتظار المسح';
-                        q.innerHTML='<div class="text-center"><p class="text-[9px] font-black mb-4 text-gray-400 uppercase italic text-center">قم بمسح الكود للربط</p><img src="'+d.lastQR+'" class="mx-auto w-44 rounded-3xl shadow-xl border-4 border-white"></div>';
+                        q.innerHTML='<img src="'+d.lastQR+'" class="w-40 rounded-2xl shadow-xl">';
                     }
                 } catch(e){}
             }
             setInterval(chk, 4000); chk();
 
-            async function logout() {
-                const key = document.getElementById('accessKey').value;
-                if(!key) return alert('أدخل مفتاح الوصول أولاً');
-                if(!confirm('هل أنت متأكد؟ سيتم قطع الاتصال بالكامل.')) return;
-                const r = await fetch('/api/logout?key=' + key, { method: 'POST' });
-                if(r.ok) { alert('تم مسح الجلسة. انتظر إعادة التشغيل.'); location.reload(); }
-            }
-
-            async function send(){
-                const p = document.getElementById('p').value;
-                const n = document.getElementById('n').value;
-                const b = document.getElementById('br').value;
-                const key = document.getElementById('accessKey').value;
-                if(!p || !key) return alert('أدخل الرقم والمفتاح');
-                
-                localStorage.setItem('bot_key', key);
-                const res = await fetch('/send-evaluation?key=' + key, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({phone: p, name: n, branch: b})
-                });
-                if(res.ok) { alert('✅ تم الإرسال لـ ' + b); location.reload(); }
-                else alert('❌ فشل: تأكد من مفتاح الوصول');
-            }
-
             async function save(){
                 const key = document.getElementById('accessKey').value;
-                const d = {
-                    googleLink: document.getElementById('gl').value,
-                    discountCode: document.getElementById('dc').value,
-                    delay: document.getElementById('dl').value,
-                    branches: document.getElementById('bl').value
-                };
-                const res = await fetch('/update-settings?key=' + key, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(d)
-                });
-                if(res.ok) { alert('✅ تم حفظ الإعدادات'); location.reload(); }
+                const d = { branches: document.getElementById('bl').value, googleLink: document.getElementById('gl').value };
+                await fetch('/update-settings?key=' + key, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(d) });
+                location.reload();
             }
         </script>
     </body></html>`);
 });
 
-app.post('/send-evaluation', async (req, res) => {
-    if (req.query.key !== WEBHOOK_KEY) return res.status(401).json({error: 'Unauthorized'});
-    const { phone, name, branch } = req.body;
-    let p = phone.replace(/\D/g, ''); 
-    if (p.startsWith('05')) p = '966' + p.substring(1);
-    else if (p.startsWith('5') && p.length === 9) p = '966' + p;
-
-    const branchName = branch || "فرع افتراضي";
-
-    if (dbConnected) {
-        await db.collection('evaluations').insertOne({ 
-            phone: p, 
-            name, 
-            branch: branchName,
-            status: 'sent', 
-            sentAt: new Date() 
-        });
-    }
-    
-    const greetings = [`مرحباً ${name || 'عزيزنا'}، نورتنا اليوم! ✨`,`أهلاً بك ${name || 'يا غالي'}، سعدنا بزيارتك لنا في ${branchName}. 😊`,`حيّاك الله ${name || 'عميلنا العزيز'}، نشكرك على اختيارك ${branchName}. 🌸`];
-    const randomMsg = greetings[Math.floor(Math.random() * greetings.length)];
-    const config = dbConnected ? await db.collection('config').findOne({ _id: 'global_settings' }) : { delay: 0 };
-
-    setTimeout(async () => {
-        if (isReady && sock) {
-            try {
-                // إضافة اسم الفرع في نص الرسالة الرئيسي
-                const messageText = `${randomMsg}\n\nكيف كانت تجربتك معنا في ${branchName}؟\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`;
-                await sock.sendMessage(p + "@s.whatsapp.net", { text: messageText });
-            } catch (err) { console.error("Send Error:", err.message); }
-        }
-    }, (parseInt(config?.delay) || 0) * 60000 + 500);
-    res.json({ success: true });
-});
-
 app.post('/update-settings', async (req, res) => {
     if (req.query.key !== WEBHOOK_KEY) return res.sendStatus(401);
-    const { googleLink, discountCode, delay, branches } = req.body;
+    const { googleLink, branches } = req.body;
     if (dbConnected) {
-        await db.collection('config').updateOne({ _id: 'global_settings' }, { $set: { googleLink, discountCode, delay: parseInt(delay) || 0, branches: branches } }, { upsert: true });
+        await db.collection('config').updateOne({ _id: 'global_settings' }, { $set: { googleLink, branches } }, { upsert: true });
     }
     res.json({ success: true });
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, async () => { 
-    await initMongo(); 
-    await connectToWhatsApp(); 
-});
+app.listen(PORT, async () => { await initMongo(); await connectToWhatsApp(); });
