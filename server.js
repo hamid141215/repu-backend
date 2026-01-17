@@ -181,18 +181,46 @@ app.get('/admin', async (req, res) => {
 });
 
 app.post('/api/send', async (req, res) => {
+    // 1. التحقق من المفتاح
     if (req.query.key !== CONFIG.webhookKey) return res.sendStatus(401);
+    
     let { phone, name, branch } = req.body;
-    let p = phone.replace(/\D/g, '');
+    if (!phone) return res.status(400).json({ error: 'الرقم مطلوب' });
+
+    // 2. تنظيف وتنسيق الرقم
+    let p = phone.replace(/\D/g, ''); // إزالة أي شيء ليس رقماً
     if (p.startsWith('05')) p = '966' + p.substring(1);
-    await db.collection('evaluations').insertOne({ phone: p, name, branch, status: 'sent', sentAt: new Date() });
-    setTimeout(async () => {
+    if (p.length === 9) p = '966' + p;
+
+    const jid = p + "@s.whatsapp.net"; // الصيغة الصحيحة لواتساب
+
+    try {
+        // 3. حفظ في قاعدة البيانات
+        await db.collection('evaluations').insertOne({ 
+            phone: p, 
+            name, 
+            branch, 
+            status: 'sent', 
+            sentAt: new Date() 
+        });
+
+        // 4. الإرسال (مع التأكد من حالة الاتصال)
         if (isReady && sock) {
-            const msg = `أهلاً بك ${name || ''}، كيف كانت تجربتك في ${branch || 'فرعنا'}؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`;
-            await sock.sendMessage(p + "@s.whatsapp.net", { text: msg });
+            setTimeout(async () => {
+                const msg = `أهلاً بك ${name || ''}، كيف كانت تجربتك في ${branch || 'فرعنا'}؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`;
+                await sock.sendMessage(jid, { text: msg });
+                console.log(`✅ Message sent to: ${jid}`);
+            }, CONFIG.delay + 1000);
+            
+            res.json({ success: true });
+        } else {
+            console.log("❌ Bot is not connected yet");
+            res.status(503).json({ error: 'البوت غير متصل حالياً' });
         }
-    }, CONFIG.delay + 1000);
-    res.json({ success: true });
+    } catch (err) {
+        console.error("❌ Send Error:", err.message);
+        res.status(500).json({ error: 'فشل في الإرسال' });
+    }
 });
 
 app.post('/api/settings', async (req, res) => {
