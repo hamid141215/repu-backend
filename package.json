@@ -1,4 +1,7 @@
 {
+  "name": "mawja-bot-pro",
+  "version": "12.5.0",
+  "main": "index.js",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.6.0",
     "dotenv": "^16.4.0",
@@ -7,5 +10,7 @@
     "mongodb": "^6.3.0",
     "pino": "^8.19.0"
   },
-  "scripts": { "start": "node index.js" }
+  "scripts": {
+    "start": "node index.js"
+  }
 }
