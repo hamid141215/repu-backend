@@ -4,3 +4,4 @@ auth_new_session/
 .wwebjs_auth/
 .wwebjs_cache/
 npm-debug.log*
+auth_stable_v111
