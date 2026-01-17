@@ -59,9 +59,14 @@ async function connectToWhatsApp() {
     const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1017531287] }));
 
     sock = makeWASocket({
-        auth: state, version,
+        auth: state,
+        version,
         browser: Browsers.macOS('Desktop'),
-        logger: pino({ level: 'silent' })
+        logger: pino({ level: 'silent' }),
+        printQRInTerminal: false,
+        syncFullHistory: false, // لتقليل تعليق الرسائل
+        shouldSyncHistoryMessage: () => false, // عدم مزامنة الرسائل القديمة لتسريع الاتصال
+        linkPreview: false // تعطيل معاينة الروابط مؤقتاً لضمان وصول النص
     });
 
     sock.ev.on('creds.update', async () => { await saveCreds(); await syncSession('save'); });
