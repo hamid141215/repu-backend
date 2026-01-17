@@ -84,15 +84,31 @@ async function connectToWhatsApp() {
 
     sock.ev.on('connection.update', (u) => {
         const { connection, lastDisconnect, qr } = u;
-        if (qr) lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
-        if (connection === 'open') { isReady = true; lastQR = null; console.log("✅ WhatsApp Connected."); }
+        
+        // تحديث الكود فوراً عند استلامه
+        if (qr) {
+            console.log("📥 New QR Received");
+            lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
+        }
+        
+        if (connection === 'open') { 
+            isReady = true; 
+            lastQR = null; 
+            console.log("✅ WhatsApp Connected."); 
+        }
+        
         if (connection === 'close') {
             isReady = false;
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (!shouldReconnect) {
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            console.log("⚠️ Connection closed, status:", statusCode);
+
+            // إذا كان الخطأ بسبب انتهاء الجلسة أو تعارض، احذف الجلسة وابدأ من جديد
+            if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+                console.log("❌ Logged out. Cleaning session...");
                 fs.rmSync(SESSION_DIR, { recursive: true, force: true });
-                db.collection('session').deleteOne({ _id: 'creds' });
+                if(db) db.collection('session').deleteOne({ _id: 'creds' });
             }
+            
             setTimeout(connectToWhatsApp, 5000);
         }
     });
