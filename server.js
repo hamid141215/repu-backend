@@ -65,16 +65,28 @@ async function syncSession(action) {
 
 // --- اتصال واتساب (Baileys) ---
 async function connectToWhatsApp() {
-    const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = await import('@whiskeysockets/baileys');
+    const { 
+        default: makeWASocket, 
+        useMultiFileAuthState, 
+        DisconnectReason, 
+        Browsers,
+        fetchLatestBaileysVersion 
+    } = await import('@whiskeysockets/baileys');
     
     await syncSession('restore');
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
 
+    // جلب أحدث إصدار من واتساب لتجنب خطأ 405
+    const { version } = await fetchLatestBaileysVersion();
+    console.log(`Checking WhatsApp Version: ${version}`);
+
     sock = makeWASocket({
         auth: state,
-        browser: Browsers.macOS('Desktop'),
+        version: version, // استخدام أحدث إصدار تم جلبه
+        browser: Browsers.macOS('Desktop'), // تغيير المتصفح لزيادة التوافق
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: false
+        printQRInTerminal: false,
+        mobile: false // التأكد من عدم تفعيل وضع الموبايل
     });
 
     sock.ev.on('creds.update', async () => { 
@@ -85,26 +97,24 @@ async function connectToWhatsApp() {
     sock.ev.on('connection.update', (u) => {
         const { connection, lastDisconnect, qr } = u;
         
-        // تحديث الكود فوراً عند استلامه
         if (qr) {
-            console.log("📥 New QR Received");
+            console.log("📥 QR Code Generated Successfully");
             lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
         }
         
         if (connection === 'open') { 
             isReady = true; 
             lastQR = null; 
-            console.log("✅ WhatsApp Connected."); 
+            console.log("✅ WhatsApp Connected Successfully!"); 
         }
         
         if (connection === 'close') {
             isReady = false;
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            console.log("⚠️ Connection closed, status:", statusCode);
-
-            // إذا كان الخطأ بسبب انتهاء الجلسة أو تعارض، احذف الجلسة وابدأ من جديد
-            if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-                console.log("❌ Logged out. Cleaning session...");
+            
+            // إذا استمر خطأ 405 أو تم تسجيل الخروج، نظف الجلسة تماماً
+            if (statusCode === 405 || statusCode === DisconnectReason.loggedOut) {
+                console.log("❌ Connection Rejected (405). Cleaning session...");
                 fs.rmSync(SESSION_DIR, { recursive: true, force: true });
                 if(db) db.collection('session').deleteOne({ _id: 'creds' });
             }
@@ -112,6 +122,9 @@ async function connectToWhatsApp() {
             setTimeout(connectToWhatsApp, 5000);
         }
     });
+    
+    // ... باقي الكود (messages.upsert)
+}
 
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
