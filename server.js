@@ -9,7 +9,14 @@ const { MongoClient } = require('mongodb');
 const app = express();
 app.use(express.json());
 
-// --- الإعدادات الفنية ---
+// --- الإعدادات الداخلية الثابتة (يتم تعديلها برمجياً فقط) ---
+const INTERNAL_CONFIG = {
+    googleLink: "https://maps.google.com/?q=YourBusiness", // رابط جوجل ماب الخاص بالعميل
+    discountCode: "MAWJA2026",                            // كود الخصم الافتراضي
+    delayMinutes: 0                                       // وقت التأخير بالدقائق (0 للإرسال الفوري)
+};
+
+// --- الإعدادات الفنية للسيرفر ---
 const SESSION_PATH = 'auth_stable_v111'; 
 const MONGO_URL = process.env.MONGO_URL;
 const WEBHOOK_KEY = process.env.WEBHOOK_KEY;
@@ -58,8 +65,7 @@ async function connectToWhatsApp() {
     const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1017531287] }));
 
     sock = makeWASocket({
-        auth: state, 
-        version,
+        auth: state, version,
         logger: pino({ level: 'error' }),
         browser: Browsers.macOS('Desktop'), 
         printQRInTerminal: false,
@@ -73,23 +79,14 @@ async function connectToWhatsApp() {
     sock.ev.on('connection.update', (u) => {
         const { connection, lastDisconnect, qr } = u;
         if (qr) lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
-        
-        if (connection === 'open') { 
-            isReady = true; 
-            lastQR = null; 
-            console.log("✅ WhatsApp Connected v11.1"); 
-        }
-        
+        if (connection === 'open') { isReady = true; lastQR = null; console.log("✅ Mawjat AlSamt v12.2 is LIVE"); }
         if (connection === 'close') {
             isReady = false;
             const code = lastDisconnect?.error?.output?.statusCode;
             if (code === DisconnectReason.loggedOut) {
-                console.log("❌ Session Logged Out. Clearing local data...");
                 fs.rmSync(SESSION_PATH, { recursive: true, force: true });
                 setTimeout(connectToWhatsApp, 5000);
-            } else {
-                setTimeout(connectToWhatsApp, 5000);
-            }
+            } else setTimeout(connectToWhatsApp, 5000);
         }
     });
 
@@ -101,13 +98,9 @@ async function connectToWhatsApp() {
             const rawPhone = msg.key.remoteJid.split('@')[0];
             const cleanPhone = rawPhone.replace(/\D/g, '');
             const phoneSuffix = cleanPhone.slice(-9); 
-            
             const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
 
             if (text === "1" || text === "2") {
-                const s = dbConnected ? await db.collection('config').findOne({ _id: 'global_settings' }) : null;
-                const config = s || { googleLink: "#", discountCode: "OFFER10" };
-                
                 if (dbConnected) {
                     await db.collection('evaluations').findOneAndUpdate(
                         { phone: { $regex: phoneSuffix + "$" }, status: 'sent' },
@@ -115,105 +108,178 @@ async function connectToWhatsApp() {
                         { sort: { sentAt: -1 } }
                     );
                 }
-                
-                const reply = text === "1" ? `يسعدنا تقييمك! 😍\n📍 ${config.googleLink}` : `نعتذر منك 😔\n🎫 كود الخصم: ${config.discountCode}`;
+                const reply = text === "1" ? `يسعدنا تقييمك! 😍\n📍 ${INTERNAL_CONFIG.googleLink}` : `نعتذر منك 😔\n🎫 كود الخصم لزيارتك القادمة: ${INTERNAL_CONFIG.discountCode}`;
                 await sock.sendMessage(msg.key.remoteJid, { text: reply });
             }
-        } catch (e) { console.log("Upsert Error:", e.message); }
+        } catch (e) {}
     });
 }
 
-// --- الواجهة ولوحة التحكم ---
+// --- مسارات النظام ---
 app.get('/api/status', (req, res) => res.json({ isReady, lastQR }));
+
 app.get('/', (req, res) => res.redirect('/admin'));
 
-app.post('/api/logout', async (req, res) => {
-    if (req.query.key !== WEBHOOK_KEY) return res.sendStatus(401);
-    try {
-        if (sock) sock.logout();
-        isReady = false;
-        lastQR = null;
-        fs.rmSync(SESSION_PATH, { recursive: true, force: true });
-        if (dbConnected) await db.collection('final_v111').deleteOne({ _id: 'creds' });
-        res.json({ success: true });
-        setTimeout(() => process.exit(0), 1000); 
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 app.get('/admin', async (req, res) => {
-    const defaultBranches = "فرع جدة, فرع الرياض, فرع الخبر";
     const s = dbConnected ? await db.collection('config').findOne({ _id: 'global_settings' }) : null;
-    
-    // تأكد من وجود الفروع حتى لو كانت الإعدادات فارغة
-    const branchesString = (s && s.branches) ? s.branches : defaultBranches;
-    const googleLink = (s && s.googleLink) ? s.googleLink : "#";
-    const discountCode = (s && s.discountCode) ? s.discountCode : "OFFER10";
-    const delay = (s && s.delay !== undefined) ? s.delay : 0;
-
-    const evals = dbConnected ? await db.collection('evaluations').find().sort({ sentAt: -1 }).limit(20).toArray() : [];
+    const branchesString = (s && s.branches) ? s.branches : "فرع جدة, فرع الرياض, فرع الخبر";
     const branchList = branchesString.split(',').map(b => b.trim()).filter(b => b.length > 0);
 
-    res.send(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>نظام الفروع - موجة الصمت</title><script src="https://cdn.tailwindcss.com"></script><style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');body{font-family:'Cairo',sans-serif;background-color:#f8fafc;}</style></head>
+    const evals = dbConnected ? await db.collection('evaluations').find().sort({ sentAt: -1 }).toArray() : [];
+
+    // إحصائيات الرضا المتقدمة
+    const totalSent = evals.length;
+    const totalReplied = evals.filter(e => e.status === 'replied').length;
+    const responseRate = totalSent > 0 ? ((totalReplied / totalSent) * 100).toFixed(1) : 0;
+    const positiveCount = evals.filter(e => e.answer === '1').length;
+    const negativeCount = evals.filter(e => e.answer === '2').length;
+    
+    // تحليل الفروع
+    const branchStats = branchList.map(name => {
+        const bEvals = evals.filter(e => e.branch === name);
+        const bPositive = bEvals.filter(e => e.answer === '1').length;
+        const bNegative = bEvals.filter(e => e.answer === '2').length;
+        return { name, total: bEvals.length, pos: bPositive, neg: bNegative };
+    });
+
+    res.send(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>Mawjat Analytics v12.2</title><script src="https://cdn.tailwindcss.com"></script><style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');body{font-family:'Cairo',sans-serif;background-color:#f8fafc;}</style></head>
     <body class="p-4 md:p-8 text-right">
-        <div class="max-w-6xl mx-auto space-y-8">
-            <header class="flex justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-sm border">
-                <div><h1 class="text-2xl font-black italic text-slate-800">MAWJAT <span class="text-blue-600">ALSAMT</span></h1><p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Multi-Branch SaaS Panel</p></div>
+        <div class="max-w-7xl mx-auto space-y-6">
+            
+            <!-- Header Panel -->
+            <header class="flex justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
                 <div class="flex items-center gap-4">
-                    <button onclick="logout()" class="text-[10px] bg-red-50 text-red-600 px-3 py-2 rounded-xl border border-red-100 font-bold hover:bg-red-600 hover:text-white transition-all">إعادة ضبط الاتصال 🔄</button>
-                    <input type="password" id="accessKey" placeholder="مفتاح الوصول" class="text-xs p-3 border rounded-2xl outline-none focus:border-blue-500 bg-gray-50">
-                    <div class="bg-gray-50 px-4 py-2 rounded-2xl border text-[10px] font-bold flex items-center gap-2"><div id="dot" class="w-3 h-3 rounded-full bg-red-500"></div><span id="stat">Checking...</span></div>
+                    <div class="bg-blue-600 p-3 rounded-2xl shadow-lg shadow-blue-200">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </div>
+                    <div><h1 class="text-2xl font-black italic text-slate-800 tracking-tighter">MAWJAT <span class="text-blue-600">ANALYTICS</span></h1><p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Branch Reputation Monitor</p></div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <input type="password" id="accessKey" placeholder="Access Key" class="text-xs p-3 border rounded-2xl outline-none focus:border-blue-500 bg-gray-50 border-slate-200">
+                    <div class="bg-slate-900 text-white px-5 py-2.5 rounded-2xl text-[10px] font-bold flex items-center gap-3 shadow-xl"><div id="dot" class="w-2.5 h-2.5 rounded-full bg-red-500"></div><span id="stat">Disconnected</span></div>
                 </div>
             </header>
 
-            <div class="grid lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2 bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 space-y-6">
-                    <h3 class="font-black text-blue-600 flex items-center gap-2"><span>📤</span> إرسال تقييم جديد</h3>
-                    <div class="grid md:grid-cols-2 gap-4">
-                        <input id="p" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border font-bold text-center outline-none focus:ring-4 ring-blue-50">
-                        <input id="n" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 rounded-2xl border font-bold text-center outline-none focus:ring-4 ring-blue-50">
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-gray-400 mr-2 uppercase tracking-tighter">اختر الفرع من القائمة</label>
-                        <select id="br" class="w-full p-4 bg-blue-50 text-blue-900 rounded-2xl border border-blue-100 font-black outline-none appearance-none cursor-pointer">
-                            ${branchList.map(b => `<option value="${b}">${b}</option>`).join('')}
-                        </select>
-                    </div>
-                    <button onclick="send()" id="sb" class="w-full bg-blue-600 text-white p-5 rounded-2xl font-black text-lg shadow-xl hover:bg-blue-700 active:scale-95 transition">إرسال لفرع <span id="selBr">${branchList[0] || '...'}</span></button>
+            <!-- Stats Overview -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+                    <p class="text-[10px] text-gray-400 font-black mb-1 uppercase">إجمالي الطلبات</p>
+                    <h3 class="text-3xl font-black text-slate-800">${totalSent}</h3>
                 </div>
-
-                <div class="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 space-y-4">
-                    <h3 class="font-black text-green-600 flex items-center gap-2"><span>⚙️</span> إعدادات النظام</h3>
-                    <div class="space-y-3">
-                        <div><label class="block text-[10px] font-bold text-gray-400 mr-2">رابط قوقل ماب</label><input id="gl" value="${googleLink}" class="w-full p-3 bg-gray-50 rounded-xl text-xs border outline-none"></div>
-                        <div><label class="block text-[10px] font-bold text-blue-600 mr-2 uppercase">إدارة الفروع (افصل بـ ,)</label><input id="bl" value="${branchesString}" class="w-full p-3 bg-gray-50 rounded-xl text-xs border font-bold text-blue-900"></div>
-                        <div class="flex gap-2">
-                            <div class="w-1/2"><label class="block text-[10px] font-bold text-gray-400 mr-2">كود الخصم</label><input id="dc" value="${discountCode}" class="w-full p-3 bg-gray-50 rounded-xl text-center font-bold text-blue-600 border"></div>
-                            <div class="w-1/2"><label class="block text-[10px] font-bold text-gray-400 mr-2">تأخير (د)</label><input id="dl" value="${delay}" class="w-full p-3 bg-gray-50 rounded-xl text-center font-bold border"></div>
-                        </div>
-                    </div>
-                    <button onclick="save()" class="w-full bg-slate-900 text-white p-4 rounded-2xl font-black hover:bg-black transition">حفظ التغييرات</button>
+                <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+                    <p class="text-[10px] text-gray-400 font-black mb-1 uppercase">معدل الاستجابة</p>
+                    <h3 class="text-3xl font-black text-blue-600">${responseRate}%</h3>
+                </div>
+                <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm border-r-4 border-r-green-500">
+                    <p class="text-[10px] text-gray-400 font-black mb-1 uppercase text-green-600">تقييمات ممتازة</p>
+                    <h3 class="text-3xl font-black text-green-600">${positiveCount}</h3>
+                </div>
+                <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm border-r-4 border-r-red-500">
+                    <p class="text-[10px] text-gray-400 font-black mb-1 uppercase text-red-600">ملاحظات سلبية</p>
+                    <h3 class="text-3xl font-black text-red-600">${negativeCount}</h3>
                 </div>
             </div>
 
-            <div id="qrc" class="bg-white p-8 rounded-[3rem] border-2 border-dashed border-blue-100 flex items-center justify-center min-h-[150px]"></div>
+            <div class="grid lg:grid-cols-3 gap-8">
+                <!-- Main Operations -->
+                <div class="lg:col-span-2 space-y-8">
+                    
+                    <!-- Quick Send Card -->
+                    <div class="bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50"></div>
+                        <h3 class="font-black text-blue-900 text-xl mb-8 flex items-center gap-3"><span>🚀</span> إرسال طلب تقييم فوري</h3>
+                        <div class="grid md:grid-cols-2 gap-6 mb-8">
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">رقم الجوال</label>
+                                <input id="p" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border border-slate-100 font-bold text-center text-lg focus:ring-4 ring-blue-50 transition-all outline-none">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">الفرع</label>
+                                <select id="br" class="w-full p-4 bg-blue-50 text-blue-900 rounded-2xl border border-blue-100 font-black text-center appearance-none cursor-pointer outline-none">
+                                    ${branchList.map(b => `<option value="${b}">${b}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        <button onclick="sendQuick()" class="w-full bg-blue-600 text-white p-5 rounded-3xl font-black text-xl shadow-2xl shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all">بدء المحادثة الآلية</button>
+                    </div>
 
-            <div class="bg-white p-8 rounded-[3rem] shadow-sm border overflow-hidden">
-                <h3 class="font-black mb-6 text-slate-800 flex justify-between items-center">📊 سجل المتابعة الذكي <span class="text-[10px] bg-blue-50 px-3 py-1 rounded-full text-blue-600 uppercase tracking-widest">Reports v11.1</span></h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-right text-sm">
-                        <thead><tr class="border-b text-gray-400 text-[10px] font-black uppercase"><th class="pb-4">العميل</th><th class="pb-4">الفرع</th><th class="pb-4 text-center">الحالة</th><th class="pb-4 text-left">الرد</th></tr></thead>
-                        <tbody>${evals.map(e => `<tr class="border-b hover:bg-gray-50 transition"><td class="py-4 font-bold text-slate-700">${e.phone}</td><td class="py-4 font-bold text-blue-500 text-[11px]">${e.branch || '-'}</td><td class="py-4 text-center"><span class="px-3 py-1 rounded-full text-[9px] font-black ${e.status === 'replied' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}">${e.status === 'replied' ? 'تم الرد' : 'بانتظار'}</span></td><td class="py-4 font-black text-left ${e.answer === '1' ? 'text-green-500' : (e.answer === '2' ? 'text-red-500' : 'text-gray-200')}">${e.answer ? (e.answer === '1' ? 'ممتاز 😍' : 'تحسين 😔') : '-'}</td></tr>`).join('')}</tbody>
-                    </table>
+                    <!-- Performance Table -->
+                    <div class="bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100">
+                        <h3 class="font-black text-slate-800 mb-8 uppercase tracking-tighter text-sm flex justify-between items-center">
+                            أداء الفروع الميداني 
+                            <span class="text-[9px] bg-slate-100 px-4 py-1 rounded-full text-slate-500">Live Data</span>
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right">
+                                <tr class="text-[10px] text-gray-400 font-black border-b uppercase"><th class="pb-4">اسم الفرع</th><th class="pb-4 text-center">إجمالي الطلبات</th><th class="pb-4 text-center text-green-600">إيجابي</th><th class="pb-4 text-center text-red-600">سلبي</th></tr>
+                                ${branchStats.map(b => `
+                                    <tr class="border-b hover:bg-slate-50 transition-all">
+                                        <td class="py-5 font-black text-slate-700">${b.name}</td>
+                                        <td class="py-5 text-center font-bold text-slate-500">${b.total}</td>
+                                        <td class="py-5 text-center text-green-600 font-black text-lg">${b.pos}</td>
+                                        <td class="py-5 text-center text-red-600 font-black text-lg">${b.neg}</td>
+                                    </tr>
+                                `).join('')}
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Side Panel -->
+                <div class="space-y-8">
+                    <!-- Branch Management -->
+                    <div class="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 space-y-6">
+                        <h3 class="font-black text-indigo-600 flex items-center gap-2"><span>📍</span> إدارة الفروع</h3>
+                        <p class="text-[10px] text-gray-400 font-bold leading-relaxed italic">أضف أسماء الفروع الخاصة بك مفصولة بفاصلة لظهورها في نظام الإرسال والتقارير.</p>
+                        <textarea id="bl" class="w-full p-5 bg-slate-50 rounded-3xl text-xs border border-slate-100 font-bold text-blue-900 h-28 focus:ring-4 ring-indigo-50 outline-none transition-all">${branchesString}</textarea>
+                        <button onclick="saveBranches()" class="w-full bg-slate-900 text-white p-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg">تحديث قائمة الفروع</button>
+                    </div>
+
+                    <!-- WhatsApp Status -->
+                    <div id="qrc" class="bg-white p-6 rounded-[3rem] border-2 border-dashed border-slate-100 flex items-center justify-center min-h-[220px]">
+                        <p class="animate-pulse text-gray-300 font-bold text-xs">جاري فحص الاتصال...</p>
+                    </div>
+
+                    <!-- Logs Snapshot -->
+                    <div class="bg-slate-900 p-8 rounded-[3rem] text-white shadow-xl">
+                        <h4 class="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-6 flex justify-between">Recent Logs <span>Live</span></h4>
+                        <div class="space-y-4">
+                            ${evals.slice(0, 4).map(e => `
+                                <div class="border-b border-white/5 pb-3">
+                                    <p class="text-[10px] font-bold">${e.phone}</p>
+                                    <div class="flex justify-between items-center mt-1">
+                                        <span class="text-[8px] opacity-40">${new Date(e.sentAt).toLocaleTimeString('ar-SA')}</span>
+                                        <span class="text-[8px] font-black ${e.status === 'replied' ? 'text-green-400' : 'text-blue-400'} uppercase">${e.status}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <script>
-            document.getElementById('accessKey').value = localStorage.getItem('bot_key') || '';
-            document.getElementById('br').addEventListener('change', (e) => {
-                const sel = document.getElementById('selBr');
-                if(sel) sel.innerText = e.target.value;
-            });
+            localStorage.setItem('bot_key', document.getElementById('accessKey').value || localStorage.getItem('bot_key') || '');
+            document.getElementById('accessKey').value = localStorage.getItem('bot_key');
+
+            async function sendQuick() {
+                const key = document.getElementById('accessKey').value;
+                const p = document.getElementById('p').value;
+                const b = document.getElementById('br').value;
+                if(!p || !key) return alert('يرجى إدخال الرقم ومفتاح الوصول أولاً');
+                const res = await fetch('/send-evaluation?key=' + key, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({phone: p, branch: b}) });
+                if(res.ok) { alert('✅ تم إرسال الطلب بنجاح'); location.reload(); }
+            }
+
+            async function saveBranches(){
+                const key = document.getElementById('accessKey').value;
+                const b = document.getElementById('bl').value;
+                if(!key) return alert('أدخل مفتاح الوصول أولاً');
+                await fetch('/update-settings?key=' + key, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({branches: b}) });
+                alert('✅ تم تحديث قائمة الفروع');
+                location.reload();
+            }
 
             async function chk(){
                 try {
@@ -223,56 +289,15 @@ app.get('/admin', async (req, res) => {
                     const t = document.getElementById('stat');
                     const q = document.getElementById('qrc');
                     if(d.isReady){
-                        o.className='w-3 h-3 rounded-full bg-green-500 animate-pulse'; t.innerText='متصل الآن';
-                        q.innerHTML='<div class="text-center font-black text-green-600 tracking-tighter uppercase italic text-xl">System Active ✅</div>';
+                        o.className='w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse'; t.innerText='Connected';
+                        q.innerHTML='<div class="text-center font-black text-blue-600 text-xs italic uppercase tracking-widest">WhatsApp Link Active</div>';
                     } else if(d.lastQR){
-                        o.className='w-3 h-3 rounded-full bg-amber-500'; t.innerText='بانتظار المسح';
-                        q.innerHTML='<div class="text-center"><p class="text-[9px] font-black mb-4 text-gray-400 uppercase italic text-center">قم بمسح الكود للربط</p><img src="'+d.lastQR+'" class="mx-auto w-44 rounded-3xl shadow-xl border-4 border-white"></div>';
+                        o.className='w-2.5 h-2.5 rounded-full bg-amber-500'; t.innerText='Awaiting QR';
+                        q.innerHTML='<div class="text-center"><p class="text-[8px] font-black text-gray-400 mb-3 uppercase">Scan to sync</p><img src="'+d.lastQR+'" class="w-36 rounded-[2rem] shadow-2xl border-4 border-white"></div>';
                     }
                 } catch(e){}
             }
-            setInterval(chk, 4000); chk();
-
-            async function logout() {
-                const key = document.getElementById('accessKey').value;
-                if(!key) return alert('أدخل مفتاح الوصول أولاً');
-                if(!confirm('هل أنت متأكد؟ سيتم قطع الاتصال بالكامل.')) return;
-                const r = await fetch('/api/logout?key=' + key, { method: 'POST' });
-                if(r.ok) { alert('تم مسح الجلسة. انتظر إعادة التشغيل.'); location.reload(); }
-            }
-
-            async function send(){
-                const p = document.getElementById('p').value;
-                const n = document.getElementById('n').value;
-                const b = document.getElementById('br').value;
-                const key = document.getElementById('accessKey').value;
-                if(!p || !key) return alert('أدخل الرقم والمفتاح');
-                
-                localStorage.setItem('bot_key', key);
-                const res = await fetch('/send-evaluation?key=' + key, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({phone: p, name: n, branch: b})
-                });
-                if(res.ok) { alert('✅ تم الإرسال لـ ' + b); location.reload(); }
-                else alert('❌ فشل: تأكد من مفتاح الوصول');
-            }
-
-            async function save(){
-                const key = document.getElementById('accessKey').value;
-                const d = {
-                    googleLink: document.getElementById('gl').value,
-                    discountCode: document.getElementById('dc').value,
-                    delay: document.getElementById('dl').value,
-                    branches: document.getElementById('bl').value
-                };
-                const res = await fetch('/update-settings?key=' + key, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(d)
-                });
-                if(res.ok) { alert('✅ تم حفظ الإعدادات'); location.reload(); }
-            }
+            setInterval(chk, 5000); chk();
         </script>
     </body></html>`);
 });
@@ -284,45 +309,30 @@ app.post('/send-evaluation', async (req, res) => {
     if (p.startsWith('05')) p = '966' + p.substring(1);
     else if (p.startsWith('5') && p.length === 9) p = '966' + p;
 
-    const branchName = branch || "فرع افتراضي";
-
     if (dbConnected) {
         await db.collection('evaluations').insertOne({ 
-            phone: p, 
-            name, 
-            branch: branchName,
-            status: 'sent', 
-            sentAt: new Date() 
+            phone: p, name, branch: branch || "فرع افتراضي", status: 'sent', sentAt: new Date() 
         });
     }
-    
-    const greetings = [`مرحباً ${name || 'عزيزنا'}، نورتنا اليوم! ✨`,`أهلاً بك ${name || 'يا غالي'}، سعدنا بزيارتك لنا في ${branchName}. 😊`,`حيّاك الله ${name || 'عميلنا العزيز'}، نشكرك على اختيارك ${branchName}. 🌸`];
-    const randomMsg = greetings[Math.floor(Math.random() * greetings.length)];
-    const config = dbConnected ? await db.collection('config').findOne({ _id: 'global_settings' }) : { delay: 0 };
 
     setTimeout(async () => {
         if (isReady && sock) {
             try {
-                // إضافة اسم الفرع في نص الرسالة الرئيسي
-                const messageText = `${randomMsg}\n\nكيف كانت تجربتك معنا في ${branchName}؟\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`;
-                await sock.sendMessage(p + "@s.whatsapp.net", { text: messageText });
-            } catch (err) { console.error("Send Error:", err.message); }
+                const branchName = branch || "فرعنا";
+                const message = `أهلاً بك، سعدنا بزيارتك لنا في ${branchName}! ✨\n\nكيف كانت تجربتك معنا؟\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`;
+                await sock.sendMessage(p + "@s.whatsapp.net", { text: message });
+            } catch (err) {}
         }
-    }, (parseInt(config?.delay) || 0) * 60000 + 500);
+    }, (INTERNAL_CONFIG.delayMinutes * 60000) + 1000);
     res.json({ success: true });
 });
 
 app.post('/update-settings', async (req, res) => {
     if (req.query.key !== WEBHOOK_KEY) return res.sendStatus(401);
-    const { googleLink, discountCode, delay, branches } = req.body;
-    if (dbConnected) {
-        await db.collection('config').updateOne({ _id: 'global_settings' }, { $set: { googleLink, discountCode, delay: parseInt(delay) || 0, branches: branches } }, { upsert: true });
-    }
+    const { branches } = req.body;
+    if (dbConnected) await db.collection('config').updateOne({ _id: 'global_settings' }, { $set: { branches } }, { upsert: true });
     res.json({ success: true });
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, async () => { 
-    await initMongo(); 
-    await connectToWhatsApp(); 
-});
+app.listen(PORT, async () => { await initMongo(); await connectToWhatsApp(); });
