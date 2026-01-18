@@ -31,9 +31,11 @@
             <div class="space-y-4">
                 <input id="name" type="text" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold italic focus:ring-4 ring-blue-50 transition-all text-right">
                 <input id="phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-center italic focus:ring-4 ring-blue-50 transition-all">
+                
                 <select id="branch" class="w-full p-4 bg-blue-600 text-white rounded-2xl font-black outline-none cursor-pointer italic appearance-none text-center">
                     {{branches}}
                 </select>
+
                 <button onclick="sendOfficialEval()" class="w-full bg-slate-900 text-white p-5 rounded-[2rem] font-black shadow-xl hover:bg-black active:scale-95 transition-all uppercase tracking-tighter text-lg">
                     إرسال عبر واتساب API
                 </button>
@@ -58,10 +60,10 @@
             const p = document.getElementById('phone').value;
             const b = document.getElementById('branch').value;
 
-            if(!p) return alert('يرجى إدخال رقم الجوال');
+            if(!p || !n) return alert('يرجى إكمال بيانات العميل');
 
             try {
-                // إرسال الطلب للسيرفر الذي سيوجهه لـ Twilio
+                // ملاحظة: {{webhookKey}} سيقوم السيرفر باستبدالها تلقائياً
                 const res = await fetch(`/api/send?key={{webhookKey}}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -69,11 +71,13 @@
                 });
 
                 if(res.ok) {
-                    alert('✅ تم إرسال القالب بنجاح عبر النظام الرسمي');
+                    alert('✅ تم إرسال طلب التقييم للعميل بنجاح');
                     document.getElementById('name').value = '';
                     document.getElementById('phone').value = '';
+                } else if(res.status === 401) {
+                    alert('❌ خطأ في الكلمة السرية (Unauthorized)');
                 } else {
-                    alert('❌ فشل الإرسال: تأكد من إعدادات Twilio في Render');
+                    alert('❌ فشل الإرسال: تحقق من إعدادات Twilio في Render');
                 }
             } catch (error) {
                 alert('❌ خطأ في الاتصال بالسيرفر');
