@@ -17,9 +17,10 @@ const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWIL
 const CONFIG = {
     mongoUrl: process.env.MONGO_URL,
     webhookKey: process.env.WEBHOOK_KEY,
-    twilioNumber: process.env.TWILIO_PHONE_NUMBER, // يجب أن يبدأ بـ whatsapp:
+    twilioNumber: process.env.TWILIO_PHONE_NUMBER,
     googleLink: process.env.Maps_LINK || "#",
-    branches: ['فرع الرياض', 'فرع جدة', 'فرع الدمام', 'فرع مكة'] // أضف فروعك هنا
+    adminPhone: process.env.MANAGER_PHONE, // هنا ربطناه بالاسم الذي اخترته في Render
+    branches: ['فرع الرياض', 'فرع جدة', 'فرع الدمام', 'فرع مكة']
 };
 
 let db;
@@ -88,36 +89,68 @@ app.post('/whatsapp/webhook', async (req, res) => {
     const customerAnswer = Body ? Body.trim() : "";
     const rawPhone = From ? From.replace('whatsapp:+', '') : "";
 
-    console.log(`Message from ${rawPhone}: ${customerAnswer}`);
+    // 1. البحث عن آخر طلب إرسال "معلق" فقط (Status: sent)
+    // هذا يضمن أن العميل لو رد مرة ثانية لن يجد طلباً نشطاً
+    const lastEval = await db.collection('evaluations').findOne(
+        { phone: { $regex: rawPhone.slice(-9) + "$" }, status: 'sent' },
+        { sort: { sentAt: -1 } }
+    );
 
-    let replyMsg = "";
-    
-    // تصنيف الرد
-    if (customerAnswer === "1") {
-        replyMsg = `يسعدنا تقييمك! 😍\n📍 يرجى إضافة تقييمك هنا: ${CONFIG.googleLink}`;
-    } else if (customerAnswer === "2") {
-        replyMsg = `نعتذر منك 😔، تم إرسال ملاحظتك للإدارة وسيتم التواصل معك لحل المشكلة.`;
+    // إذا لم يجد طلب بانتظار الرد، يرسل رد فارغ ويخرج (يمنع الرد على الرسائل المتكررة)
+    if (!lastEval) {
+        res.type('text/xml');
+        return res.send('<Response></Response>');
     }
 
-    if (replyMsg) {
-        // تحديث قاعدة البيانات بالرد
-        await db.collection('evaluations').findOneAndUpdate(
-            { phone: { $regex: rawPhone.slice(-9) + "$" }, status: 'sent' },
-            { $set: { status: 'replied', answer: customerAnswer, repliedAt: new Date() } },
-            { sort: { sentAt: -1 } }
+    let replyMsg = "";
+    let isNegative = false; // علامة لمعرفة إذا كان التقييم سلبي
+
+    if (customerAnswer === "1") {
+        replyMsg = `يسعدنا تقييمك! 😍\n📍 يرجى إضافة تقييمك هنا: ${CONFIG.googleLink}`;
+        
+        // تحديث الحالة فوراً لمنع الرد مرة أخرى
+        await db.collection('evaluations').updateOne(
+            { _id: lastEval._id },
+            { $set: { status: 'replied', answer: '1', repliedAt: new Date() } }
         );
 
-        // إرسال الرد التلقائي
+    } else if (customerAnswer === "2") {
+        replyMsg = `نعتذر منك 😔، تم إرسال ملاحظتك للإدارة وسيتم التواصل معك قريباً لحل المشكلة.`;
+        isNegative = true;
+
+        // تحديث الحالة فوراً لمنع الرد مرة أخرى
+        await db.collection('evaluations').updateOne(
+            { _id: lastEval._id },
+            { $set: { status: 'replied', answer: '2', repliedAt: new Date() } }
+        );
+    }
+
+    // إرسال الرد للعميل (إذا كان 1 أو 2)
+    if (replyMsg) {
         try {
             await twilioClient.messages.create({
                 from: CONFIG.twilioNumber,
                 body: replyMsg,
                 to: From
             });
-        } catch (err) { console.error("Reply Error:", err.message); }
+
+            // --- إرسال تنبيه للمدير إذا كان التقييم سلبي (رقم 2) ---
+            if (isNegative && CONFIG.adminPhone) {
+                await twilioClient.messages.create({
+                    from: CONFIG.twilioNumber,
+                    body: `⚠️ *تنبيه تقييم سلبي!*\n\n*العميل:* ${lastEval.name}\n*الجوال:* ${rawPhone}\n*الفرع:* ${lastEval.branch}\n*التقييم:* يحتاج تحسين (2)`,
+                    to: CONFIG.adminPhone
+                });
+                console.log("تم تنبيه المدير بنجاح");
+            }
+        } catch (err) {
+            console.error("خطأ في إرسال الرسائل:", err.message);
+        }
     }
 
-    res.sendStatus(200); // إغلاق الطلب بنجاح
+    // إرسال XML فارغ لإنهاء المحادثة ومنع ظهور كلمة OK
+    res.type('text/xml');
+    res.send('<Response></Response>');
 });
 
 const PORT = process.env.PORT || 10000;
