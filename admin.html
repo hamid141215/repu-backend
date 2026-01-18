@@ -3,53 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة تحكم Mawjat Analytics | الرسمي</title>
+    <title>لوحة تحكم Mawجات | الرسمي</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Cairo', sans-serif; background-color: #f0f4f8; }
-        .card { background: white; border-radius: 2rem; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
-    </style>
+    <style>body { font-family: 'Cairo', sans-serif; background-color: #f0f4f8; }</style>
 </head>
 <body class="p-4 md:p-8">
     <div class="max-w-4xl mx-auto space-y-6">
-        <header class="card p-6 flex justify-between items-center border border-blue-100">
-            <div>
-                <h1 class="text-2xl font-black text-slate-800 tracking-tighter uppercase italic underline decoration-blue-500">MAWJAT OFFICIAL</h1>
-                <p class="text-[10px] text-blue-500 font-bold uppercase tracking-widest mt-1">Verified WhatsApp Business API</p>
-            </div>
-            <div class="flex items-center gap-3 bg-green-50 px-5 py-2.5 rounded-2xl border border-green-100">
-                <div class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
-                <span class="text-[10px] font-black uppercase text-green-600 tracking-widest">System Live</span>
+        <header class="bg-white p-6 rounded-3xl flex justify-between items-center shadow-sm">
+            <h1 class="text-2xl font-black text-slate-800 italic underline decoration-blue-500">MAWJAT OFFICIAL</h1>
+            <div class="flex items-center gap-2 bg-green-50 px-4 py-2 rounded-xl text-green-600 font-bold text-xs">
+                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div> نظام نشط
             </div>
         </header>
 
-        <div class="card p-10 border border-gray-100">
-            <h3 class="font-black text-slate-700 text-lg mb-8 italic flex items-center gap-2">
-                <span>🚀</span> إرسال طلب تقييم (قالب رسمي)
-            </h3>
+        <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100">
+            <h3 class="font-black text-slate-700 mb-6 flex items-center gap-2">🚀 إرسال طلب تقييم</h3>
             <div class="space-y-4">
-                <input id="name" type="text" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold italic focus:ring-4 ring-blue-50 transition-all text-right">
-                <input id="phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-center italic focus:ring-4 ring-blue-50 transition-all">
+                <input id="name" type="text" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 border rounded-2xl outline-none font-bold text-right">
+                <input id="phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 border rounded-2xl outline-none font-bold text-center">
+                <select id="branch" class="w-full p-4 bg-blue-600 text-white rounded-2xl font-black outline-none text-center italic">{{branches}}</select>
+                <button onclick="sendOfficialEval()" class="w-full bg-slate-900 text-white p-5 rounded-3xl font-black hover:bg-black transition-all">إرسال عبر واتساب API</button>
                 
-                <select id="branch" class="w-full p-4 bg-blue-600 text-white rounded-2xl font-black outline-none cursor-pointer italic appearance-none text-center">
-                    {{branches}}
-                </select>
-
-                <button onclick="sendOfficialEval()" class="w-full bg-slate-900 text-white p-5 rounded-[2rem] font-black shadow-xl hover:bg-black active:scale-95 transition-all uppercase tracking-tighter text-lg">
-                    إرسال عبر واتساب API
-                </button>
+                <a href="/reports/all" class="block text-center w-full bg-gray-100 text-slate-600 p-4 rounded-3xl font-bold hover:bg-gray-200 transition-all mt-4">📊 عرض تقارير التقييمات الشاملة</a>
             </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
-            <div class="card p-6 text-center border border-gray-100">
-                <p class="text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest italic">إجمالي العمليات</p>
-                <h2 class="text-3xl font-black text-slate-800 italic">{{total}}</h2>
+            <div class="bg-white p-6 rounded-3xl text-center shadow-sm">
+                <p class="text-[10px] font-black text-gray-400 uppercase italic">إجمالي العمليات</p>
+                <h2 class="text-3xl font-black text-slate-800">{{total}}</h2>
             </div>
-            <div class="card p-6 text-center border border-gray-100">
-                <p class="text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest italic">حالة التوثيق</p>
-                <h2 class="text-lg font-black text-green-600 italic">نشط ✅</h2>
+            <div class="bg-white p-6 rounded-3xl text-center shadow-sm">
+                <p class="text-[10px] font-black text-gray-400 uppercase italic">الحالة</p>
+                <h2 class="text-lg font-black text-green-600">متصل ✅</h2>
             </div>
         </div>
     </div>
@@ -59,29 +46,16 @@
             const n = document.getElementById('name').value;
             const p = document.getElementById('phone').value;
             const b = document.getElementById('branch').value;
-
-            if(!p || !n) return alert('يرجى إكمال بيانات العميل');
-
+            if(!p || !n) return alert('يرجى إكمال البيانات');
             try {
-                // ملاحظة: {{webhookKey}} سيقوم السيرفر باستبدالها تلقائياً
                 const res = await fetch(`/api/send?key={{webhookKey}}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({phone: p, name: n, branch: b})
                 });
-
-                if(res.ok) {
-                    alert('✅ تم إرسال طلب التقييم للعميل بنجاح');
-                    document.getElementById('name').value = '';
-                    document.getElementById('phone').value = '';
-                } else if(res.status === 401) {
-                    alert('❌ خطأ في الكلمة السرية (Unauthorized)');
-                } else {
-                    alert('❌ فشل الإرسال: تحقق من إعدادات Twilio في Render');
-                }
-            } catch (error) {
-                alert('❌ خطأ في الاتصال بالسيرفر');
-            }
+                if(res.ok) { alert('✅ تم الإرسال'); document.getElementById('name').value=''; document.getElementById('phone').value=''; }
+                else { alert('❌ فشل الإرسال'); }
+            } catch (e) { alert('❌ خطأ في السيرفر'); }
         }
     </script>
 </body>
