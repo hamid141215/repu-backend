@@ -2,9 +2,16 @@ require('dotenv').config();
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const twilio = require('twilio');
+const path = require('path'); // أضفنا هذا السطر للتعامل مع مسارات الملفات
 
 const app = express();
 app.use(express.json());
+
+// --- إضافة هذا الجزء لعرض لوحة التحكم ---
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin.html'));
+});
+// ---------------------------------------
 
 // إعدادات Twilio الرسمية
 const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -13,8 +20,7 @@ const CONFIG = {
     mongoUrl: process.env.MONGO_URL,
     webhookKey: process.env.WEBHOOK_KEY,
     googleLink: process.env.Maps_LINK || "#",
-    managerPhone: process.env.MANAGER_PHONE,
-    twilioNumber: process.env.TWILIO_PHONE_NUMBER // الرقم بصيغة whatsapp:+14155238886
+    twilioNumber: process.env.TWILIO_PHONE_NUMBER
 };
 
 let db;
@@ -25,7 +31,10 @@ const initMongo = async () => {
         await client.connect();
         db = client.db('whatsapp_bot');
         console.log("🔗 MongoDB Connected (Official Mode)");
-    } catch (e) { setTimeout(initMongo, 5000); }
+    } catch (e) { 
+        console.error("MongoDB Error:", e);
+        setTimeout(initMongo, 5000); 
+    }
 };
 
 // استقبال طلب الإرسال من الـ API
@@ -33,13 +42,11 @@ app.post('/api/send', async (req, res) => {
     if (req.query.key !== CONFIG.webhookKey) return res.sendStatus(401);
     let { phone, name, branch } = req.body;
     
-    // تنسيق الرقم للصيغة الدولية
     let p = String(phone).replace(/\D/g, '');
     if (p.startsWith('05')) p = '966' + p.substring(1);
     const toJid = `whatsapp:+${p}`;
 
     try {
-        // إرسال الرسالة عبر Twilio (نظام القوالب الرسمي)
         await twilioClient.messages.create({
             from: CONFIG.twilioNumber,
             body: `أهلاً بك ${name}، كيف كانت تجربتك في ${branch}؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`,
@@ -55,10 +62,12 @@ app.post('/api/send', async (req, res) => {
 });
 
 // استقبال ردود العملاء (Webhook من Twilio)
-app.post('/whatsapp/webhook', async (req, res) => {
-    const { Body, From } = req.body; // Body هو نص الرسالة، From هو رقم العميل
-    const text = Body.trim();
-    const rawPhone = From.replace('whatsapp:+', '');
+app.post('/whatsapp/webhook', express.urlencoded({ extended: false }), async (req, res) => {
+    const { Body, From } = req.body;
+    const text = Body ? Body.trim() : "";
+    const rawPhone = From ? From.replace('whatsapp:+', '') : "";
+
+    console.log(`Received message from ${rawPhone}: ${text}`);
 
     if (["1", "2"].includes(text)) {
         const evaluation = await db.collection('evaluations').findOneAndUpdate(
@@ -69,8 +78,6 @@ app.post('/whatsapp/webhook', async (req, res) => {
 
         if (evaluation) {
             let replyMsg = text === "1" ? `يسعدنا تقييمك! 😍\n📍 ${CONFIG.googleLink}` : `نعتذر منك 😔، سيتم التواصل معك لحل المشكلة.`;
-            
-            // الرد خلال نافذة الـ 24 ساعة (مجاني من Meta)
             await twilioClient.messages.create({
                 from: CONFIG.twilioNumber,
                 body: replyMsg,
@@ -82,4 +89,7 @@ app.post('/whatsapp/webhook', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, async () => { await initMongo(); });
+app.listen(PORT, async () => { 
+    console.log(`Server is running on port ${PORT}`);
+    await initMongo(); 
+});
