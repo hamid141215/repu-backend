@@ -135,18 +135,28 @@ app.post('/whatsapp/webhook', async (req, res) => {
             });
 
             // --- إرسال تنبيه للمدير إذا كان التقييم سلبي (رقم 2) ---
-            if (isNegative && CONFIG.adminPhone) {
-                await twilioClient.messages.create({
-                    from: CONFIG.twilioNumber,
-                    body: `⚠️ *تنبيه تقييم سلبي!*\n\n*العميل:* ${lastEval.name}\n*الجوال:* ${rawPhone}\n*الفرع:* ${lastEval.branch}\n*التقييم:* يحتاج تحسين (2)`,
-                    to: CONFIG.adminPhone
-                });
-                console.log("تم تنبيه المدير بنجاح");
-            }
-        } catch (err) {
-            console.error("خطأ في إرسال الرسائل:", err.message);
-        }
-    }
+            // --- إرسال تنبيه للمدير إذا كان التقييم سلبي (رقم 2) ---
+if (isNegative && CONFIG.adminPhone) {
+    // 1. تجهيز رابط الواتساب المباشر للعميل
+    const waLink = `https://wa.me/${rawPhone}`;
+
+    // 2. التأكد من تنسيق رقم المدير (whatsapp:+)
+    let adminNum = CONFIG.adminPhone.startsWith('whatsapp:') 
+                   ? CONFIG.adminPhone 
+                   : `whatsapp:${CONFIG.adminPhone}`;
+
+    await twilioClient.messages.create({
+        from: CONFIG.twilioNumber,
+        body: `⚠️ *تنبيه تقييم سلبي!*\n\n` +
+              `*العميل:* ${lastEval.name}\n` +
+              `*الجوال:* ${rawPhone}\n` +
+              `*الفرع:* ${lastEval.branch}\n` +
+              `*التقييم:* يحتاج تحسين (2)\n\n` +
+              `🔗 *للتواصل مع العميل مباشرة اضغط هنا:*\n${waLink}`, // رابط الضغط والدردشة
+        to: adminNum
+    });
+    console.log("تم إرسال التنبيه والرابط للمدير");
+}
 
     // إرسال XML فارغ لإنهاء المحادثة ومنع ظهور كلمة OK
     res.type('text/xml');
