@@ -62,7 +62,7 @@
 
             try {
                 // إرسال الطلب للسيرفر الذي سيوجهه لـ Twilio
-                const res = await fetch(`/api/send?key={{webhookKey}}`, {
+                const res = await fetch(`/api/send?key=Repu_Secure_1412`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({phone: p, name: n, branch: b})
