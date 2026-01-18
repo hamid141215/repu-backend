@@ -81,7 +81,8 @@ async function connectToWhatsApp() {
 
     sock.ev.on('connection.update', (u) => {
         const { connection, lastDisconnect, qr } = u;
-        if (qr) lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
+        // سطر مطور لضمان وضوح الكود واستجابة الكاميرا فورا
+if (qr) lastQR = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300&margin=0&format=png`;
         if (connection === 'open') { isReady = true; lastQR = null; console.log("✅ LIVE"); }
         if (connection === 'close') {
             isReady = false;
