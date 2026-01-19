@@ -11,7 +11,7 @@ app.use(express.urlencoded({ extended: true }));
 
 const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-// دالة توحيد الأرقام الدولية (E.164)
+// دالة توحيد الأرقام الدولية (E.164) لضمان دقة البيانات
 const normalizePhone = (phone) => {
     let p = String(phone).replace(/\D/g, '');
     if (p.startsWith('05')) p = '966' + p.substring(1);
@@ -32,7 +32,7 @@ const initMongo = async () => {
     }
 };
 
-// Middleware لتأمين الروابط عبر Headers
+// Middleware لتأمين الروابط عبر Headers (منع الوصول غير المصرح به)
 const authenticate = async (req, res, next) => {
     const apiKey = req.headers['x-api-key'];
     if (!apiKey) return res.status(401).json({ error: "Missing API Key" });
@@ -44,14 +44,51 @@ const authenticate = async (req, res, next) => {
     next();
 };
 
+// --- المسارات (Routes) ---
+
+// 1. لوحة التحكم الرئيسية
 app.get('/', async (req, res) => {
     try {
         const total = await db.collection('evaluations').countDocuments();
         let html = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
         res.send(html.replace(/{{total}}/g, total));
     } catch (e) { res.status(500).send("Error loading dashboard"); }
-} );
+});
 
+// 2. صفحة التقارير الجديدة
+app.get('/reports', async (req, res) => {
+    try {
+        const evaluations = await db.collection('evaluations')
+            .find()
+            .sort({ sentAt: -1 })
+            .toArray();
+
+        let html = fs.readFileSync(path.join(__dirname, 'reports.html'), 'utf8');
+        
+        const rows = evaluations.map(ev => `
+            <tr class="border-b hover:bg-gray-50 transition">
+                <td class="p-4 text-right font-bold text-slate-700">${ev.name}</td>
+                <td class="p-4 text-center text-slate-600">${ev.phone}</td>
+                <td class="p-4 text-center">
+                    <span class="px-3 py-1 rounded-full text-[10px] font-bold ${ev.status === 'replied' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">
+                        ${ev.status === 'replied' ? 'تم الرد' : 'بانتظار الرد'}
+                    </span>
+                </td>
+                <td class="p-4 text-center">
+                    ${ev.answer === '1' ? '<span class="text-green-600 font-bold">✅ ممتاز</span>' : ev.answer === '2' ? '<span class="text-red-600 font-bold">❌ سلبي</span>' : '<span class="text-gray-400">-</span>'}
+                </td>
+                <td class="p-4 text-center text-gray-400 text-xs">${ev.sentAt ? new Date(ev.sentAt).toLocaleString('ar-SA') : '-'}</td>
+            </tr>
+        `).join('');
+
+        res.send(html.replace('{{rows}}', rows));
+    } catch (e) {
+        console.error("Reports Error:", e.message);
+        res.status(500).send("خطأ في تحميل التقارير");
+    }
+});
+
+// 3. إرسال طلب التقييم
 app.post('/api/send', authenticate, async (req, res) => {
     const { phone, name, branch } = req.body;
     const cleanPhone = normalizePhone(phone);
@@ -76,6 +113,7 @@ app.post('/api/send', authenticate, async (req, res) => {
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
+// 4. Webhook تويليو لمعالجة ردود الواتساب
 app.post('/whatsapp/webhook', async (req, res) => {
     const { Body, From } = req.body;
     const customerAnswer = Body ? Body.trim() : "";
@@ -98,7 +136,7 @@ app.post('/whatsapp/webhook', async (req, res) => {
                 replyMsg = `نعتذر منك 😔، تم إرسال ملاحظتك للإدارة وسيتم التواصل معك قريباً.`;
                 await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '2', repliedAt: new Date() } });
                 
-                // تنبيه المدير مع معالجة رقم الجوال
+                // تنبيه المدير مع معالجة رقم الجوال آلياً
                 try {
                     let adminNum = normalizePhone(process.env.MANAGER_PHONE || client.adminPhone);
                     await twilioClient.messages.create({
