@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const twilio = require('twilio');
 const path = require('path');
 const fs = require('fs');
@@ -11,136 +11,107 @@ app.use(express.urlencoded({ extended: true }));
 
 const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-const CONFIG = {
-    mongoUrl: process.env.MONGO_URL,
-    webhookKey: process.env.WEBHOOK_KEY,
-    twilioNumber: process.env.TWILIO_PHONE_NUMBER,
-    googleLink: process.env.Maps_LINK || "#",
-    adminPhone: process.env.MANAGER_PHONE,
-    branches: ['فرع الرياض', 'فرع جدة', 'فرع الدمام', 'فرع مكة']
+// دالة توحيد الأرقام الدولية (E.164) لمنع تداخل البيانات
+const normalizePhone = (phone) => {
+    let p = String(phone).replace(/\D/g, '');
+    if (p.startsWith('05')) p = '966' + p.substring(1);
+    return p;
 };
 
 let db;
 const initMongo = async () => {
     try {
-        const client = new MongoClient(CONFIG.mongoUrl);
+        const client = new MongoClient(process.env.MONGO_URL);
         await client.connect();
-        db = client.db('whatsapp_bot');
-        console.log("🔗 MongoDB Connected");
+        db = client.db('mawjat_platform');
+        console.log("🛡️ Database Secured & Connected");
     } catch (e) { 
         console.error("Mongo Error:", e.message);
         setTimeout(initMongo, 5000); 
     }
 };
 
-// عرض لوحة التحكم
+// Middleware لتأمين الروابط عبر Headers (سد ثغرة تسريب المفتاح في URL)
+const authenticate = async (req, res, next) => {
+    const apiKey = req.headers['x-api-key'];
+    if (!apiKey) return res.status(401).json({ error: "Missing API Key" });
+    
+    // البحث عن العميل صاحب هذا المفتاح في قاعدة البيانات
+    const client = await db.collection('clients').findOne({ apiKey: apiKey });
+    if (!client) return res.status(403).json({ error: "Invalid API Key" });
+    
+    req.clientData = client; // تمرير بيانات العميل لباقي المسارات
+    next();
+};
+
+// لوحة التحكم - حقن البيانات ديناميكياً
 app.get('/', async (req, res) => {
     try {
         const total = await db.collection('evaluations').countDocuments();
         let html = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
-        const branchesHtml = CONFIG.branches.map(b => `<option value="${b}">${b}</option>`).join('');
-        html = html.replace(/{{total}}/g, total)
-                   .replace(/{{webhookKey}}/g, CONFIG.webhookKey)
-                   .replace(/{{branches}}/g, branchesHtml);
-        res.send(html);
-    } catch (e) {
-        res.sendFile(path.join(__dirname, 'admin.html'));
-    }
+        // هنا يمكنك إضافة منطق لجلب الفروع الخاصة بالعميل المسجل دخولاً
+        res.send(html.replace(/{{total}}/g, total));
+    } catch (e) { res.status(500).send("Error loading dashboard"); }
 });
 
-// مسار التقارير الشاملة
-app.get('/reports/all', async (req, res) => {
-    try {
-        const allEvals = await db.collection('evaluations').find({ status: "replied" }).sort({ repliedAt: -1 }).toArray();
-        let tableRows = allEvals.map(e => {
-            const isPos = e.answer === "1";
-            const rowBg = isPos ? "#e6fffa" : "#fff5f5";
-            return `<tr style="background:${rowBg}; border-bottom:1px solid #ddd;">
-                <td style="padding:12px;">${e.name}</td>
-                <td style="padding:12px;">${e.phone}</td>
-                <td style="padding:12px;">${e.branch}</td>
-                <td style="padding:12px; text-align:center;">
-                    <span style="background:${isPos ? '#38a169' : '#e53e3e'}; color:white; padding:4px 8px; border-radius:8px; font-size:12px;">
-                        ${isPos ? 'ممتاز (1)' : 'يحتاج تحسين (2)'}
-                    </span>
-                </td>
-                <td style="padding:12px;">${new Date(e.repliedAt).toLocaleString('ar-SA')}</td>
-            </tr>`;
-        }).join('');
+// إرسال التقييم - يدعم فودكس واللوحة اليدوية
+app.post('/api/send', authenticate, async (req, res) => {
+    const { phone, name, branch } = req.body;
+    const cleanPhone = normalizePhone(phone);
+    const client = req.clientData;
 
-        res.send(`
-            <div dir="rtl" style="font-family:sans-serif; padding:20px; max-width:1000px; margin:auto;">
-                <h2 style="border-bottom:2px solid #333; padding-bottom:10px;">📊 تقرير تقييمات Mawjat Analytics</h2>
-                <table style="width:100%; border-collapse:collapse; margin-top:20px;">
-                    <thead style="background:#333; color:white;">
-                        <tr><th>الاسم</th><th>الجوال</th><th>الفرع</th><th>التقييم</th><th>التاريخ</th></tr>
-                    </thead>
-                    <tbody>${tableRows}</tbody>
-                </table>
-                <div style="margin-top:20px; text-align:center;">
-                    <button onclick="window.print()" style="padding:10px 20px; cursor:pointer;">طباعة PDF</button>
-                    <a href="/" style="margin-right:10px; text-decoration:none; color:blue;">العودة للوحة التحكم</a>
-                </div>
-            </div>
-        `);
-    } catch (e) { res.status(500).send("خطأ في جلب البيانات"); }
-});
-
-app.post('/api/send', async (req, res) => {
-    if (req.query.key !== CONFIG.webhookKey) return res.sendStatus(401);
-    let { phone, name, branch } = req.body;
-    let p = String(phone).replace(/\D/g, '');
-    if (p.startsWith('05')) p = '966' + p.substring(1);
     try {
         await twilioClient.messages.create({
-            from: CONFIG.twilioNumber,
+            from: process.env.TWILIO_PHONE_NUMBER,
             body: `أهلاً بك ${name}، كيف كانت تجربتك في ${branch}؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`,
-            to: `whatsapp:+${p}`
+            to: `whatsapp:+${cleanPhone}`
         });
-        await db.collection('evaluations').insertOne({ phone: p, name, branch, status: 'sent', sentAt: new Date() });
+
+        await db.collection('evaluations').insertOne({ 
+            clientId: client._id,
+            phone: cleanPhone, 
+            name, 
+            branch, 
+            status: 'sent', 
+            sentAt: new Date() 
+        });
         res.json({ success: true });
-    } catch (error) { res.status(500).send(error.message); }
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
+// Webhook تويليو المطور - معالجة دقيقة للردود
 app.post('/whatsapp/webhook', async (req, res) => {
     const { Body, From } = req.body;
     const customerAnswer = Body ? Body.trim() : "";
-    const rawPhone = From ? From.replace('whatsapp:+', '') : "";
+    const fullPhone = From.replace('whatsapp:+', '');
 
     try {
+        // البحث المطابق تماماً للرقم الدولي الكامل
         const lastEval = await db.collection('evaluations').findOne(
-            { phone: { $regex: rawPhone.slice(-9) + "$" }, status: 'sent' },
+            { phone: fullPhone, status: 'sent' },
             { sort: { sentAt: -1 } }
         );
 
-        if (!lastEval) {
-            res.type('text/xml');
-            return res.send('<Response></Response>');
-        }
+        if (lastEval) {
+            const client = await db.collection('clients').findOne({ _id: lastEval.clientId });
+            let replyMsg = "";
 
-        let replyMsg = "";
-        let isNegative = false;
-
-        if (customerAnswer === "1") {
-            replyMsg = `يسعدنا تقييمك! 😍\n📍 يرجى إضافة تقييمك هنا: ${CONFIG.googleLink}`;
-            await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '1', repliedAt: new Date() } });
-        } else if (customerAnswer === "2") {
-            replyMsg = `نعتذر منك 😔، تم إرسال ملاحظتك للإدارة وسيتم التواصل معك قريباً.`;
-            isNegative = true;
-            await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '2', repliedAt: new Date() } });
-        }
-
-        if (replyMsg) {
-            await twilioClient.messages.create({ from: CONFIG.twilioNumber, body: replyMsg, to: From });
-            if (isNegative && CONFIG.adminPhone) {
-                const waLink = `https://wa.me/${rawPhone}`;
-                let adminNum = CONFIG.adminPhone.startsWith('whatsapp:') ? CONFIG.adminPhone : `whatsapp:${CONFIG.adminPhone}`;
+            if (customerAnswer === "1") {
+                replyMsg = `يسعدنا تقييمك! 😍\n📍 يرجى إضافة تقييمك هنا: ${client.googleLink}`;
+                await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '1', repliedAt: new Date() } });
+            } else if (customerAnswer === "2") {
+                replyMsg = `نعتذر منك 😔، تم إرسال ملاحظتك للإدارة وسيتم التواصل معك قريباً.`;
+                await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '2', repliedAt: new Date() } });
+                
+                // تنبيه المدير الخاص بهذا المطعم تحديداً
                 await twilioClient.messages.create({
-                    from: CONFIG.twilioNumber,
-                    body: `⚠️ *تنبيه تقييم سلبي!*\n\n*العميل:* ${lastEval.name}\n*الفرع:* ${lastEval.branch}\n🔗 *للتواصل المباشر:*\n${waLink}`,
-                    to: adminNum
+                    from: process.env.TWILIO_PHONE_NUMBER,
+                    body: `⚠️ تنبيه تقييم سلبي!\nالعميل: ${lastEval.name}\nالفرع: ${lastEval.branch}`,
+                    to: `whatsapp:+${client.adminPhone}`
                 });
             }
+
+            if (replyMsg) await twilioClient.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, body: replyMsg, to: From });
         }
     } catch (err) { console.error("Webhook Error:", err.message); }
     res.type('text/xml').send('<Response></Response>');
