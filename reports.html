@@ -2,37 +2,64 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تقارير موجة | Analytics</title>
+    <title>تقارير العميل | Mawjat</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }</style>
 </head>
 <body class="p-4 md:p-8">
-    <div class="max-w-6xl mx-auto">
-        <header class="flex justify-between items-center mb-8 bg-white p-6 rounded-3xl shadow-sm">
-            <div>
-                <h1 class="text-2xl font-black text-slate-800">📊 سجل التقييمات الشامل</h1>
-                <p class="text-xs text-gray-400 font-bold">متابعة أداء الفروع والعملاء لحظياً</p>
-            </div>
-            <a href="/" class="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-black transition">العودة للرئيسية</a>
+    <div class="max-w-5xl mx-auto">
+        <header class="flex justify-between items-center mb-8 bg-white p-6 rounded-3xl shadow-sm border">
+            <h1 id="rep_title" class="text-xl font-black text-slate-800 font-black">تقارير التقييمات</h1>
+            <a href="/" class="bg-slate-900 text-white px-6 py-2 rounded-xl text-xs font-bold">العودة</a>
         </header>
 
-        <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
+        <div id="auth_box" class="bg-white p-10 rounded-3xl text-center shadow-lg border mb-10">
+            <p class="mb-4 font-bold text-gray-500">يرجى إدخال مفتاح الـ API لعرض تقاريرك</p>
+            <input id="rep_key" type="password" class="p-3 border rounded-xl text-center font-bold outline-none w-64">
+            <button onclick="loadMyReports()" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold mr-2">عرض</button>
+        </div>
+
+        <div id="table_container" class="hidden bg-white rounded-[2.5rem] shadow-xl border overflow-hidden">
             <table class="w-full text-right border-collapse">
-                <thead>
-                    <tr class="bg-slate-50 border-b">
-                        <th class="p-5 text-slate-500 font-black uppercase text-xs">العميل</th>
-                        <th class="p-5 text-center text-slate-500 font-black uppercase text-xs">الجوال</th>
-                        <th class="p-5 text-center text-slate-500 font-black uppercase text-xs">الحالة</th>
-                        <th class="p-5 text-center text-slate-500 font-black uppercase text-xs">التقييم</th>
-                        <th class="p-5 text-center text-slate-500 font-black uppercase text-xs">التاريخ</th>
+                <thead class="bg-slate-50 border-b">
+                    <tr>
+                        <th class="p-4">العميل</th>
+                        <th class="p-4 text-center">الجوال</th>
+                        <th class="p-4 text-center">الرد</th>
+                        <th class="p-4 text-center">التاريخ</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {{rows}}
-                </tbody>
+                <tbody id="rows"></tbody>
             </table>
         </div>
     </div>
+
+    <script>
+        async function loadMyReports() {
+            const key = document.getElementById('rep_key').value || localStorage.getItem('m_key');
+            const res = await fetch(`/api/my-reports`, { headers: { 'x-api-key': key } });
+            
+            if(res.ok) {
+                const data = await res.json();
+                document.getElementById('auth_box').classList.add('hidden');
+                document.getElementById('table_container').classList.remove('hidden');
+                document.getElementById('rows').innerHTML = data.map(ev => `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="p-4 font-bold text-slate-700">${ev.name}</td>
+                        <td class="p-4 text-center text-gray-500">${ev.phone}</td>
+                        <td class="p-4 text-center">${ev.answer === '1' ? '✅ ممتاز' : ev.answer === '2' ? '❌ سلبي' : '-'}</td>
+                        <td class="p-4 text-center text-[10px] text-gray-400">${new Date(ev.sentAt).toLocaleString('ar-SA')}</td>
+                    </tr>
+                `).join('');
+                
+                // جلب الاسم لتحديث العنوان
+                const info = await fetch(`/api/client-info`, { headers: { 'x-api-key': key } });
+                const infoData = await info.json();
+                document.getElementById('rep_title').innerText = `تقارير ${infoData.name}`;
+            } else { alert('مفتاح خاطئ'); }
+        }
+        window.onload = () => { if(localStorage.getItem('m_key')) { document.getElementById('rep_key').value = localStorage.getItem('m_key'); loadMyReports(); } };
+    </script>
 </body>
 </html>

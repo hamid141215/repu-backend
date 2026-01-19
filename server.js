@@ -24,16 +24,16 @@ const initMongo = async () => {
         const client = new MongoClient(process.env.MONGO_URL);
         await client.connect();
         db = client.db('mawjat_platform');
-        console.log("🛡️ Database Secured & Connected");
+        console.log("🛡️ Database Isolated & Connected");
     } catch (e) { 
         console.error("Mongo Error:", e.message);
         setTimeout(initMongo, 5000); 
     }
 };
 
-// Middleware للأمان (عملاء المطاعم)
+// Middleware لتأمين الروابط وعزل الهوية
 const authenticate = async (req, res, next) => {
-    const apiKey = req.headers['x-api-key'];
+    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
     if (!apiKey) return res.status(401).json({ error: "Missing API Key" });
     const client = await db.collection('clients').findOne({ apiKey });
     if (!client) return res.status(403).json({ error: "Invalid API Key" });
@@ -41,74 +41,70 @@ const authenticate = async (req, res, next) => {
     next();
 };
 
-// Middleware لحماية لوحة السوبر أدمن (أنت فقط)
 const superAdminAuth = (req, res, next) => {
     const pass = req.headers['x-admin-password'];
-    if (pass === process.env.ADMIN_PASSWORD) {
-        next();
-    } else {
-        res.status(401).json({ error: "Unauthorized" });
-    }
+    if (pass === process.env.ADMIN_PASSWORD) next();
+    else res.status(401).json({ error: "Unauthorized" });
 };
 
 // --- المسارات (Routes) ---
 
-app.get('/', async (req, res) => {
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// جلب بيانات العميل والإحصائيات الخاصة به فقط
+app.get('/api/client-info', authenticate, async (req, res) => {
     try {
-        const total = await db.collection('evaluations').countDocuments();
-        let html = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
-        res.send(html.replace(/{{total}}/g, total));
-    } catch (e) { res.status(500).send("Error"); }
-});
-
-app.get('/reports', async (req, res) => {
-    try {
-        const evaluations = await db.collection('evaluations').find().sort({ sentAt: -1 }).toArray();
-        let html = fs.readFileSync(path.join(__dirname, 'reports.html'), 'utf8');
-        const rows = evaluations.map(ev => `
-            <tr class="border-b">
-                <td class="p-4 text-right">${ev.name}</td>
-                <td class="p-4 text-center">${ev.phone}</td>
-                <td class="p-4 text-center">${ev.answer === '1' ? '✅ ممتاز' : ev.answer === '2' ? '❌ سلبي' : '-'}</td>
-                <td class="p-4 text-center text-xs text-gray-400">${ev.sentAt ? new Date(ev.sentAt).toLocaleString('ar-SA') : '-'}</td>
-            </tr>
-        `).join('');
-        res.send(html.replace('{{rows}}', rows));
-    } catch (e) { res.status(500).send("Error"); }
-});
-
-// صفحة السوبر أدمن
-app.get('/super-admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'super-admin.html'));
-});
-
-// API لإدارة العملاء (محمية)
-app.get('/api/clients', superAdminAuth, async (req, res) => {
-    const clients = await db.collection('clients').find().toArray();
-    res.json(clients);
-});
-
-app.post('/api/clients/add', superAdminAuth, async (req, res) => {
-    const { name, apiKey, googleLink, adminPhone } = req.body;
-    await db.collection('clients').insertOne({ name, apiKey, googleLink, adminPhone, createdAt: new Date() });
-    res.json({ success: true });
+        const total = await db.collection('evaluations').countDocuments({ clientId: req.clientData._id });
+        res.json({
+            name: req.clientData.name,
+            total: total
+        });
+    } catch (e) { res.status(500).json({ error: "Error fetching info" }); }
 });
 
 app.post('/api/send', authenticate, async (req, res) => {
     const { phone, name, branch } = req.body;
     const cleanPhone = normalizePhone(phone);
     const client = req.clientData;
+    
     try {
+        // تضمين اسم المطعم ديناميكياً في الرسالة
         await twilioClient.messages.create({
             from: process.env.TWILIO_PHONE_NUMBER,
-            body: `أهلاً بك ${name}، كيف كانت تجربتك في ${branch}؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`,
+            body: `أهلاً بك ${name}، كيف كانت تجربتك في ${client.name} - ${branch}؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`,
             to: `whatsapp:+${cleanPhone}`
         });
-        await db.collection('evaluations').insertOne({ clientId: client._id, phone: cleanPhone, name, branch, status: 'sent', sentAt: new Date() });
-        res.json({ success: true });
+
+        await db.collection('evaluations').insertOne({ 
+            clientId: client._id, 
+            phone: cleanPhone, 
+            name, 
+            branch, 
+            status: 'sent', 
+            sentAt: new Date() 
+        });
+        res.json({ success: true, clientName: client.name });
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
+app.get('/reports', (req, res) => {
+    res.sendFile(path.join(__dirname, 'reports.html'));
+});
+
+// جلب التقييمات المعزولة للمطعم فقط
+app.get('/api/my-reports', authenticate, async (req, res) => {
+    try {
+        const evaluations = await db.collection('evaluations')
+            .find({ clientId: req.clientData._id })
+            .sort({ sentAt: -1 })
+            .toArray();
+        res.json(evaluations);
+    } catch (e) { res.status(500).json({ error: "Error fetching reports" }); }
+});
+
+// Webhook ومعالجة الردود (نفس المنطق السابق مع التأكد من اسم المطعم)
 app.post('/whatsapp/webhook', async (req, res) => {
     const { Body, From } = req.body;
     const customerAnswer = Body ? Body.trim() : "";
@@ -119,16 +115,16 @@ app.post('/whatsapp/webhook', async (req, res) => {
             const client = await db.collection('clients').findOne({ _id: lastEval.clientId });
             let replyMsg = "";
             if (customerAnswer === "1") {
-                replyMsg = `يسعدنا تقييمك! 😍\n📍 ${client.googleLink}`;
+                replyMsg = `شكراً لزيارتك ${client.name}! 😍\n📍 قيمنا هنا: ${client.googleLink}`;
                 await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '1', repliedAt: new Date() } });
             } else if (customerAnswer === "2") {
-                replyMsg = `نعتذر منك 😔، تم إرسال ملاحظتك للإدارة.`;
+                replyMsg = `نعتذر منك 😔، تم إرسال ملاحظتك لإدارة ${client.name} وسيتم التواصل معك.`;
                 await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '2', repliedAt: new Date() } });
                 try {
                     let adminNum = normalizePhone(process.env.MANAGER_PHONE || client.adminPhone);
                     await twilioClient.messages.create({
                         from: process.env.TWILIO_PHONE_NUMBER,
-                        body: `⚠️ تنبيه سلبي!\nالعميل: ${lastEval.name}\nالفرع: ${lastEval.branch}`,
+                        body: `⚠️ تنبيه سلبي - ${client.name}!\nالعميل: ${lastEval.name}\nالفرع: ${lastEval.branch}`,
                         to: `whatsapp:+${adminNum}`
                     });
                 } catch (e) { console.error("Admin Alert Fail", e.message); }
@@ -137,6 +133,15 @@ app.post('/whatsapp/webhook', async (req, res) => {
         }
     } catch (err) { console.error("Webhook Error", err.message); }
     res.type('text/xml').send('<Response></Response>');
+});
+
+// سوبر أدمن
+app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
+app.get('/api/clients', superAdminAuth, async (req, res) => res.json(await db.collection('clients').find().toArray()));
+app.post('/api/clients/add', superAdminAuth, async (req, res) => {
+    const { name, apiKey, googleLink, adminPhone } = req.body;
+    await db.collection('clients').insertOne({ name, apiKey, googleLink, adminPhone, createdAt: new Date() });
+    res.json({ success: true });
 });
 
 const PORT = process.env.PORT || 10000;

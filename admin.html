@@ -2,154 +2,78 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mawjat Analytics | Dashboard</title>
+    <title>لوحة التحكم | Mawjat</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Cairo', sans-serif; background-color: #f4f7fa; }
-        .glass-effect { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); }
-        .navy-gradient { background: linear-gradient(135deg, #001a4d 0%, #002366 100%); }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }</style>
 </head>
-<body class="antialiased min-h-screen pb-12">
+<body class="p-4">
+    <div class="max-w-xl mx-auto space-y-4">
+        <header class="bg-white p-6 rounded-3xl shadow-sm flex justify-between items-center border">
+            <h1 id="restaurant_name" class="font-black text-xl text-blue-600 italic">Mawjat Loader...</h1>
+            <span class="text-[10px] bg-green-100 text-green-600 px-3 py-1 rounded-full font-bold">LIVE</span>
+        </header>
 
-    <header class="navy-gradient text-white p-6 shadow-xl mb-8">
-        <div class="max-w-5xl mx-auto flex justify-between items-center">
-            <div>
-                <h1 class="text-3xl font-black tracking-tighter italic">MAWJAT <span class="text-blue-400 font-light">OFFICIAL</span></h1>
-                <p class="text-[10px] opacity-70 font-bold uppercase tracking-widest">Enterprise Analytics System v2.0</p>
-            </div>
-            <div class="flex items-center gap-3 bg-white/10 px-4 py-2 rounded-2xl border border-white/20">
-                <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-                <span class="text-xs font-bold uppercase">System Active</span>
+        <div class="bg-slate-900 p-6 rounded-[2rem] text-white">
+            <div class="flex gap-2">
+                <input id="key_input" type="password" placeholder="أدخل API Key" class="bg-slate-800 border-none rounded-xl p-3 flex-1 text-center outline-none focus:ring-2 ring-blue-500">
+                <button onclick="updateIdentity()" class="bg-blue-600 px-6 rounded-xl font-bold">دخول</button>
             </div>
         </div>
-    </header>
 
-    <main class="max-w-5xl mx-auto px-4 space-y-6">
-        
-        <section class="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl border border-slate-800 text-white">
-            <div class="flex items-center gap-4 mb-6">
-                <div class="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/20">🔑</div>
-                <div>
-                    <h3 class="font-black text-xl">تأمين الوصول (API Security)</h3>
-                    <p class="text-[10px] text-slate-400 uppercase font-bold italic">Required for Authentication</p>
-                </div>
+        <div class="bg-white p-8 rounded-[2.5rem] shadow-lg border">
+            <div class="space-y-4">
+                <input id="name" type="text" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 rounded-2xl border text-right font-bold outline-none focus:border-blue-500">
+                <input id="phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border text-center font-bold outline-none focus:border-blue-500">
+                <select id="branch" class="w-full p-4 bg-slate-100 rounded-2xl font-bold text-center outline-none">
+                    <option>الفرع الرئيسي</option>
+                    <option>فرع التحلية</option>
+                </select>
+                <button onclick="sendEval()" class="w-full bg-blue-600 text-white p-5 rounded-3xl font-black shadow-lg">إرسال التقييم ✨</button>
             </div>
-            <div class="flex flex-col md:flex-row gap-3">
-                <input id="key_input" type="password" placeholder="أدخل مفتاح الـ API الخاص بمنشأتك" 
-                       class="flex-1 p-4 bg-slate-800 border-none rounded-2xl text-center font-bold text-blue-400 outline-none focus:ring-2 ring-blue-600 transition-all">
-                <button onclick="saveKey()" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-2xl font-black transition-all shadow-lg active:scale-95">حفظ المفتاح</button>
-            </div>
-            <p id="key_status" class="text-[10px] mt-4 text-slate-500 font-bold italic pr-2"></p>
-        </section>
-
-        <div class="grid md:grid-cols-3 gap-6">
-            <section class="md:col-span-2 bg-white rounded-[2.5rem] p-10 shadow-sm border border-gray-100 relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
-                <h3 class="font-black text-slate-800 text-2xl mb-8 flex items-center gap-3">
-                    🚀 إرسال طلب تقييم جديد
-                </h3>
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase pr-4">اسم العميل</label>
-                        <input id="name" type="text" placeholder="مثال: أحمد محمد" 
-                               class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-right focus:border-blue-500 transition-all">
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase pr-4">رقم الجوال</label>
-                        <input id="phone" type="tel" placeholder="05xxxxxxxx" 
-                               class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-center focus:border-blue-500 transition-all">
-                    </div>
-                </div>
-                <div class="mt-6 space-y-2">
-                    <label class="text-[10px] font-black text-slate-400 uppercase pr-4">اختر الفرع</label>
-                    <select id="branch" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold outline-none text-center cursor-pointer hover:bg-gray-100 transition-all">
-                        <option value="الفرع الرئيسي">الفرع الرئيسي</option>
-                        <option value="فرع التحلية">فرع التحلية</option>
-                        <option value="فرع الدمام">فرع الدمام</option>
-                    </select>
-                </div>
-                <button onclick="sendOfficialEval()" class="w-full bg-slate-900 text-white p-6 rounded-[2rem] font-black text-xl mt-10 hover:bg-black shadow-xl hover:-translate-y-1 transition-all active:scale-95">
-                    إرسال عبر واتساب ✨
-                </button>
-            </section>
-
-            <aside class="space-y-6">
-                <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 text-center relative overflow-hidden">
-                    <div class="absolute top-0 right-0 p-2 opacity-5">📈</div>
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-tighter mb-2">إجمالي التقييمات المرسلة</p>
-                    <h2 class="text-5xl font-black text-slate-800">{{total}}</h2>
-                    <div class="mt-4 text-[10px] text-green-500 font-bold">تحديث تلقائي لحظي</div>
-                </div>
-
-                <a href="/reports" class="flex items-center justify-between bg-blue-50 p-6 rounded-[2rem] border border-blue-100 group hover:bg-blue-600 transition-all">
-                    <span class="font-black text-blue-600 group-hover:text-white transition-colors">📊 عرض التقارير</span>
-                    <span class="text-xl group-hover:translate-x-[-5px] transition-transform">⬅️</span>
-                </a>
-
-                <div class="bg-gray-50 p-6 rounded-[2rem] border border-dashed border-gray-200">
-                    <p class="text-[10px] font-bold text-gray-400 leading-relaxed text-center italic">
-                        "نظام موجة يضمن لك تحسين سمعتك الرقمية عبر أتمتة طلبات التقييم بدقة"
-                    </p>
-                </div>
-            </aside>
         </div>
-    </main>
+
+        <div class="bg-white p-6 rounded-3xl text-center shadow-sm border">
+            <p class="text-[10px] font-black text-gray-400 uppercase italic">إحصائياتك الخاصة</p>
+            <h2 id="client_total" class="text-4xl font-black text-slate-800">0</h2>
+            <a href="/reports" class="text-blue-500 text-xs font-bold mt-2 block underline">عرض التقارير الكاملة</a>
+        </div>
+    </div>
 
     <script>
-        // دالة حفظ المفتاح في ذاكرة المتصفح للأمان
-        const saveKey = () => {
+        const updateIdentity = async () => {
             const key = document.getElementById('key_input').value;
-            if(key) {
-                localStorage.setItem('mawjat_api_key', key);
-                document.getElementById('key_status').innerText = "✅ تم حفظ المفتاح وتشفيره محلياً";
-                alert('تم حفظ مفتاح الأمان بنجاح');
-            }
+            if(!key) return;
+            localStorage.setItem('m_key', key);
+            
+            const res = await fetch(`/api/client-info`, { headers: { 'x-api-key': key } });
+            if(res.ok) {
+                const data = await res.json();
+                document.getElementById('restaurant_name').innerText = data.name;
+                document.getElementById('client_total').innerText = data.total;
+                document.title = `لوحة ${data.name}`;
+            } else { alert('مفتاح غير صالح'); }
         };
 
-        // تحميل المفتاح تلقائياً عند فتح الصفحة
-        window.onload = () => {
-            const savedKey = localStorage.getItem('mawjat_api_key');
-            if(savedKey) {
-                document.getElementById('key_input').value = savedKey;
-                document.getElementById('key_status').innerText = "✅ تم تحميل المفتاح المحفوظ سابقاً";
-            }
-        };
-
-        async function sendOfficialEval() {
-            const n = document.getElementById('name').value;
-            const p = document.getElementById('phone').value;
-            const b = document.getElementById('branch').value;
-            const key = localStorage.getItem('mawjat_api_key');
-
-            if(!p || !n || !key) {
-                return alert('⚠️ تنبيه: يرجى إكمال جميع الحقول والتأكد من حفظ مفتاح الـ API أولاً');
-            }
-
-            try {
-                const res = await fetch('/api/send', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-api-key': key // الأمان عبر الـ Headers
-                    },
-                    body: JSON.stringify({phone: p, name: n, branch: b})
-                });
-
-                if(res.ok) {
-                    alert('✅ تم إرسال طلب التقييم بنجاح للعميل');
-                    document.getElementById('name').value = '';
-                    document.getElementById('phone').value = '';
-                } else {
-                    const errData = await res.json();
-                    alert('❌ فشل الإرسال: ' + (errData.error || 'تأكد من صلاحية المفتاح'));
-                }
-            } catch (e) {
-                alert('❌ خطأ: تعذر الاتصال بالسيرفر. تأكد من تشغيل المشروع وعمل الـ Push');
-            }
+        async function sendEval() {
+            const key = localStorage.getItem('m_key');
+            const data = {
+                name: document.getElementById('name').value,
+                phone: document.getElementById('phone').value,
+                branch: document.getElementById('branch').value
+            };
+            const res = await fetch('/api/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': key },
+                body: JSON.stringify(data)
+            });
+            if(res.ok) { alert('✅ تم الإرسال'); updateIdentity(); }
         }
+
+        window.onload = () => {
+            const k = localStorage.getItem('m_key');
+            if(k) { document.getElementById('key_input').value = k; updateIdentity(); }
+        };
     </script>
 </body>
 </html>
