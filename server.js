@@ -83,15 +83,42 @@ app.get('/api/my-reports', authenticate, async (req, res) => {
 });
 
 app.get('/api/export-excel', authenticate, async (req, res) => {
-    const evals = await db.collection('evaluations').find({ clientId: req.clientData._id }).sort({ sentAt: -1 }).toArray();
-    let csv = "\ufeffالعميل,الجوال,الفرع,التقييم,التاريخ\n";
-    evals.forEach(e => {
-        const ans = e.answer === '1' ? 'ممتاز' : e.answer === '2' ? 'سلبي' : 'لم يرد';
-        csv += `${e.name},${e.phone},${e.branch},${ans},${new Date(e.sentAt).toLocaleDateString('ar-SA')}\n`;
-    });
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename=Reports_${req.clientData.name}.csv`);
-    res.status(200).send(csv);
+    try {
+        // جلب البيانات الخاصة بالعميل فقط
+        const evals = await db.collection('evaluations')
+            .find({ clientId: req.clientData._id })
+            .sort({ sentAt: -1 })
+            .toArray();
+
+        // إضافة BOM لضمان قراءة اللغة العربية في Excel
+        let csv = "\ufeff"; 
+        csv += "العميل,الجوال,الفرع,الرد,التاريخ\n";
+
+        evals.forEach(e => {
+            const ans = e.answer === '1' ? 'ممتاز' : e.answer === '2' ? 'سلبي' : 'لم يرد';
+            const date = new Date(e.sentAt).toLocaleDateString('ar-SA');
+            
+            // تنظيف النصوص من الفواصل التي قد تفسد ملف الـ CSV
+            const safeName = (e.name || '').replace(/,/g, ' ');
+            const safeBranch = (e.branch || 'الرئيسي').replace(/,/g, ' ');
+            
+            csv += `${safeName},${e.phone},${safeBranch},${ans},${date}\n`;
+        });
+
+        // ضبط الـ Headers بدون أحرف عربية لمنع انهيار السيرفر
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        // استخدمنا اسماً ثابتاً بالإنجليزية هنا لتجنب خطأ ERR_INVALID_CHAR
+        res.setHeader('Content-Disposition', 'attachment; filename=Mawjat_Report.csv');
+        
+        // إرسال البيانات فوراً
+        return res.status(200).send(csv);
+
+    } catch (e) {
+        console.error("Export Error:", e);
+        if (!res.headersSent) {
+            res.status(500).json({ error: "فشل تصدير الملف" });
+        }
+    }
 });
 
 // --- الجوهر: الويب هوك للردود التلقائية (تمت إعادته) ---
