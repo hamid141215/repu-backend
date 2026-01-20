@@ -3,10 +3,10 @@ const express = require('express');
 const { MongoClient, ObjectId } = require('mongodb');
 const twilio = require('twilio');
 const path = require('path');
-const fs = require('fs');
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // مهم لاستقبال بيانات الويب هوك من تويليو
 
 const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
@@ -23,11 +23,11 @@ const initMongo = async () => {
         const client = new MongoClient(process.env.MONGO_URL);
         await client.connect();
         db = client.db('mawjat_platform');
-        console.log("🛡️ Security Layer Active & DB Connected");
+        console.log("🛡️ Mawjat Repu: Security & Webhook Active");
     } catch (e) { setTimeout(initMongo, 5000); }
 };
 
-// Middleware الحماية القصوى
+// Middleware الحماية القصوى لجميع المسارات
 const authenticate = async (req, res, next) => {
     const apiKey = req.headers['x-api-key'] || req.query.apiKey;
     if (!apiKey) return res.status(401).json({ error: "Authentication Required" });
@@ -47,8 +47,10 @@ const authenticate = async (req, res, next) => {
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/reports', (req, res) => res.sendFile(path.join(__dirname, 'reports.html')));
+app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
 
-// API مؤمنة بالكامل
+// --- API الموظفين والمطاعم ---
+
 app.get('/api/client-info', authenticate, async (req, res) => {
     const total = await db.collection('evaluations').countDocuments({ clientId: req.clientData._id });
     res.json({ name: req.clientData.name, total });
@@ -63,7 +65,14 @@ app.post('/api/send', authenticate, async (req, res) => {
             body: `أهلاً بك ${name}، كيف كانت تجربتك في ${req.clientData.name} - ${branch}؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`,
             to: `whatsapp:+${cleanPhone}`
         });
-        await db.collection('evaluations').insertOne({ clientId: req.clientData._id, phone: cleanPhone, name, branch, status: 'sent', sentAt: new Date() });
+        await db.collection('evaluations').insertOne({ 
+            clientId: req.clientData._id, 
+            phone: cleanPhone, 
+            name, 
+            branch, 
+            status: 'sent', 
+            sentAt: new Date() 
+        });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -80,53 +89,78 @@ app.get('/api/export-excel', authenticate, async (req, res) => {
         const ans = e.answer === '1' ? 'ممتاز' : e.answer === '2' ? 'سلبي' : 'لم يرد';
         csv += `${e.name},${e.phone},${e.branch},${ans},${new Date(e.sentAt).toLocaleDateString('ar-SA')}\n`;
     });
-    res.setHeader('Content-Disposition', `attachment; filename=Reports.csv`);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=Reports_${req.clientData.name}.csv`);
     res.status(200).send(csv);
 });
 
-// --- مسارات السوبر أدمن (إدارة المنصة) ---
+// --- الجوهر: الويب هوك للردود التلقائية (تمت إعادته) ---
+app.post('/whatsapp/webhook', async (req, res) => {
+    const { Body, From } = req.body;
+    const customerAnswer = Body ? Body.trim() : "";
+    const fullPhone = From.replace('whatsapp:+', '');
 
-// 1. مسار جلب قائمة العملاء (هذا ما تحتاجه الصفحة عند الفتح)
+    try {
+        const lastEval = await db.collection('evaluations').findOne(
+            { phone: fullPhone, status: 'sent' }, 
+            { sort: { sentAt: -1 } }
+        );
+
+        if (lastEval) {
+            const client = await db.collection('clients').findOne({ _id: lastEval.clientId });
+            let replyMsg = "";
+
+            if (customerAnswer === "1") {
+                replyMsg = `شكراً لتقييمك لـ ${client.name}! 😍\n📍 قيمنا هنا: ${client.googleLink}`;
+                await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '1', repliedAt: new Date() } });
+            } else if (customerAnswer === "2") {
+                replyMsg = `نعتذر منك 😔، تم استلام ملاحظتك من قبل إدارة ${client.name}.`;
+                await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '2', repliedAt: new Date() } });
+                
+                // تنبيه المدير الفوري في حال التقييم السلبي
+                try {
+                    let adminNum = normalizePhone(client.adminPhone || process.env.MANAGER_PHONE);
+                    await twilioClient.messages.create({
+                        from: process.env.TWILIO_PHONE_NUMBER,
+                        body: `⚠️ تنبيه سلبي جديد - ${client.name}\nالعميل: ${lastEval.name}\nالجوال: ${lastEval.phone}\nالفرع: ${lastEval.branch}`,
+                        to: `whatsapp:+${adminNum}`
+                    });
+                } catch (e) { console.error("Admin Alert Failed"); }
+            }
+            
+            if (replyMsg) {
+                await twilioClient.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, body: replyMsg, to: From });
+            }
+        }
+    } catch (err) { console.error("Webhook Error"); }
+    res.type('text/xml').send('<Response></Response>');
+});
+
+// --- مسارات السوبر أدمن ---
+
 app.get('/api/clients', async (req, res) => {
-    // التحقق من كلمة المرور من الهيدرز
-    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) {
-        return res.status(401).json({ error: "كلمة المرور غير صحيحة" });
-    }
-    
+    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: "Unauthorized" });
     try {
         const clients = await db.collection('clients').find().toArray();
         res.json(clients);
-    } catch (e) {
-        res.status(500).json({ error: "خطأ في جلب البيانات" });
-    }
+    } catch (e) { res.status(500).json({ error: "Error" }); }
 });
 
-// 2. مسار إضافة عميل جديد (الموجود عندك مع تحسين بسيط)
 app.post('/api/clients/add', async (req, res) => {
-    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) {
-        return res.status(401).json({ error: "غير مصرح لك" });
-    }
-
+    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: "Unauthorized" });
     try {
         const { name, apiKey, googleLink, adminPhone, plan, durationType } = req.body;
         const expiryDate = new Date();
-        
-        if (durationType === 'monthly') {
-            expiryDate.setMonth(expiryDate.getMonth() + 1);
-        } else {
-            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-        }
+        if (durationType === 'monthly') expiryDate.setMonth(expiryDate.getMonth() + 1);
+        else expiryDate.setFullYear(expiryDate.getFullYear() + 1);
 
         await db.collection('clients').insertOne({ 
             name, apiKey, googleLink, adminPhone, 
             plan, durationType, expiryDate, 
             createdAt: new Date() 
         });
-        
         res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: "فشل في إضافة العميل" });
-    }
+    } catch (e) { res.status(500).json({ error: "Failed" }); }
 });
 
 const PORT = process.env.PORT || 10000;
