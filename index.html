@@ -3,112 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>موجة | ضاعف تقييمات مطعمك على Google Maps</title>
+    <title>Mawjat Repu | ضاعف تقييماتك على Google Maps</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Cairo', sans-serif; scroll-behavior: smooth; }
-        .hero-gradient { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
+        .toggle-checkbox:checked { right: 0; border-color: #2563eb; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #2563eb; }
+        .pricing-card { transition: all 0.3s ease; }
+        .pricing-card:hover { transform: translateY(-10px); }
     </style>
 </head>
-<body class="bg-slate-50">
+<body class="bg-slate-50 text-slate-900">
 
-    <nav class="fixed w-full z-50 glass-effect bg-white/80 backdrop-blur-md border-b">
+    <nav class="fixed w-full z-50 bg-white/90 backdrop-blur-md border-b">
         <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-            <h1 class="text-2xl font-black text-blue-600 italic">MAWJAT</h1>
-            <div class="hidden md:flex gap-8 font-bold text-slate-600">
+            <h1 class="text-2xl font-black text-blue-600 tracking-tighter">MAWJAT <span class="text-slate-800">REPU</span></h1>
+            <div class="hidden md:flex gap-8 font-bold text-slate-600 items-center">
                 <a href="#features" class="hover:text-blue-600 transition">المميزات</a>
                 <a href="#pricing" class="hover:text-blue-600 transition">الأسعار</a>
-                <a href="/super-admin" class="text-slate-400 font-light text-xs self-center">دخول الإدارة</a>
+                <a href="/app" class="bg-blue-600 text-white px-6 py-2 rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200">ابدأ الآن</a>
             </div>
-            <a href="https://wa.me/966XXXXXXXX" class="bg-blue-600 text-white px-6 py-2 rounded-full font-bold shadow-lg hover:bg-blue-700 transition">جرب مجاناً</a>
         </div>
     </nav>
 
-    <section class="hero-gradient text-white pt-32 pb-20 px-6">
-        <div class="max-w-4xl mx-auto text-center">
-            <h2 class="text-4xl md:text-6xl font-black mb-6 leading-tight">حوّل كل زبون إلى <span class="text-blue-400">5 نجوم</span> على Google Maps</h2>
-            <p class="text-lg opacity-80 mb-10 leading-relaxed">منصة "موجة" تساعدك على أتمتة طلب التقييمات عبر الواتساب API، إدارة سمعة مطعمتك، ومعالجة الشكاوي قبل أن تصل للعلن.</p>
-            <div class="flex flex-col md:flex-row gap-4 justify-center">
-                <a href="#pricing" class="bg-blue-600 p-4 px-10 rounded-2xl font-black text-lg hover:scale-105 transition shadow-2xl">ابدأ الآن</a>
-                <a href="#features" class="bg-white/10 p-4 px-10 rounded-2xl font-black text-lg border border-white/20 hover:bg-white/20">كيف يعمل؟</a>
+    <section class="pt-32 pb-20 px-6 bg-gradient-to-b from-blue-50 to-white text-center">
+        <div class="max-w-4xl mx-auto">
+            <span class="bg-blue-100 text-blue-700 px-4 py-1 rounded-full text-xs font-black mb-6 inline-block">نظام إدارة السمعة الرقمية الأول</span>
+            <h2 class="text-5xl md:text-7xl font-black mb-8 leading-tight text-slate-900">Mawjat Repu</h2>
+            <p class="text-xl text-slate-600 mb-10 leading-relaxed max-w-2xl mx-auto">حوّل تجربة عملائك إلى تقييمات إيجابية مستمرة. منصة ذكية لإرسال طلبات التقييم عبر الواتساب وإدارة ملاحظات العملاء باحترافية.</p>
+        </div>
+    </section>
+
+    <section id="pricing" class="py-20 px-6">
+        <div class="max-w-6xl mx-auto text-center mb-16">
+            <h2 class="text-4xl font-black mb-4">اختر خطة نجاحك</h2>
+            <p class="text-slate-500 mb-8 font-bold">وفر شهرين كاملين عند اختيار الاشتراك السنوي 🎁</p>
+
+            <div class="flex items-center justify-center gap-4 mb-12">
+                <span class="font-bold text-slate-600">شهري</span>
+                <label class="relative inline-block w-16 h-8 align-middle select-none transition duration-200 ease-in">
+                    <input type="checkbox" id="pricing-toggle" class="toggle-checkbox absolute block w-8 h-8 rounded-full bg-white border-4 appearance-none cursor-pointer transition-all duration-300 right-8 border-slate-300"/>
+                    <label for="pricing-toggle" class="toggle-label block overflow-hidden h-8 rounded-full bg-slate-300 cursor-pointer"></label>
+                </label>
+                <span class="font-bold text-slate-600">سنوي</span>
             </div>
         </div>
-    </section>
 
-    <section id="features" class="py-20 px-6 max-w-6xl mx-auto grid md:grid-cols-3 gap-10">
-        <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 text-center">
-            <div class="text-4xl mb-4">🚀</div>
-            <h3 class="font-black text-xl mb-2 text-slate-800">أتمتة ذكية</h3>
-            <p class="text-slate-500 text-sm">أرسل طلب التقييم بضغطة زر فور انتهاء تجربة العميل.</p>
-        </div>
-        <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 text-center">
-            <div class="text-4xl mb-4">🛡️</div>
-            <h3 class="font-black text-xl mb-2 text-slate-800">حماية السمعة</h3>
-            <p class="text-slate-500 text-sm">استقبل التقييمات السلبية سراً وعالجها قبل نشرها.</p>
-        </div>
-        <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 text-center">
-            <div class="text-4xl mb-4">📊</div>
-            <h3 class="font-black text-xl mb-2 text-slate-800">تقارير لحظية</h3>
-            <p class="text-slate-500 text-sm">راقب أداء فروعك وموظفيك من خلال لوحة تحكم واحدة.</p>
-        </div>
-    </section>
-
-    <section id="pricing" class="py-20 bg-slate-100 px-6">
-        <div class="max-w-6xl mx-auto text-center mb-16">
-            <h2 class="text-3xl font-black text-slate-800">خطط اشتراك مرنة تناسب طموحك</h2>
-            <p class="text-slate-500 mt-2">وفر حتى 20% عند الاشتراك السنوي</p>
-        </div>
-
-        <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
-            <div class="bg-white p-8 rounded-[3rem] shadow-xl border border-blue-100 relative">
-                <h4 class="font-black text-xl text-slate-800">رذاذ (Starter)</h4>
-                <div class="my-6">
-                    <span class="text-4xl font-black text-blue-600">2,490</span> <span class="text-slate-400 font-bold">ر.س / سنة</span>
+        <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8 items-start">
+            
+            <div class="pricing-card bg-white p-10 rounded-[3rem] shadow-xl border border-slate-100">
+                <h4 class="font-black text-2xl mb-2">باقة الإنطلاق</h4>
+                <p class="text-slate-400 text-sm mb-6">للمشاريع الصغيرة والناشئة</p>
+                <div class="mb-8">
+                    <span class="text-5xl font-black text-slate-900 plan-price" data-monthly="299" data-yearly="2490">299</span>
+                    <span class="text-slate-400 font-bold price-unit">ر.س / شهر</span>
                 </div>
                 <ul class="space-y-4 text-right mb-10 text-slate-600 font-bold text-sm">
                     <li>✅ فرع واحد فقط</li>
                     <li>✅ 300 طلب شهرياً</li>
                     <li>✅ تنبيهات واتساب فورية</li>
-                    <li>❌ تقارير أداء متقدمة</li>
+                    <li>✅ تقارير أساسية</li>
                 </ul>
-                <button class="w-full bg-slate-100 text-slate-800 p-4 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition">اشترك الآن</button>
+                <a href="https://wa.me/966XXXXXXXX" class="block text-center bg-slate-100 text-slate-800 p-4 rounded-2xl font-black hover:bg-slate-900 hover:text-white transition italic">Mawjat Start</a>
             </div>
 
-            <div class="bg-slate-900 p-8 rounded-[3rem] shadow-2xl border border-blue-500 scale-105 text-white relative">
-                <div class="absolute -top-4 right-1/2 translate-x-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black">الأكثر طلباً</div>
-                <h4 class="font-black text-xl">تيّار (Pro)</h4>
-                <div class="my-6">
-                    <span class="text-4xl font-black text-blue-400">4,990</span> <span class="text-slate-400 font-bold">ر.س / سنة</span>
+            <div class="pricing-card bg-slate-900 p-10 rounded-[3rem] shadow-2xl border-4 border-blue-600 scale-105 text-white relative">
+                <div class="absolute -top-5 right-1/2 translate-x-1/2 bg-blue-600 px-6 py-2 rounded-full text-xs font-black">الأكثر شعبية</div>
+                <h4 class="font-black text-2xl mb-2">باقة التوسع</h4>
+                <p class="text-slate-400 text-sm mb-6">للمطاعم والمقاهي المتوسطة</p>
+                <div class="mb-8">
+                    <span class="text-5xl font-black text-blue-400 plan-price" data-monthly="499" data-yearly="4990">499</span>
+                    <span class="text-slate-400 font-bold price-unit">ر.س / شهر</span>
                 </div>
                 <ul class="space-y-4 text-right mb-10 text-slate-300 font-bold text-sm">
                     <li>✅ حتى 3 فروع</li>
                     <li>✅ 1,500 طلب شهرياً</li>
-                    <li>✅ تقارير أداء متقدمة</li>
+                    <li>✅ تقارير متقدمة + Excel</li>
                     <li>✅ تحليل أوقات الذروة</li>
                 </ul>
-                <button class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg shadow-blue-500/20 hover:bg-blue-500 transition">اشترك الآن</button>
+                <a href="https://wa.me/966XXXXXXXX" class="block text-center bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg shadow-blue-500/30 hover:bg-blue-500 transition italic">Mawjat Growth</a>
             </div>
 
-            <div class="bg-white p-8 rounded-[3rem] shadow-xl border border-gray-100">
-                <h4 class="font-black text-xl text-slate-800">طوفان (Enterprise)</h4>
-                <div class="my-6">
-                    <span class="text-4xl font-black text-slate-800">14,900</span> <span class="text-slate-400 font-bold">ر.س / سنة</span>
+            <div class="pricing-card bg-white p-10 rounded-[3rem] shadow-xl border border-slate-100">
+                <h4 class="font-black text-2xl mb-2">باقة الشركات</h4>
+                <p class="text-slate-400 text-sm mb-6">للسلاسل والعلامات الكبرى</p>
+                <div class="mb-8">
+                    <span class="text-4xl font-black text-slate-900">سعر مخصص</span>
                 </div>
                 <ul class="space-y-4 text-right mb-10 text-slate-600 font-bold text-sm">
                     <li>✅ فروع غير محدودة</li>
                     <li>✅ رسائل غير محدودة</li>
-                    <li>✅ نظام إدارة الأزمات</li>
-                    <li>✅ دعم فني مخصص 24/7</li>
+                    <li>✅ نظام إدارة أزمات متكامل</li>
+                    <li>✅ ربط API مخصص</li>
                 </ul>
-                <button class="w-full bg-slate-100 text-slate-800 p-4 rounded-2xl font-black hover:bg-slate-900 hover:text-white transition">تواصل معنا</button>
+                <a href="https://wa.me/966XXXXXXXX" class="block text-center bg-slate-900 text-white p-4 rounded-2xl font-black hover:opacity-90 transition italic">Mawjat Enterprise</a>
             </div>
+
         </div>
     </section>
 
-    <footer class="py-10 text-center text-slate-400 text-xs border-t">
-        <p>© 2026 منصة موجة (Mawjat). جميع الحقوق محفوظة.</p>
+    <footer class="py-12 bg-white text-center border-t">
+        <p class="text-slate-400 font-bold">© 2026 MAWJAT REPO. جميع الحقوق محفوظة.</p>
     </footer>
 
+    <script>
+        const toggle = document.getElementById('pricing-toggle');
+        const prices = document.querySelectorAll('.plan-price');
+        const units = document.querySelectorAll('.price-unit');
+
+        toggle.addEventListener('change', function() {
+            prices.forEach((price, index) => {
+                if (this.checked) {
+                    // تحويل للسنوي
+                    price.innerText = price.getAttribute('data-yearly');
+                    units[index].innerText = 'ر.س / سنة';
+                } else {
+                    // تحويل للشهري
+                    price.innerText = price.getAttribute('data-monthly');
+                    units[index].innerText = 'ر.س / شهر';
+                }
+            });
+        });
+    </script>
 </body>
 </html>
