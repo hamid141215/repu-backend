@@ -2,65 +2,154 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إدارة المنصة | Super Admin</title>
+    <title>إدارة المنصة | Mawjat Repu Super Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Cairo', sans-serif; background-color: #0f172a; color: white; }</style>
+    <style>body { font-family: 'Cairo', sans-serif; background-color: #0f172a; color: white; } input, select { color: black !important; font-weight: bold; }</style>
 </head>
 <body class="p-8">
     <div class="max-w-6xl mx-auto">
         <header class="flex justify-between items-center mb-10 bg-slate-800 p-6 rounded-3xl border border-slate-700">
-            <h1 class="text-2xl font-black text-blue-500 italic italic">SUPER ADMIN</h1>
-            <div id="auth_form">
-                <input id="admin_pass" type="password" placeholder="كلمة المرور" class="p-2 rounded-lg text-black outline-none">
-                <button onclick="load()" class="bg-blue-600 px-4 py-2 rounded-lg font-bold">دخول</button>
+            <h1 class="text-2xl font-black text-blue-500 italic uppercase">Super Admin</h1>
+            <div id="auth_form" class="flex gap-2">
+                <input id="admin_pass" type="password" placeholder="كلمة المرور" class="p-2 rounded-lg outline-none w-48 text-black">
+                <button onclick="load()" class="bg-blue-600 px-6 py-2 rounded-lg font-bold hover:bg-blue-500 transition">دخول</button>
             </div>
+            <button id="logout_btn" onclick="logout()" class="hidden bg-red-600 px-4 py-2 rounded-lg font-bold">خروج</button>
         </header>
 
         <div id="dash" class="hidden grid lg:grid-cols-3 gap-8">
-            <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 space-y-4 text-black font-bold">
-                <h3 class="text-blue-400">➕ إضافة مطعم جديد</h3>
-                <input id="n" type="text" placeholder="الاسم">
-                <input id="k" type="text" placeholder="API Key">
-                <input id="g" type="text" placeholder="رابط Google">
-                <input id="p" type="text" placeholder="جوال المدير">
-                <select id="plan" class="w-full p-2 rounded-lg"><option value="Starter">رذاذ</option><option value="Pro">تيار</option></select>
-                <select id="dur" class="w-full p-2 rounded-lg"><option value="monthly">شهري</option><option value="yearly">سنوي</option></select>
-                <button onclick="add()" class="w-full bg-blue-600 text-white p-3 rounded-xl font-black">تفعيل</button>
+            <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 space-y-4 font-bold">
+                <h3 class="text-blue-400 font-black">➕ إضافة مطعم جديد</h3>
+                <input id="n" type="text" placeholder="الاسم الكامل للمطعم" class="w-full p-3 rounded-xl">
+                <input id="k" type="text" placeholder="API Key (فريد)" class="w-full p-3 rounded-xl">
+                <input id="g" type="text" placeholder="رابط Google Maps" class="w-full p-3 rounded-xl">
+                <input id="p" type="text" placeholder="جوال المدير (966...)" class="w-full p-3 rounded-xl">
+                
+                <div class="flex gap-2">
+                    <select id="plan" class="w-1/2 p-3 rounded-xl">
+                        <option value="Starter">رذاذ (Starter)</option>
+                        <option value="Pro">تيار (Pro)</option>
+                        <option value="Enterprise">طوفان</option>
+                    </select>
+                    <select id="dur" class="w-1/2 p-3 rounded-xl">
+                        <option value="monthly">شهري</option>
+                        <option value="yearly">سنوي</option>
+                    </select>
+                </div>
+                <button onclick="add()" class="w-full bg-blue-600 text-white p-4 rounded-xl font-black shadow-lg hover:bg-blue-500 transition">تفعيل الحساب</button>
             </div>
+
             <div class="lg:col-span-2 bg-slate-800 rounded-3xl border border-slate-700 overflow-hidden">
-                <table class="w-full text-right text-xs">
-                    <thead class="bg-slate-900"><tr><th class="p-4">المطعم</th><th class="p-4 text-center">الانتهاء</th><th class="p-4 text-center">الحالة</th></tr></thead>
-                    <tbody id="list"></tbody>
+                <table class="w-full text-right text-sm">
+                    <thead class="bg-slate-900 text-slate-400">
+                        <tr>
+                            <th class="p-4">المطعم</th>
+                            <th class="p-4 text-center text-xs">تاريخ الانتهاء</th>
+                            <th class="p-4 text-center text-xs">الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody id="list">
+                        </tbody>
                 </table>
             </div>
         </div>
     </div>
+
     <script>
-        const getP = () => localStorage.getItem('ap') || document.getElementById('admin_pass').value;
+        // دالة ذكية لجلب الباسورد
+        function getP() {
+            const fromField = document.getElementById('admin_pass').value;
+            const fromStorage = localStorage.getItem('ap');
+            return fromField || fromStorage;
+        }
+
         async function load() {
-            const res = await fetch('/api/clients', { headers: { 'x-admin-password': getP() }});
-            if(res.ok) {
-                localStorage.setItem('ap', getP());
-                document.getElementById('dash').classList.remove('hidden');
-                document.getElementById('auth_form').innerHTML = '<button onclick="location.reload()" class="text-red-400 font-bold">تحديث</button>';
-                const data = await res.json();
-                document.getElementById('list').innerHTML = data.map(c => `
-                    <tr class="border-b border-slate-700">
-                        <td class="p-4 font-bold text-blue-300">${c.name}</td>
-                        <td class="p-4 text-center font-mono">${new Date(c.expiryDate).toLocaleDateString('ar-SA')}</td>
-                        <td class="p-4 text-center">${new Date(c.expiryDate) < new Date() ? '🔴 منتهٍ' : '🟢 نشط'}</td>
-                    </tr>
-                `).join('');
+            const password = getP();
+            if(!password) {
+                alert("يرجى إدخال كلمة المرور أولاً");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/clients', { 
+                    headers: { 'x-admin-password': password }
+                });
+
+                if(res.ok) {
+                    localStorage.setItem('ap', password); // حفظ الباسورد فقط إذا كان صحيحاً
+                    document.getElementById('dash').classList.remove('hidden');
+                    document.getElementById('auth_form').classList.add('hidden');
+                    document.getElementById('logout_btn').classList.remove('hidden');
+                    
+                    const data = await res.json();
+                    document.getElementById('list').innerHTML = data.map(c => `
+                        <tr class="border-b border-slate-700 hover:bg-slate-700/50 transition">
+                            <td class="p-4 font-bold text-blue-300">
+                                ${c.name} <br>
+                                <span class="text-[10px] text-slate-500 font-mono">${c.apiKey}</span>
+                            </td>
+                            <td class="p-4 text-center font-mono text-xs">
+                                ${new Date(c.expiryDate).toLocaleDateString('ar-SA')}
+                            </td>
+                            <td class="p-4 text-center">
+                                ${new Date(c.expiryDate) < new Date() ? 
+                                    '<span class="bg-red-900/30 text-red-500 px-2 py-1 rounded-full text-[10px] font-bold">منتهٍ</span>' : 
+                                    '<span class="bg-green-900/30 text-green-500 px-2 py-1 rounded-full text-[10px] font-bold">نشط</span>'}
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    alert('❌ كلمة المرور غير صحيحة');
+                    localStorage.removeItem('ap');
+                }
+            } catch (err) {
+                alert('🌐 خطأ في الاتصال بالسيرفر');
             }
         }
+
         async function add() {
-            const data = { name: document.getElementById('n').value, apiKey: document.getElementById('k').value, googleLink: document.getElementById('g').value, adminPhone: document.getElementById('p').value, plan: document.getElementById('plan').value, durationType: document.getElementById('dur').value };
-            await fetch('/api/clients/add', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': getP() }, body: JSON.stringify(data) });
-            alert('تم التفعيل'); load();
+            const password = getP();
+            const data = { 
+                name: document.getElementById('n').value, 
+                apiKey: document.getElementById('k').value, 
+                googleLink: document.getElementById('g').value, 
+                adminPhone: document.getElementById('p').value, 
+                plan: document.getElementById('plan').value, 
+                durationType: document.getElementById('dur').value 
+            };
+
+            if(!data.name || !data.apiKey) return alert("يرجى ملء البيانات الأساسية");
+
+            const res = await fetch('/api/clients/add', { 
+                method: 'POST', 
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'x-admin-password': password 
+                }, 
+                body: JSON.stringify(data) 
+            });
+
+            if(res.ok) {
+                alert('✅ تم تفعيل المطعم بنجاح');
+                load(); // تحديث الجدول
+                // تصفير الحقول
+                document.getElementById('n').value = '';
+                document.getElementById('k').value = '';
+            } else {
+                alert('❌ فشل الإضافة، تأكد من الصلاحيات');
+            }
         }
-        window.onload = () => { if(localStorage.getItem('ap')) load(); };
+
+        function logout() {
+            localStorage.removeItem('ap');
+            location.reload();
+        }
+
+        // محاولة التحميل التلقائي إذا كان هناك باسورد مخزن
+        window.onload = () => {
+            if(localStorage.getItem('ap')) load();
+        };
     </script>
-    <style>input { width: 100%; padding: 0.75rem; border-radius: 0.75rem; outline: none; }</style>
 </body>
 </html>

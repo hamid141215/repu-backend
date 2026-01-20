@@ -84,15 +84,49 @@ app.get('/api/export-excel', authenticate, async (req, res) => {
     res.status(200).send(csv);
 });
 
-// سوبر أدمن
+// --- مسارات السوبر أدمن (إدارة المنصة) ---
+
+// 1. مسار جلب قائمة العملاء (هذا ما تحتاجه الصفحة عند الفتح)
+app.get('/api/clients', async (req, res) => {
+    // التحقق من كلمة المرور من الهيدرز
+    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) {
+        return res.status(401).json({ error: "كلمة المرور غير صحيحة" });
+    }
+    
+    try {
+        const clients = await db.collection('clients').find().toArray();
+        res.json(clients);
+    } catch (e) {
+        res.status(500).json({ error: "خطأ في جلب البيانات" });
+    }
+});
+
+// 2. مسار إضافة عميل جديد (الموجود عندك مع تحسين بسيط)
 app.post('/api/clients/add', async (req, res) => {
-    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).send();
-    const { name, apiKey, googleLink, adminPhone, plan, durationType } = req.body;
-    const expiryDate = new Date();
-    if (durationType === 'monthly') expiryDate.setMonth(expiryDate.getMonth() + 1);
-    else expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-    await db.collection('clients').insertOne({ name, apiKey, googleLink, adminPhone, plan, durationType, expiryDate, createdAt: new Date() });
-    res.json({ success: true });
+    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) {
+        return res.status(401).json({ error: "غير مصرح لك" });
+    }
+
+    try {
+        const { name, apiKey, googleLink, adminPhone, plan, durationType } = req.body;
+        const expiryDate = new Date();
+        
+        if (durationType === 'monthly') {
+            expiryDate.setMonth(expiryDate.getMonth() + 1);
+        } else {
+            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+        }
+
+        await db.collection('clients').insertOne({ 
+            name, apiKey, googleLink, adminPhone, 
+            plan, durationType, expiryDate, 
+            createdAt: new Date() 
+        });
+        
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: "فشل في إضافة العميل" });
+    }
 });
 
 const PORT = process.env.PORT || 10000;
