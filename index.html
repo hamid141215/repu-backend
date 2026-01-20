@@ -11,6 +11,8 @@
         .hero-gradient { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
         .toggle-checkbox:checked { right: 0; border-color: #2563eb; }
         .toggle-checkbox:checked + .toggle-label { background-color: #2563eb; }
+        /* منع ظهور أي تأطير أزرق عند النقر على الأزرار */
+        button:focus { outline: none; }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -81,7 +83,7 @@
 
         <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
             <div class="bg-slate-800 p-10 rounded-[3rem] border border-slate-700">
-                <h4 class="font-black text-2xl mb-2 text-blue-400">باقة الإنطلاق</h4>
+                <h4 class="font-black text-2xl mb-2 text-blue-400">باقة المنطلق</h4>
                 <div class="my-8">
                     <span class="text-6xl font-black plan-price" data-monthly="299" data-yearly="2490">299</span>
                     <span class="text-slate-400 font-bold price-unit">ر.س / شهر</span>
@@ -89,15 +91,15 @@
                 <ul class="space-y-4 text-right mb-12 text-slate-300 font-bold text-sm">
                     <li>✅ فرع واحد فقط</li>
                     <li>✅ 300 طلب شهرياً</li>
-                    <li>✅ تنبيهات واتساب فورية</li>
+                    <li>✅ تنبيهات واتساب فورية للمدير</li>
                     <li>✅ لوحة تحكم أساسية</li>
                 </ul>
-                <button onclick="contactSales('باقة الإنطلاق')" class="w-full text-center bg-white text-slate-900 p-4 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition uppercase tracking-tighter">Mawjat Repu Start</button>
+                <button onclick="contactSales('باقة المنطلق')" class="w-full text-center bg-white text-slate-900 p-4 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition uppercase tracking-tighter">Mawjat Repu Start</button>
             </div>
 
             <div class="bg-blue-600 p-10 rounded-[3rem] shadow-2xl scale-105 relative border-4 border-blue-400">
                 <div class="absolute -top-5 right-1/2 translate-x-1/2 bg-white text-blue-600 px-6 py-2 rounded-full text-[10px] font-black shadow-lg uppercase tracking-widest italic">Recommended</div>
-                <h4 class="font-black text-2xl mb-2">باقة التوسع</h4>
+                <h4 class="font-black text-2xl mb-2">باقة المتوسع</h4>
                 <div class="my-8 text-white">
                     <span class="text-6xl font-black plan-price" data-monthly="499" data-yearly="4990">499</span>
                     <span class="font-bold price-unit">ر.س / شهر</span>
@@ -106,9 +108,10 @@
                     <li>✅ حتى 3 فروع</li>
                     <li>✅ 1,500 طلب شهرياً</li>
                     <li>✅ تصدير التقارير لـ Excel</li>
+                    <li>✅ تحليل أوقات الذروة</li>
                     <li>✅ دعم فني ذو أولوية</li>
                 </ul>
-                <button onclick="contactSales('باقة التوسع')" class="w-full text-center bg-slate-900 text-white p-4 rounded-2xl font-black shadow-xl hover:opacity-90 transition uppercase tracking-tighter">Mawjat Repu Growth</button>
+                <button onclick="contactSales('باقة المتوسع')" class="w-full text-center bg-slate-900 text-white p-4 rounded-2xl font-black shadow-xl hover:opacity-90 transition uppercase tracking-tighter">Mawjat Repu Growth</button>
             </div>
 
             <div class="bg-slate-800 p-10 rounded-[3rem] border border-slate-700">
@@ -119,8 +122,9 @@
                 <p class="text-slate-400 text-sm mb-10 leading-relaxed">مثالية للسلاسل والعلامات التجارية الكبرى التي تحتاج لإدارة شاملة وحلول مخصصة.</p>
                 <ul class="space-y-4 text-right mb-12 text-slate-300 font-bold text-sm">
                     <li>✅ فروع ورسائل غير محدودة</li>
-                    <li>✅ نظام إدارة الأزمات</li>
-                    <li>✅ ربط API مخصص</li>
+                    <li>✅ نظام إدارة الأزمات الفوري</li>
+                    <li>✅ ربط API مخصص لفروعك</li>
+                    <li>✅ مدير حساب مخصص</li>
                 </ul>
                 <button onclick="contactSales('باقة الشركات')" class="w-full text-center bg-blue-600 text-white p-4 rounded-2xl font-black hover:bg-blue-500 transition uppercase tracking-tighter">Contact Enterprise</button>
             </div>
@@ -128,11 +132,14 @@
     </section>
 
     <footer class="py-12 text-center text-slate-400 border-t border-gray-200">
-        <h2 class="text-xl font-black text-blue-600 mb-4 italic uppercase">MAWJAT REPU</h2>
-        <p class="text-[10px] font-bold uppercase tracking-[0.3em]">Digital Reputation Management System © 2026</p>
+        <div class="max-w-6xl mx-auto px-6">
+            <h2 class="text-xl font-black text-blue-600 mb-4 italic uppercase">MAWJAT REPU</h2>
+            <p class="text-[10px] font-bold uppercase tracking-[0.3em]">Digital Reputation Management System © 2026</p>
+        </div>
     </footer>
 
     <script>
+        // دالة تبديل الأسعار
         const toggle = document.getElementById('pricing-toggle');
         const prices = document.querySelectorAll('.plan-price');
         const units = document.querySelectorAll('.price-unit');
@@ -149,14 +156,19 @@
             });
         });
 
-        // دالة الاتصال الآمنة
+        // الحل الأمني الجذري: منع ظهور البيانات في الرابط العلوي
         function contactSales(planName) {
             const isYearly = document.getElementById('pricing-toggle').checked;
             const duration = isYearly ? "سنوي" : "شهري";
             const message = `مرحباً Mawjat Repu، أرغب في الاستفسار عن ${planName} اشتراك ${duration}`;
-            const phone = "966567442706"; // استبدله برقمك الحقيقي هنا
+            const phone = "966567442706";
+
+            // بناء الرابط بشكل مشفر
             const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-            window.open(whatsappUrl, '_blank');
+            
+            // فتح الرابط في نافذة جديدة دون تغيير الـ URL الحالي للموقع
+            const newWindow = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+            if (newWindow) newWindow.opener = null;
         }
     </script>
 </body>
