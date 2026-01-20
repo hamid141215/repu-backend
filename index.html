@@ -18,7 +18,7 @@
     <nav class="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b">
         <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
             <h1 class="text-2xl font-black text-blue-600 tracking-tighter italic uppercase">MAWJAT <span class="text-slate-800">REPU</span></h1>
-            <div class="hidden md:flex gap-8 font-bold text-slate-600">
+            <div class="hidden md:flex gap-8 font-bold text-slate-600 items-center">
                 <a href="#features" class="hover:text-blue-600 transition">المميزات</a>
                 <a href="#pricing" class="hover:text-blue-600 transition">الأسعار</a>
                 <a href="/app" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">دخول العملاء</a>
@@ -29,12 +29,12 @@
     <section class="hero-gradient text-white pt-32 pb-24 px-6">
         <div class="max-w-4xl mx-auto text-center">
             <span class="bg-blue-500/20 text-blue-300 px-4 py-1 rounded-full text-xs font-black mb-6 inline-block border border-blue-500/30 uppercase tracking-widest">Mawjat Repu v2.0</span>
-            <h2 class="text-4xl md:text-7xl font-black mb-8 leading-tight uppercase">MAWJAT REPU</h2>
+            <h2 class="text-4xl md:text-7xl font-black mb-8 leading-tight uppercase tracking-tighter">MAWJAT REPU</h2>
             <h3 class="text-2xl md:text-4xl font-bold mb-6 text-blue-400">حوّل كل زبون إلى 5 نجوم على Google Maps</h3>
             <p class="text-lg opacity-80 mb-10 leading-relaxed max-w-2xl mx-auto">نظام ذكي لأتمتة طلب التقييمات عبر الواتساب، إدارة سمعة مطعمك الرقمية، ومعالجة الشكاوي فورياً قبل أن تصل للعلن.</p>
             <div class="flex flex-col md:flex-row gap-4 justify-center">
                 <a href="#pricing" class="bg-blue-600 p-4 px-10 rounded-2xl font-black text-lg hover:scale-105 transition shadow-2xl">اشترك الآن</a>
-                <a href="https://wa.me/966XXXXXXXX" class="bg-white/10 p-4 px-10 rounded-2xl font-black text-lg border border-white/20 hover:bg-white/20 transition italic tracking-widest">Mawjat Repu Demo</a>
+                <button onclick="contactSales('تجربة النظام')" class="bg-white/10 p-4 px-10 rounded-2xl font-black text-lg border border-white/20 hover:bg-white/20 transition italic tracking-widest">Mawjat Repu Demo</button>
             </div>
         </div>
     </section>
@@ -81,7 +81,7 @@
 
         <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
             <div class="bg-slate-800 p-10 rounded-[3rem] border border-slate-700">
-                <h4 class="font-black text-2xl mb-2 text-blue-400">باقة المنطلق</h4>
+                <h4 class="font-black text-2xl mb-2 text-blue-400">باقة الإنطلاق</h4>
                 <div class="my-8">
                     <span class="text-6xl font-black plan-price" data-monthly="299" data-yearly="2490">299</span>
                     <span class="text-slate-400 font-bold price-unit">ر.س / شهر</span>
@@ -89,15 +89,15 @@
                 <ul class="space-y-4 text-right mb-12 text-slate-300 font-bold text-sm">
                     <li>✅ فرع واحد فقط</li>
                     <li>✅ 300 طلب شهرياً</li>
-                    <li>✅ تنبيهات واتساب فورية للمدير</li>
+                    <li>✅ تنبيهات واتساب فورية</li>
                     <li>✅ لوحة تحكم أساسية</li>
                 </ul>
-                <a href="https://wa.me/966XXXXXXXX" class="block text-center bg-white text-slate-900 p-4 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition uppercase tracking-tighter">Mawjat Repu Start</a>
+                <button onclick="contactSales('باقة الإنطلاق')" class="w-full text-center bg-white text-slate-900 p-4 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition uppercase tracking-tighter">Mawjat Repu Start</button>
             </div>
 
             <div class="bg-blue-600 p-10 rounded-[3rem] shadow-2xl scale-105 relative border-4 border-blue-400">
                 <div class="absolute -top-5 right-1/2 translate-x-1/2 bg-white text-blue-600 px-6 py-2 rounded-full text-[10px] font-black shadow-lg uppercase tracking-widest italic">Recommended</div>
-                <h4 class="font-black text-2xl mb-2">باقة المتوسع</h4>
+                <h4 class="font-black text-2xl mb-2">باقة التوسع</h4>
                 <div class="my-8 text-white">
                     <span class="text-6xl font-black plan-price" data-monthly="499" data-yearly="4990">499</span>
                     <span class="font-bold price-unit">ر.س / شهر</span>
@@ -106,10 +106,9 @@
                     <li>✅ حتى 3 فروع</li>
                     <li>✅ 1,500 طلب شهرياً</li>
                     <li>✅ تصدير التقارير لـ Excel</li>
-                    <li>✅ تحليل أوقات الذروة</li>
                     <li>✅ دعم فني ذو أولوية</li>
                 </ul>
-                <a href="https://wa.me/966XXXXXXXX" class="block text-center bg-slate-900 text-white p-4 rounded-2xl font-black shadow-xl hover:opacity-90 transition uppercase tracking-tighter">Mawjat Repu Growth</a>
+                <button onclick="contactSales('باقة التوسع')" class="w-full text-center bg-slate-900 text-white p-4 rounded-2xl font-black shadow-xl hover:opacity-90 transition uppercase tracking-tighter">Mawjat Repu Growth</button>
             </div>
 
             <div class="bg-slate-800 p-10 rounded-[3rem] border border-slate-700">
@@ -120,20 +119,17 @@
                 <p class="text-slate-400 text-sm mb-10 leading-relaxed">مثالية للسلاسل والعلامات التجارية الكبرى التي تحتاج لإدارة شاملة وحلول مخصصة.</p>
                 <ul class="space-y-4 text-right mb-12 text-slate-300 font-bold text-sm">
                     <li>✅ فروع ورسائل غير محدودة</li>
-                    <li>✅ نظام إدارة الأزمات الفوري</li>
-                    <li>✅ ربط API مخصص لفروعك</li>
-                    <li>✅ مدير حساب مخصص</li>
+                    <li>✅ نظام إدارة الأزمات</li>
+                    <li>✅ ربط API مخصص</li>
                 </ul>
-                <a href="https://wa.me/966XXXXXXXX" class="block text-center bg-blue-600 text-white p-4 rounded-2xl font-black hover:bg-blue-500 transition uppercase tracking-tighter">Contact Enterprise</a>
+                <button onclick="contactSales('باقة الشركات')" class="w-full text-center bg-blue-600 text-white p-4 rounded-2xl font-black hover:bg-blue-500 transition uppercase tracking-tighter">Contact Enterprise</button>
             </div>
         </div>
     </section>
 
-    <footer class="py-12 text-center text-slate-400">
-        <div class="max-w-6xl mx-auto px-6 border-t border-gray-200 pt-10">
-            <h2 class="text-xl font-black text-blue-600 mb-4 italic uppercase">MAWJAT REPU</h2>
-            <p class="text-[10px] font-bold uppercase tracking-[0.3em]">Digital Reputation Management System © 2026</p>
-        </div>
+    <footer class="py-12 text-center text-slate-400 border-t border-gray-200">
+        <h2 class="text-xl font-black text-blue-600 mb-4 italic uppercase">MAWJAT REPU</h2>
+        <p class="text-[10px] font-bold uppercase tracking-[0.3em]">Digital Reputation Management System © 2026</p>
     </footer>
 
     <script>
@@ -152,6 +148,16 @@
                 }
             });
         });
+
+        // دالة الاتصال الآمنة
+        function contactSales(planName) {
+            const isYearly = document.getElementById('pricing-toggle').checked;
+            const duration = isYearly ? "سنوي" : "شهري";
+            const message = `مرحباً Mawjat Repu، أرغب في الاستفسار عن ${planName} اشتراك ${duration}`;
+            const phone = "966567442706"; // استبدله برقمك الحقيقي هنا
+            const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
     </script>
 </body>
 </html>
