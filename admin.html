@@ -12,34 +12,34 @@
         <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md text-center shadow-2xl">
             <h2 class="text-2xl font-black text-blue-600 mb-2 italic">MAWJAT REPU</h2>
             <p class="text-slate-500 text-sm mb-6 font-bold">يرجى إدخال مفتاح الوصول الخاص بمطعمك</p>
-            <input id="key_input" type="password" placeholder="API Key" class="w-full p-4 bg-slate-100 rounded-2xl mb-4 text-center font-bold outline-none border-2 border-transparent focus:border-blue-500">
-            <button onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg hover:bg-blue-700 transition">دخول النظام</button>
+            <input id="key_input" type="password" placeholder="API Key" class="w-full p-4 bg-slate-100 rounded-2xl mb-4 text-center font-bold outline-none border-2 border-transparent focus:border-blue-500 text-black">
+            <button id="login_btn" onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg hover:bg-blue-700 transition">دخول النظام</button>
         </div>
     </div>
 
     <div id="main_app" class="hidden max-w-xl mx-auto space-y-4">
         <header class="bg-white p-6 rounded-3xl shadow-sm flex justify-between items-center border">
             <h1 id="restaurant_name" class="font-black text-xl text-blue-600 italic">...</h1>
-            <button onclick="logout()" class="text-xs bg-red-50 text-red-600 p-2 px-4 rounded-xl font-bold">تسجيل خروج</button>
+            <button onclick="logout()" class="text-xs bg-red-50 text-red-600 p-2 px-4 rounded-xl font-bold hover:bg-red-100 transition">تسجيل خروج</button>
         </header>
 
         <div class="bg-white p-8 rounded-[2.5rem] shadow-lg border">
             <div class="space-y-4">
-                <input id="cust_name" type="text" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 rounded-2xl border text-right font-bold outline-none focus:border-blue-500">
-                <input id="cust_phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border text-center font-bold outline-none focus:border-blue-500">
-                <select id="branch" class="w-full p-4 bg-slate-100 rounded-2xl font-bold text-center outline-none">
+                <input id="cust_name" type="text" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 rounded-2xl border text-right font-bold outline-none focus:border-blue-500 text-black">
+                <input id="cust_phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border text-center font-bold outline-none focus:border-blue-500 text-black">
+                <select id="branch" class="w-full p-4 bg-slate-100 rounded-2xl font-bold text-center outline-none text-black">
                     <option>الفرع الرئيسي</option>
                 </select>
-                <button onclick="send()" class="w-full bg-blue-600 text-white p-5 rounded-3xl font-black shadow-lg">إرسال التقييم ✨</button>
+                <button onclick="send()" class="w-full bg-blue-600 text-white p-5 rounded-3xl font-black shadow-lg hover:bg-blue-700 transition">إرسال التقييم ✨</button>
             </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
             <div class="bg-white p-6 rounded-3xl text-center border shadow-sm">
-                <p class="text-[10px] font-black text-gray-400 uppercase">الإجمالي</p>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">إجمالي الرسائل</p>
                 <h2 id="total" class="text-3xl font-black text-slate-800">0</h2>
             </div>
-            <a href="/reports" class="bg-slate-900 p-6 rounded-3xl text-center text-white flex flex-col justify-center items-center">
+            <a href="/reports" class="bg-slate-900 p-6 rounded-3xl text-center text-white flex flex-col justify-center items-center hover:bg-slate-800 transition">
                 <span class="text-xs font-bold">📊 عرض</span>
                 <span class="text-xs font-bold">التقارير</span>
             </a>
@@ -47,26 +47,34 @@
     </div>
 
     <script>
-        let sessionKey = null;
-
+        // دالة الدخول الذكي
         async function login() {
-            const key = document.getElementById('key_input').value;
-            const res = await fetch('/api/client-info', { headers: { 'x-api-key': key } });
-            
-            if(res.ok) {
-                const data = await res.json();
-                sessionKey = key;
-                sessionStorage.setItem('temp_key', key);
-                document.getElementById('restaurant_name').innerText = data.name;
-                document.getElementById('total').innerText = data.total;
-                document.getElementById('login_screen').classList.add('hidden');
-                document.getElementById('main_app').classList.remove('hidden');
-            } else {
-                alert('⚠️ المفتاح خاطئ أو الاشتراك منتهٍ');
-            }
+            const keyInput = document.getElementById('key_input');
+            const key = keyInput.value || localStorage.getItem('repu_key');
+            if(!key) return;
+
+            const btn = document.getElementById('login_btn');
+            btn.innerText = "جاري التحقق...";
+
+            try {
+                const res = await fetch('/api/client-info', { headers: { 'x-api-key': key } });
+                if(res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('repu_key', key); // حفظ الجلسة
+                    document.getElementById('restaurant_name').innerText = data.name;
+                    document.getElementById('total').innerText = data.total;
+                    document.getElementById('login_screen').classList.add('hidden');
+                    document.getElementById('main_app').classList.remove('hidden');
+                } else {
+                    localStorage.removeItem('repu_key');
+                    if(keyInput.value) alert('⚠️ المفتاح خاطئ أو الاشتراك منتهٍ');
+                }
+            } catch(e) { console.error(e); }
+            btn.innerText = "دخول النظام";
         }
 
         async function send() {
+            const key = localStorage.getItem('repu_key');
             const data = {
                 name: document.getElementById('cust_name').value,
                 phone: document.getElementById('cust_phone').value,
@@ -74,23 +82,27 @@
             };
             const res = await fetch('/api/send', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': sessionKey },
+                headers: { 'Content-Type': 'application/json', 'x-api-key': key },
                 body: JSON.stringify(data)
             });
             if(res.ok) { 
-                alert('✅ تم الإرسال'); 
+                alert('✅ تم الإرسال بنجاح'); 
                 document.getElementById('cust_name').value = '';
                 document.getElementById('cust_phone').value = '';
+                login(); // تحديث الإحصائيات
+            } else {
+                const err = await res.json();
+                alert('❌ فشل الإرسال: ' + err.error);
             }
         }
 
         function logout() {
-            sessionStorage.clear();
+            localStorage.removeItem('repu_key'); // مسح كامل للجلسة
             location.reload();
         }
 
-        // منع الدخول التلقائي من localStorage القديم
-        window.onload = () => { localStorage.clear(); };
+        // محاولة الدخول التلقائي عند التحميل
+        window.onload = () => { if(localStorage.getItem('repu_key')) login(); };
     </script>
 </body>
 </html>
