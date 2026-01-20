@@ -11,6 +11,7 @@ app.use(express.urlencoded({ extended: true }));
 
 const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
+// توحيد تنسيق الأرقام
 const normalizePhone = (phone) => {
     let p = String(phone).replace(/\D/g, '');
     if (p.startsWith('05')) p = '966' + p.substring(1);
@@ -24,87 +25,84 @@ const initMongo = async () => {
         const client = new MongoClient(process.env.MONGO_URL);
         await client.connect();
         db = client.db('mawjat_platform');
-        console.log("🛡️ Database Isolated & Connected");
+        console.log("🛡️ المنصة جاهزة: عزل البيانات والاشتراكات مفعل");
     } catch (e) { 
         console.error("Mongo Error:", e.message);
         setTimeout(initMongo, 5000); 
     }
 };
 
-// Middleware لتأمين الروابط وعزل الهوية
+// Middleware: التحقق من الهوية + تاريخ انتهاء الاشتراك
 const authenticate = async (req, res, next) => {
     const apiKey = req.headers['x-api-key'] || req.query.apiKey;
     if (!apiKey) return res.status(401).json({ error: "Missing API Key" });
+
     const client = await db.collection('clients').findOne({ apiKey });
     if (!client) return res.status(403).json({ error: "Invalid API Key" });
+
+    if (client.expiryDate && new Date(client.expiryDate) < new Date()) {
+        return res.status(402).json({ error: "Subscription Expired" });
+    }
+
     req.clientData = client;
     next();
 };
 
 const superAdminAuth = (req, res, next) => {
-    const pass = req.headers['x-admin-password'];
-    if (pass === process.env.ADMIN_PASSWORD) next();
+    if (req.headers['x-admin-password'] === process.env.ADMIN_PASSWORD) next();
     else res.status(401).json({ error: "Unauthorized" });
 };
 
 // --- المسارات (Routes) ---
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'admin.html'));
-});
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html'))); // صفحة الهبوط
+app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'admin.html'))); // لوحة الإرسال
+app.get('/reports', (req, res) => res.sendFile(path.join(__dirname, 'reports.html'))); // التقارير
+app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html'))); // الإدارة
 
-// جلب بيانات العميل والإحصائيات الخاصة به فقط
+// معلومات العميل وإحصائياته
 app.get('/api/client-info', authenticate, async (req, res) => {
-    try {
-        const total = await db.collection('evaluations').countDocuments({ clientId: req.clientData._id });
-        res.json({
-            name: req.clientData.name,
-            total: total
-        });
-    } catch (e) { res.status(500).json({ error: "Error fetching info" }); }
+    const total = await db.collection('evaluations').countDocuments({ clientId: req.clientData._id });
+    res.json({ name: req.clientData.name, total, expiry: req.clientData.expiryDate });
 });
 
+// إرسال التقييم
 app.post('/api/send', authenticate, async (req, res) => {
     const { phone, name, branch } = req.body;
     const cleanPhone = normalizePhone(phone);
-    const client = req.clientData;
-    
     try {
-        // تضمين اسم المطعم ديناميكياً في الرسالة
         await twilioClient.messages.create({
             from: process.env.TWILIO_PHONE_NUMBER,
-            body: `أهلاً بك ${name}، كيف كانت تجربتك في ${client.name} - ${branch}؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`,
+            body: `أهلاً بك ${name}، كيف كانت تجربتك في ${req.clientData.name} - ${branch}؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`,
             to: `whatsapp:+${cleanPhone}`
         });
-
-        await db.collection('evaluations').insertOne({ 
-            clientId: client._id, 
-            phone: cleanPhone, 
-            name, 
-            branch, 
-            status: 'sent', 
-            sentAt: new Date() 
-        });
-        res.json({ success: true, clientName: client.name });
-    } catch (error) { res.status(500).json({ error: error.message }); }
+        await db.collection('evaluations').insertOne({ clientId: req.clientData._id, phone: cleanPhone, name, branch, status: 'sent', sentAt: new Date() });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/reports', (req, res) => {
-    res.sendFile(path.join(__dirname, 'reports.html'));
-});
-
-// جلب التقييمات المعزولة للمطعم فقط
+// جلب التقارير الخاصة (معزولة)
 app.get('/api/my-reports', authenticate, async (req, res) => {
-    try {
-        const evaluations = await db.collection('evaluations')
-            .find({ clientId: req.clientData._id })
-            .sort({ sentAt: -1 })
-            .toArray();
-        res.json(evaluations);
-    } catch (e) { res.status(500).json({ error: "Error fetching reports" }); }
+    const evals = await db.collection('evaluations').find({ clientId: req.clientData._id }).sort({ sentAt: -1 }).toArray();
+    res.json(evals);
 });
 
-// Webhook ومعالجة الردود (نفس المنطق السابق مع التأكد من اسم المطعم)
+// تصدير ملف إكسل يدوي بدون مكتبات
+app.get('/api/export-excel', authenticate, async (req, res) => {
+    try {
+        const evals = await db.collection('evaluations').find({ clientId: req.clientData._id }).sort({ sentAt: -1 }).toArray();
+        let csv = "\ufeffالعميل,الجوال,الفرع,التقييم,التاريخ\n";
+        evals.forEach(e => {
+            const ans = e.answer === '1' ? 'ممتاز' : e.answer === '2' ? 'سلبي' : 'لم يرد';
+            csv += `${e.name},${e.phone},${e.branch},${ans},${new Date(e.sentAt).toLocaleDateString('ar-SA')}\n`;
+        });
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename=Reports_${req.clientData.name}.csv`);
+        res.send(csv);
+    } catch (e) { res.status(500).send("Export Error"); }
+});
+
+// Webhook
 app.post('/whatsapp/webhook', async (req, res) => {
     const { Body, From } = req.body;
     const customerAnswer = Body ? Body.trim() : "";
@@ -113,34 +111,30 @@ app.post('/whatsapp/webhook', async (req, res) => {
         const lastEval = await db.collection('evaluations').findOne({ phone: fullPhone, status: 'sent' }, { sort: { sentAt: -1 } });
         if (lastEval) {
             const client = await db.collection('clients').findOne({ _id: lastEval.clientId });
-            let replyMsg = "";
+            let msg = "";
             if (customerAnswer === "1") {
-                replyMsg = `شكراً لزيارتك ${client.name}! 😍\n📍 قيمنا هنا: ${client.googleLink}`;
+                msg = `شكراً لتقييمك لـ ${client.name}! 😍\n📍 قيمنا هنا: ${client.googleLink}`;
                 await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '1', repliedAt: new Date() } });
             } else if (customerAnswer === "2") {
-                replyMsg = `نعتذر منك 😔، تم إرسال ملاحظتك لإدارة ${client.name} وسيتم التواصل معك.`;
+                msg = `نعتذر منك 😔، تم إرسال ملاحظتك لإدارة ${client.name}.`;
                 await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '2', repliedAt: new Date() } });
-                try {
-                    let adminNum = normalizePhone(process.env.MANAGER_PHONE || client.adminPhone);
-                    await twilioClient.messages.create({
-                        from: process.env.TWILIO_PHONE_NUMBER,
-                        body: `⚠️ تنبيه سلبي - ${client.name}!\nالعميل: ${lastEval.name}\nالفرع: ${lastEval.branch}`,
-                        to: `whatsapp:+${adminNum}`
-                    });
-                } catch (e) { console.error("Admin Alert Fail", e.message); }
+                let adminNum = normalizePhone(process.env.MANAGER_PHONE || client.adminPhone);
+                await twilioClient.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, body: `⚠️ تنبيه سلبي - ${client.name}\nالعميل: ${lastEval.name}`, to: `whatsapp:+${adminNum}` });
             }
-            if (replyMsg) await twilioClient.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, body: replyMsg, to: From });
+            if (msg) await twilioClient.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, body: msg, to: From });
         }
-    } catch (err) { console.error("Webhook Error", err.message); }
+    } catch (err) { console.error("Webhook Error"); }
     res.type('text/xml').send('<Response></Response>');
 });
 
-// سوبر أدمن
-app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
+// السوبر أدمن
 app.get('/api/clients', superAdminAuth, async (req, res) => res.json(await db.collection('clients').find().toArray()));
 app.post('/api/clients/add', superAdminAuth, async (req, res) => {
-    const { name, apiKey, googleLink, adminPhone } = req.body;
-    await db.collection('clients').insertOne({ name, apiKey, googleLink, adminPhone, createdAt: new Date() });
+    const { name, apiKey, googleLink, adminPhone, plan, durationType } = req.body;
+    const expiryDate = new Date();
+    if (durationType === 'monthly') expiryDate.setMonth(expiryDate.getMonth() + 1);
+    else expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    await db.collection('clients').insertOne({ name, apiKey, googleLink, adminPhone, plan, durationType, expiryDate, createdAt: new Date() });
     res.json({ success: true });
 });
 

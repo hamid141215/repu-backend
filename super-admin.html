@@ -2,81 +2,65 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إدارة المنصة | Mawjat</title>
+    <title>إدارة المنصة | Super Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Cairo', sans-serif; background-color: #0f172a; }</style>
+    <style>body { font-family: 'Cairo', sans-serif; background-color: #0f172a; color: white; }</style>
 </head>
-<body class="p-8 text-white">
-    <div class="max-w-5xl mx-auto">
-        <header class="mb-10 flex justify-between items-center bg-slate-800 p-6 rounded-3xl">
-            <h1 class="text-2xl font-black text-blue-500">لوحة تحكم السوبر أدمن</h1>
-            <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded-xl text-xs font-bold">خروج</button>
+<body class="p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="flex justify-between items-center mb-10 bg-slate-800 p-6 rounded-3xl border border-slate-700">
+            <h1 class="text-2xl font-black text-blue-500 italic italic">SUPER ADMIN</h1>
+            <div id="auth_form">
+                <input id="admin_pass" type="password" placeholder="كلمة المرور" class="p-2 rounded-lg text-black outline-none">
+                <button onclick="load()" class="bg-blue-600 px-4 py-2 rounded-lg font-bold">دخول</button>
+            </div>
         </header>
 
-        <div id="auth_section" class="bg-slate-800 p-10 rounded-3xl text-center border border-slate-700">
-            <h2 class="text-xl mb-4 font-bold">🔐 الدخول للمديرين فقط</h2>
-            <input id="admin_pass" type="password" placeholder="كلمة مرور المدير" class="p-3 rounded-xl text-black text-center font-bold outline-none mb-4 w-64">
-            <br>
-            <button onclick="loadDashboard()" class="bg-blue-600 px-10 py-3 rounded-xl font-black">دخول</button>
-        </div>
-
-        <div id="main_dashboard" class="hidden grid lg:grid-cols-3 gap-8">
-            <div class="bg-slate-800 p-6 rounded-3xl h-fit border border-slate-700">
-                <h3 class="font-bold text-blue-400 mb-6 underline">➕ إضافة عميل</h3>
-                <div class="space-y-4 text-black">
-                    <input id="c_name" type="text" placeholder="اسم المطعم" class="w-full p-3 rounded-xl font-bold">
-                    <input id="c_key" type="text" placeholder="API Key" class="w-full p-3 rounded-xl font-bold">
-                    <input id="c_google" type="text" placeholder="رابط Google" class="w-full p-3 rounded-xl font-bold">
-                    <input id="c_admin" type="text" placeholder="جوال المدير" class="w-full p-3 rounded-xl font-bold text-center">
-                    <button onclick="addNew()" class="w-full bg-blue-600 text-white p-4 rounded-xl font-black">تنشيط العميل</button>
-                </div>
+        <div id="dash" class="hidden grid lg:grid-cols-3 gap-8">
+            <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 space-y-4 text-black font-bold">
+                <h3 class="text-blue-400">➕ إضافة مطعم جديد</h3>
+                <input id="n" type="text" placeholder="الاسم">
+                <input id="k" type="text" placeholder="API Key">
+                <input id="g" type="text" placeholder="رابط Google">
+                <input id="p" type="text" placeholder="جوال المدير">
+                <select id="plan" class="w-full p-2 rounded-lg"><option value="Starter">رذاذ</option><option value="Pro">تيار</option></select>
+                <select id="dur" class="w-full p-2 rounded-lg"><option value="monthly">شهري</option><option value="yearly">سنوي</option></select>
+                <button onclick="add()" class="w-full bg-blue-600 text-white p-3 rounded-xl font-black">تفعيل</button>
             </div>
             <div class="lg:col-span-2 bg-slate-800 rounded-3xl border border-slate-700 overflow-hidden">
-                <table class="w-full text-right">
-                    <thead class="bg-slate-900 text-slate-400 text-xs uppercase">
-                        <tr><th class="p-4">العميل</th><th class="p-4 text-center">المفتاح</th><th class="p-4 text-center">الجوال</th></tr>
-                    </thead>
-                    <tbody id="clients_table"></tbody>
+                <table class="w-full text-right text-xs">
+                    <thead class="bg-slate-900"><tr><th class="p-4">المطعم</th><th class="p-4 text-center">الانتهاء</th><th class="p-4 text-center">الحالة</th></tr></thead>
+                    <tbody id="list"></tbody>
                 </table>
             </div>
         </div>
     </div>
-
     <script>
-        const getPass = () => localStorage.getItem('admin_p');
-        
-        async function loadDashboard() {
-            const pass = document.getElementById('admin_pass').value || getPass();
-            const res = await fetch('/api/clients', { headers: { 'x-admin-password': pass } });
-            
+        const getP = () => localStorage.getItem('ap') || document.getElementById('admin_pass').value;
+        async function load() {
+            const res = await fetch('/api/clients', { headers: { 'x-admin-password': getP() }});
             if(res.ok) {
-                localStorage.setItem('admin_p', pass);
-                document.getElementById('auth_section').classList.add('hidden');
-                document.getElementById('main_dashboard').classList.remove('hidden');
-                const clients = await res.json();
-                document.getElementById('clients_table').innerHTML = clients.map(c => `
+                localStorage.setItem('ap', getP());
+                document.getElementById('dash').classList.remove('hidden');
+                document.getElementById('auth_form').innerHTML = '<button onclick="location.reload()" class="text-red-400 font-bold">تحديث</button>';
+                const data = await res.json();
+                document.getElementById('list').innerHTML = data.map(c => `
                     <tr class="border-b border-slate-700">
                         <td class="p-4 font-bold text-blue-300">${c.name}</td>
-                        <td class="p-4 text-center"><code>${c.apiKey}</code></td>
-                        <td class="p-4 text-center">${c.adminPhone}</td>
+                        <td class="p-4 text-center font-mono">${new Date(c.expiryDate).toLocaleDateString('ar-SA')}</td>
+                        <td class="p-4 text-center">${new Date(c.expiryDate) < new Date() ? '🔴 منتهٍ' : '🟢 نشط'}</td>
                     </tr>
                 `).join('');
-            } else { alert('❌ كلمة المرور خطأ'); }
+            }
         }
-
-        async function addNew() {
-            const data = { name: document.getElementById('c_name').value, apiKey: document.getElementById('c_key').value, googleLink: document.getElementById('c_google').value, adminPhone: document.getElementById('c_admin').value };
-            const res = await fetch('/api/clients/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-password': getPass() },
-                body: JSON.stringify(data)
-            });
-            if(res.ok) { alert('✅ تمت الإضافة'); location.reload(); }
+        async function add() {
+            const data = { name: document.getElementById('n').value, apiKey: document.getElementById('k').value, googleLink: document.getElementById('g').value, adminPhone: document.getElementById('p').value, plan: document.getElementById('plan').value, durationType: document.getElementById('dur').value };
+            await fetch('/api/clients/add', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': getP() }, body: JSON.stringify(data) });
+            alert('تم التفعيل'); load();
         }
-
-        function logout() { localStorage.removeItem('admin_p'); location.reload(); }
-        window.onload = () => { if(getPass()) loadDashboard(); };
+        window.onload = () => { if(localStorage.getItem('ap')) load(); };
     </script>
+    <style>input { width: 100%; padding: 0.75rem; border-radius: 0.75rem; outline: none; }</style>
 </body>
 </html>

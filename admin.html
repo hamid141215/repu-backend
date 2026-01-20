@@ -10,70 +10,69 @@
 <body class="p-4">
     <div class="max-w-xl mx-auto space-y-4">
         <header class="bg-white p-6 rounded-3xl shadow-sm flex justify-between items-center border">
-            <h1 id="restaurant_name" class="font-black text-xl text-blue-600 italic">Mawjat Loader...</h1>
-            <span class="text-[10px] bg-green-100 text-green-600 px-3 py-1 rounded-full font-bold">LIVE</span>
+            <h1 id="restaurant_name" class="font-black text-xl text-blue-600 italic italic">Mawjat Loader...</h1>
+            <a href="/reports" class="text-xs bg-slate-100 p-2 rounded-lg font-bold">📊 التقارير</a>
         </header>
 
         <div class="bg-slate-900 p-6 rounded-[2rem] text-white">
             <div class="flex gap-2">
-                <input id="key_input" type="password" placeholder="أدخل API Key" class="bg-slate-800 border-none rounded-xl p-3 flex-1 text-center outline-none focus:ring-2 ring-blue-500">
-                <button onclick="updateIdentity()" class="bg-blue-600 px-6 rounded-xl font-bold">دخول</button>
+                <input id="key_input" type="password" placeholder="أدخل API Key" class="bg-slate-800 border-none rounded-xl p-3 flex-1 text-center outline-none">
+                <button onclick="updateIdentity()" class="bg-blue-600 px-6 rounded-xl font-bold hover:bg-blue-500">دخول</button>
             </div>
         </div>
 
         <div class="bg-white p-8 rounded-[2.5rem] shadow-lg border">
             <div class="space-y-4">
-                <input id="name" type="text" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 rounded-2xl border text-right font-bold outline-none focus:border-blue-500">
-                <input id="phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border text-center font-bold outline-none focus:border-blue-500">
+                <input id="name" type="text" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 rounded-2xl border text-right font-bold outline-none">
+                <input id="phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border text-center font-bold outline-none">
                 <select id="branch" class="w-full p-4 bg-slate-100 rounded-2xl font-bold text-center outline-none">
                     <option>الفرع الرئيسي</option>
                     <option>فرع التحلية</option>
                 </select>
-                <button onclick="sendEval()" class="w-full bg-blue-600 text-white p-5 rounded-3xl font-black shadow-lg">إرسال التقييم ✨</button>
+                <button onclick="sendEval()" class="w-full bg-blue-600 text-white p-5 rounded-3xl font-black shadow-lg hover:bg-blue-700 transition">إرسال التقييم ✨</button>
             </div>
         </div>
 
         <div class="bg-white p-6 rounded-3xl text-center shadow-sm border">
-            <p class="text-[10px] font-black text-gray-400 uppercase italic">إحصائياتك الخاصة</p>
+            <p class="text-[10px] font-black text-gray-400 uppercase">إحصائياتك الخاصة</p>
             <h2 id="client_total" class="text-4xl font-black text-slate-800">0</h2>
-            <a href="/reports" class="text-blue-500 text-xs font-bold mt-2 block underline">عرض التقارير الكاملة</a>
         </div>
     </div>
 
     <script>
         const updateIdentity = async () => {
-            const key = document.getElementById('key_input').value;
+            const key = document.getElementById('key_input').value || localStorage.getItem('m_key');
             if(!key) return;
-            localStorage.setItem('m_key', key);
-            
             const res = await fetch(`/api/client-info`, { headers: { 'x-api-key': key } });
             if(res.ok) {
                 const data = await res.json();
                 document.getElementById('restaurant_name').innerText = data.name;
                 document.getElementById('client_total').innerText = data.total;
-                document.title = `لوحة ${data.name}`;
+                localStorage.setItem('m_key', key);
+            } else if(res.status === 402) {
+                alert('⚠️ اشتراكك منتهٍ، يرجى التواصل مع الإدارة للتجديد');
             } else { alert('مفتاح غير صالح'); }
         };
 
         async function sendEval() {
             const key = localStorage.getItem('m_key');
-            const data = {
-                name: document.getElementById('name').value,
-                phone: document.getElementById('phone').value,
-                branch: document.getElementById('branch').value
-            };
+            const data = { name: document.getElementById('name').value, phone: document.getElementById('phone').value, branch: document.getElementById('branch').value };
             const res = await fetch('/api/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-api-key': key },
                 body: JSON.stringify(data)
             });
-            if(res.ok) { alert('✅ تم الإرسال'); updateIdentity(); }
+            if(res.ok) { 
+                alert('✅ تم الإرسال'); 
+                document.getElementById('name').value = '';
+                document.getElementById('phone').value = '';
+                updateIdentity(); 
+            } else {
+                const err = await res.json();
+                alert('❌ خطأ: ' + err.error);
+            }
         }
-
-        window.onload = () => {
-            const k = localStorage.getItem('m_key');
-            if(k) { document.getElementById('key_input').value = k; updateIdentity(); }
-        };
+        window.onload = updateIdentity;
     </script>
 </body>
 </html>
