@@ -157,19 +157,29 @@
         });
 
         // الحل الأمني الجذري: منع ظهور البيانات في الرابط العلوي
-        function contactSales(planName) {
-            const isYearly = document.getElementById('pricing-toggle').checked;
-            const duration = isYearly ? "سنوي" : "شهري";
-            const message = `مرحباً Mawjat Repu، أرغب في الاستفسار عن ${planName} اشتراك ${duration}`;
-            const phone = "966567156070";
+        // دالة الربط المباشر بكتالوج واتساب بزنس المحدثة
+function contactSales(planName) {
+    const phone = "966567156070"; // رقمك المسجل الجديد
+    
+    // روابط المنتجات الدقيقة التي زودتني بها
+    const catalogLinks = {
+        "باقة المنطلق": "https://wa.me/p/25631452069837758/966567156070",
+        "باقة المتوسع": "https://wa.me/p/33501379162810569/966567156070",
+        "تجربة النظام": `https://wa.me/${phone}?text=${encodeURIComponent("مرحباً، أرغب في تجربة نظام موجة ريبو مجاناً")}`
+    };
 
-            // بناء الرابط بشكل مشفر
-            const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-            
-            // فتح الرابط في نافذة جديدة دون تغيير الـ URL الحالي للموقع
-            const newWindow = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-            if (newWindow) newWindow.opener = null;
-        }
+    // اختيار الرابط المناسب
+    let targetUrl = catalogLinks[planName];
+
+    // إذا كان الضغط على باقة الشركات (التي تم إلغاء رابطها) أو غير موجودة، يتم التحويل للمحادثة العامة
+    if (!targetUrl) {
+        targetUrl = `https://wa.me/${phone}?text=${encodeURIComponent("مرحباً Mawjat Repu، أرغب في الاستفسار عن حلولكم")}`;
+    }
+
+    // فتح الرابط بشكل آمن في نافذة جديدة
+    const newWindow = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    if (newWindow) newWindow.opener = null;
+}
     </script>
 </body>
 </html>
