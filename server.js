@@ -65,15 +65,16 @@ app.post('/api/send', authenticate, async (req, res) => {
     const cleanPhone = normalizePhone(phone);
 
     try {
-        await twilioClient.messages.create({
-            from: getTwilioSender(),
-            to: `whatsapp:+${cleanPhone}`,
-            contentSid: 'HXe54a3f32a20960047a45d78181743d5d',
-            contentVariables: JSON.stringify({
-                1: name,
-                2: req.clientData.name
-            })
-        });
+        // استبدل جزء الإرسال بهذا الكود النظيف تماماً
+await twilioClient.messages.create({
+    from: 'whatsapp:+19713064248', 
+    to: `whatsapp:+${cleanPhone}`,
+    contentSid: 'HXe54a3f32a20960047a45d78181743d5d',
+    contentVariables: JSON.stringify({
+        "1": name,
+        "2": req.clientData.name
+    })
+});
 
         await db.collection('evaluations').insertOne({ 
             clientId: req.clientData._id, 
