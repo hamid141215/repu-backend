@@ -11,9 +11,10 @@ app.use(express.urlencoded({ extended: true }));
 const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 // دالة لتنظيف رقم المرسل لضمان صيغة whatsapp:+1XXXXXXXXXX الصحيحة
+// التنسيق الصارم لمنع خطأ الـ Channel
 const getTwilioSender = () => {
-    const rawNumber = process.env.TWILIO_PHONE_NUMBER.replace(/\D/g, ''); // استخراج الأرقام فقط
-    return `whatsapp:+${rawNumber}`;
+    // نستخدم الرقم الخام مباشرة مع البادئة الإجبارية لتويليو
+    return "whatsapp:+19713064248"; 
 };
 
 const normalizePhone = (phone) => {
