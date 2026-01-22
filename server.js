@@ -66,12 +66,20 @@ app.get('/api/client-info', authenticate, async (req, res) => {
 app.post('/api/send', authenticate, async (req, res) => {
     const { phone, name, branch } = req.body;
     const cleanPhone = normalizePhone(phone);
+
     try {
+        // إرسال الرسالة باستخدام الـ Content SID الخاص بالقالب الذي أنشأته
         await twilioClient.messages.create({
-            from: process.env.TWILIO_PHONE_NUMBER,
-            body: `أهلاً بك ${name}، كيف كانت تجربتك في ${req.clientData.name} - ${branch}؟\n\n1️⃣ ممتاز\n2️⃣ يحتاج تحسين`,
-            to: `whatsapp:+${cleanPhone}`
+            from: `whatsapp:${process.env.TWILIO_PHONE_NUMBER}`,
+            to: `whatsapp:+${cleanPhone}`,
+            contentSid: 'HXe54a3f32a20960047a45d78181743d5d', // الكود الخاص بك
+            contentVariables: JSON.stringify({
+                1: name,               // اسم العميل لمغير {{1}}
+                2: req.clientData.name   // اسم المطعم للمتغير {{2}}
+            })
         });
+
+        // تسجيل العملية في قاعدة البيانات
         await db.collection('evaluations').insertOne({ 
             clientId: req.clientData._id, 
             phone: cleanPhone, 
@@ -80,10 +88,11 @@ app.post('/api/send', authenticate, async (req, res) => {
             status: 'sent', 
             sentAt: new Date() 
         });
+
         res.json({ success: true });
-    } catch (e) { 
-        console.error("Twilio Send Error:", e.message);
-        res.status(500).json({ error: "فشل إرسال الرسالة، تأكد من إعدادات تويليو" }); 
+    } catch (e) {
+        console.error("Twilio Error:", e.message);
+        res.status(500).json({ error: "فشل الإرسال: " + e.message });
     }
 });
 
@@ -125,41 +134,69 @@ app.get('/api/export-excel', authenticate, async (req, res) => {
 // --- الجوهر: الويب هوك لاستقبال ردود العملاء ---
 app.post('/whatsapp/webhook', async (req, res) => {
     const { Body, From } = req.body;
+    // تنظيف الرد وتوحيده (تحويله لنص صغير أو إزالة المسافات)
     const customerAnswer = Body ? Body.trim() : "";
     const fullPhone = From.replace('whatsapp:+', '');
 
     try {
-        // البحث عن آخر رسالة أرسلت لهذا العميل وحالتها "sent"
+        // البحث عن آخر عملية إرسال تمت لهذا العميل
         const lastEval = await db.collection('evaluations').findOne(
             { phone: fullPhone, status: 'sent' }, 
             { sort: { sentAt: -1 } }
         );
 
         if (lastEval) {
+            // جلب بيانات المطعم (بما فيها رقم جوال المدير)
             const client = await db.collection('clients').findOne({ _id: lastEval.clientId });
-            let replyMsg = "";
-
-            if (customerAnswer === "1") {
-                replyMsg = `شكراً لتقييمك لـ ${client.name}! 😍\n📍 قيمنا هنا: ${client.googleLink}`;
-                await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '1', repliedAt: new Date() } });
-            } else if (customerAnswer === "2") {
-                replyMsg = `نعتذر منك 😔، تم استلام ملاحظتك من قبل إدارة ${client.name}.`;
-                await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '2', repliedAt: new Date() } });
-                
-                // تنبيه المدير الفوري في حال التقييم السلبي
-                let adminNum = normalizePhone(client.adminPhone || process.env.MANAGER_PHONE);
-                await twilioClient.messages.create({
-                    from: process.env.TWILIO_PHONE_NUMBER,
-                    body: `⚠️ تنبيه سلبي جديد - ${client.name}\nالعميل: ${lastEval.name}\nالجوال: ${lastEval.phone}`,
-                    to: `whatsapp:+${adminNum}`
-                });
-            }
             
-            if (replyMsg) {
-                await twilioClient.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, body: replyMsg, to: From });
+            if (client) {
+                let replyMsg = "";
+
+                // التحقق إذا كان الرد إيجابياً (رقم 1 أو نص الزر الإيجابي)
+                if (customerAnswer === "1" || customerAnswer.includes("ممتاز")) {
+                    replyMsg = `شكراً لتقييمك لـ ${client.name}! 😍\n📍 يسعدنا جداً أن تشارك تجربتك الرائعة مع الجميع على خرائط جوجل:\n${client.googleLink}`;
+                    
+                    await db.collection('evaluations').updateOne(
+                        { _id: lastEval._id }, 
+                        { $set: { status: 'replied', answer: '1', repliedAt: new Date() } }
+                    );
+                } 
+                // التحقق إذا كان الرد سلبياً (رقم 2 أو نص الزر السلبي)
+                else if (customerAnswer === "2" || customerAnswer.includes("ملاحظات")) {
+                    replyMsg = `نعتذر جداً عن تجربتك غير المرضية في ${client.name} 😔. تم إرسال ملاحظتك للإدارة فوراً وسيتم التواصل معك قريباً.`;
+                    
+                    await db.collection('evaluations').updateOne(
+                        { _id: lastEval._id }, 
+                        { $set: { status: 'complaint', answer: '2', repliedAt: new Date() } }
+                    );
+
+                    // --- إرسال تنبيه فوري لمدير المطعم (التوجيه الذكي) ---
+                    if (client.adminPhone) {
+                        const adminNum = normalizePhone(client.adminPhone);
+                        const alertMsg = `⚠️ *تنبيه: شكوى عميل*\n\nالمطعم: ${client.name}\nالفرع: ${lastEval.branch || 'الرئيسي'}\nالعميل: ${lastEval.name}\nالجوال: ${lastEval.phone}\n\nيرجى التواصل معه فوراً لإرضائه.`;
+                        
+                        await twilioClient.messages.create({
+                            from: `whatsapp:${process.env.TWILIO_PHONE_NUMBER}`,
+                            body: alertMsg,
+                            to: `whatsapp:+${adminNum}`
+                        });
+                    }
+                }
+
+                // إرسال الرد التلطيفي النهائي للعميل
+                if (replyMsg) {
+                    await twilioClient.messages.create({
+                        from: `whatsapp:${process.env.TWILIO_PHONE_NUMBER}`,
+                        body: replyMsg,
+                        to: From
+                    });
+                }
             }
         }
-    } catch (err) { console.error("Webhook Error"); }
+    } catch (err) {
+        console.error("Webhook Error:", err);
+    }
+    // إغلاق الطلب بنجاح لتويليو
     res.type('text/xml').send('<Response></Response>');
 });
 
