@@ -10,10 +10,8 @@ app.use(express.urlencoded({ extended: true }));
 
 const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-// التنسيق الصارم للمرسل لضمان عمل قناة الواتساب الرسمية
-const getTwilioSender = () => {
-    return "whatsapp:+19713064248"; 
-};
+// المحرك الجديد للإرسال (Messaging Service SID)
+const MESSAGING_SERVICE_SID = 'MG3c5f83c10c1a23b224ec8068c8ddcee7'; // <--- ضع كود الـ MG هنا
 
 const normalizePhone = (phone) => {
     let p = String(phone).replace(/\D/g, '');
@@ -28,7 +26,7 @@ const initMongo = async () => {
         const client = new MongoClient(process.env.MONGO_URL);
         await client.connect();
         db = client.db('mawjat_platform');
-        console.log("🛡️ Mawjat Repu: DB Connected & Secure");
+        console.log("🛡️ Mawjat Repu: System Online & Secured");
     } catch (e) { 
         console.error("MongoDB Error:", e);
         setTimeout(initMongo, 5000); 
@@ -40,34 +38,31 @@ const authenticate = async (req, res, next) => {
     if (!apiKey) return res.status(401).json({ error: "Authentication Required" });
     const client = await db.collection('clients').findOne({ apiKey });
     if (!client) return res.status(403).json({ error: "Invalid Key" });
-    if (client.expiryDate && new Date(client.expiryDate) < new Date()) {
-        return res.status(402).json({ error: "Subscription Expired" });
-    }
     req.clientData = client;
     next();
 };
 
-// --- المسارات الأساسية ---
+// --- مسارات الصفحات ---
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/reports', (req, res) => res.sendFile(path.join(__dirname, 'reports.html')));
 app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
 
-// --- API الإرسال والتقارير ---
-app.get('/api/client-info', authenticate, async (req, res) => {
-    const total = await db.collection('evaluations').countDocuments({ clientId: req.clientData._id });
-    res.json({ name: req.clientData.name, total });
-});
-
+// --- إرسال التقييم مع جدولة (تأخير 30 دقيقة) ---
 app.post('/api/send', authenticate, async (req, res) => {
     const { phone, name, branch } = req.body;
     const cleanPhone = normalizePhone(phone);
 
     try {
+        // حساب وقت الإرسال: الآن + 30 دقيقة لضمان تجربة العميل للخدمة
+        const scheduledTime = new Date(Date.now() + 30 * 60000).toISOString();
+
         await twilioClient.messages.create({
-            from: getTwilioSender(),
+            messagingServiceSid: MESSAGING_SERVICE_SID,
             to: `whatsapp:+${cleanPhone}`,
-            contentSid: 'HXe54a3f32a20960047a45d78181743d5d', // تأكد من استبداله بـ SID الجديد فور قبوله
+            sendAt: scheduledTime,
+            scheduleType: 'fixed',
+            contentSid: 'HXe54a3f32a20960047a45d78181743d5d', // القالب المعتمد
             contentVariables: JSON.stringify({ "1": name, "2": req.clientData.name })
         });
 
@@ -75,11 +70,14 @@ app.post('/api/send', authenticate, async (req, res) => {
             clientId: req.clientData._id, 
             phone: cleanPhone, 
             name, branch, 
-            status: 'sent', sentAt: new Date() 
+            status: 'scheduled', 
+            scheduledFor: scheduledTime,
+            sentAt: new Date() 
         });
-        res.json({ success: true });
+
+        res.json({ success: true, message: "تمت جدولة الرسالة لتصل بعد 30 دقيقة" });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: "خطأ في الجدولة: " + e.message });
     }
 });
 
@@ -88,7 +86,7 @@ app.get('/api/my-reports', authenticate, async (req, res) => {
     res.json(evals);
 });
 
-// --- الويب هوك لاستقبال ردود الأزرار وتوجيه الشكاوى ---
+// --- الويب هوك (Webhook) لمعالجة الردود وتنبيه المدير ---
 app.post('/whatsapp/webhook', async (req, res) => {
     const { Body, From } = req.body;
     const customerAnswer = Body ? Body.trim() : "";
@@ -96,17 +94,15 @@ app.post('/whatsapp/webhook', async (req, res) => {
 
     try {
         const lastEval = await db.collection('evaluations').findOne(
-            { phone: fullPhone, status: 'sent' }, 
-            { sort: { sentAt: -1 } }
+            { phone: fullPhone }, { sort: { sentAt: -1 } }
         );
 
         if (lastEval) {
             const client = await db.collection('clients').findOne({ _id: lastEval.clientId });
             if (client) {
                 let replyMsg = "";
-
                 if (customerAnswer === "1" || customerAnswer.includes("ممتاز")) {
-                    replyMsg = `شكراً لتقييمك لـ ${client.name}! 😍\n📍 قيمنا هنا: ${client.googleLink}`;
+                    replyMsg = `شكراً لتقييمك لـ ${client.name}! 😍\n📍 شارك تجربتك هنا: ${client.googleLink}`;
                     await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '1', repliedAt: new Date() } });
                 } 
                 else if (customerAnswer === "2" || customerAnswer.includes("ملاحظات")) {
@@ -114,17 +110,15 @@ app.post('/whatsapp/webhook', async (req, res) => {
                     await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'complaint', answer: '2', repliedAt: new Date() } });
 
                     if (client.adminPhone) {
-                        const adminNum = normalizePhone(client.adminPhone);
                         await twilioClient.messages.create({
-                            from: getTwilioSender(),
-                            body: `⚠️ شكوى جديدة - ${client.name}\nالعميل: ${lastEval.name}\nالجوال: ${lastEval.phone}`,
-                            to: `whatsapp:+${adminNum}`
+                            messagingServiceSid: MESSAGING_SERVICE_SID,
+                            body: `⚠️ تنبيه شكوى - ${client.name}\nالعميل: ${lastEval.name}\nالجوال: ${lastEval.phone}`,
+                            to: `whatsapp:+${normalizePhone(client.adminPhone)}`
                         });
                     }
                 }
-
                 if (replyMsg) {
-                    await twilioClient.messages.create({ from: getTwilioSender(), body: replyMsg, to: From });
+                    await twilioClient.messages.create({ messagingServiceSid: MESSAGING_SERVICE_SID, body: replyMsg, to: From });
                 }
             }
         }
@@ -132,40 +126,31 @@ app.post('/whatsapp/webhook', async (req, res) => {
     res.type('text/xml').send('<Response></Response>');
 });
 
-// --- مسارات السوبر أدمن المحدثة (إدارة كاملة) ---
+// --- إدارة السوبر أدمن (إضافة، تعديل، حذف) ---
 app.get('/api/clients', async (req, res) => {
-    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: "Unauthorized" });
+    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).send();
     const clients = await db.collection('clients').find().toArray();
     res.json(clients);
 });
 
 app.post('/api/clients/add', async (req, res) => {
-    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: "Unauthorized" });
+    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).send();
     const { name, apiKey, googleLink, adminPhone, plan, durationType } = req.body;
     const expiryDate = new Date();
-    if (durationType === 'monthly') expiryDate.setMonth(expiryDate.getMonth() + 1);
-    else expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-
-    await db.collection('clients').insertOne({ 
-        name, apiKey, googleLink, adminPhone, plan, durationType, expiryDate, createdAt: new Date() 
-    });
+    durationType === 'monthly' ? expiryDate.setMonth(expiryDate.getMonth() + 1) : expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    await db.collection('clients').insertOne({ name, apiKey, googleLink, adminPhone, plan, durationType, expiryDate, createdAt: new Date() });
     res.json({ success: true });
 });
 
-// تعديل بيانات مطعم
 app.put('/api/clients/:id', async (req, res) => {
-    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: "Unauthorized" });
+    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).send();
     const { name, googleLink, adminPhone } = req.body;
-    await db.collection('clients').updateOne(
-        { _id: new ObjectId(req.params.id) },
-        { $set: { name, googleLink, adminPhone } }
-    );
+    await db.collection('clients').updateOne({ _id: new ObjectId(req.params.id) }, { $set: { name, googleLink, adminPhone } });
     res.json({ success: true });
 });
 
-// حذف مطعم نهائياً
 app.delete('/api/clients/:id', async (req, res) => {
-    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: "Unauthorized" });
+    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).send();
     await db.collection('clients').deleteOne({ _id: new ObjectId(req.params.id) });
     res.json({ success: true });
 });

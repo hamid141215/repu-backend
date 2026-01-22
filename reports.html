@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
-        .status-badge { padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 800; }
+        .status-badge { padding: 6px 14px; border-radius: 12px; font-size: 11px; font-weight: 800; }
         .complaint-card { border: 2px solid #fee2e2; background: #fff1f2; transition: all 0.3s; }
         .complaint-card:hover { transform: translateY(-2px); border-color: #fecaca; }
     </style>
@@ -19,7 +19,7 @@
         
         <header class="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 text-black">
             <div>
-                <h1 class="text-2xl font-black text-slate-800 tracking-tighter">📊 مركز التحليلات</h1>
+                <h1 class="text-2xl font-black text-slate-800 tracking-tighter text-black">📊 مركز التحليلات</h1>
                 <p id="res_name" class="text-blue-600 text-sm font-black mt-1 uppercase tracking-widest italic"></p>
             </div>
             <div class="flex gap-3">
@@ -34,16 +34,16 @@
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm text-black">
-                <p class="text-slate-400 text-[10px] font-black uppercase mb-1">إجمالي طلبات التقييم</p>
+                <p class="text-slate-400 text-[10px] font-black uppercase mb-1">إجمالي العمليات</p>
                 <h3 id="stat_total" class="text-4xl font-black text-slate-800 tracking-tighter">0</h3>
             </div>
-            <div class="bg-white p-6 rounded-[2.5rem] border-b-8 border-blue-500 shadow-sm border border-slate-200">
+            <div class="bg-white p-6 rounded-[2.5rem] border-b-8 border-blue-500 shadow-sm border border-slate-200 text-black">
                 <p class="text-blue-600 text-[10px] font-black uppercase mb-1">تقييمات إيجابية</p>
-                <h3 id="stat_positive" class="text-4xl font-black text-blue-600 tracking-tighter">0</h3>
+                <h3 id="stat_positive" class="text-4xl font-black text-blue-600 tracking-tighter text-black">0</h3>
             </div>
-            <div class="bg-white p-6 rounded-[2.5rem] border-b-8 border-rose-500 shadow-sm border border-slate-200">
+            <div class="bg-white p-6 rounded-[2.5rem] border-b-8 border-rose-500 shadow-sm border border-slate-200 text-black">
                 <p class="text-rose-600 text-[10px] font-black uppercase mb-1">شكاوى سلبية ⚠️</p>
-                <h3 id="stat_negative" class="text-4xl font-black text-rose-600 tracking-tighter">0</h3>
+                <h3 id="stat_negative" class="text-4xl font-black text-rose-600 tracking-tighter text-black">0</h3>
             </div>
         </div>
 
@@ -52,13 +52,12 @@
                 <span class="animate-ping w-2 h-2 bg-rose-600 rounded-full"></span>
                 شكاوى تحتاج تدخل سريع
             </h4>
-            <div id="complaints_grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                </div>
+            <div id="complaints_grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
         </div>
 
         <div class="bg-white rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden">
-            <div class="p-6 border-b bg-slate-50/50 flex justify-between items-center">
-                <h4 class="font-black text-slate-700">سجل التفاعلات العام</h4>
+            <div class="p-6 border-b bg-slate-50/50 flex justify-between items-center text-black">
+                <h4 class="font-black text-slate-700">سجل التفاعلات والجدولة</h4>
                 <span class="text-[10px] font-bold text-slate-400">تحديث تلقائي</span>
             </div>
             <div class="overflow-x-auto text-black">
@@ -68,11 +67,11 @@
                             <th class="p-5">العميل</th>
                             <th class="p-5 text-center">رقم الجوال</th>
                             <th class="p-5 text-center">الفرع</th>
-                            <th class="p-5 text-center">الرد النهائي</th>
-                            <th class="p-5 text-center">التوقيت</th>
+                            <th class="p-5 text-center">حالة الرد / الجدولة</th>
+                            <th class="p-5 text-center">توقيت الطلب</th>
                         </tr>
                     </thead>
-                    <tbody id="rows" class="divide-y divide-slate-100"></tbody>
+                    <tbody id="rows" class="divide-y divide-slate-100 text-black"></tbody>
                 </table>
             </div>
         </div>
@@ -98,7 +97,6 @@
                     if(e.answer === '1') pos++;
                     if(e.answer === '2') {
                         neg++;
-                        // إضافة كرت شكوى سريع
                         complaintsGrid.innerHTML += `
                             <div class="complaint-card p-5 rounded-3xl flex justify-between items-center">
                                 <div>
@@ -123,11 +121,12 @@
                     <tr class="hover:bg-slate-50 transition-colors">
                         <td class="p-5 font-bold text-slate-700">${ev.name}</td>
                         <td class="p-5 text-center font-mono text-slate-500 text-sm">${ev.phone}</td>
-                        <td class="p-5 text-center text-xs font-bold">${ev.branch || 'الرئيسي'}</td>
+                        <td class="p-5 text-center text-xs font-bold text-black">${ev.branch || 'الرئيسي'}</td>
                         <td class="p-5 text-center">
-                            ${ev.answer === '1' ? '<span class="status-badge bg-blue-100 text-blue-700">✅ ممتاز جداً</span>' : 
+                            ${ev.status === 'scheduled' ? '<span class="status-badge bg-amber-100 text-amber-700 italic">⏳ قيد الانتظار (جدولة)</span>' : 
+                              ev.answer === '1' ? '<span class="status-badge bg-blue-100 text-blue-700">✅ ممتاز جداً</span>' : 
                               ev.answer === '2' ? '<span class="status-badge bg-rose-100 text-rose-700">⚠️ ملاحظة سلبية</span>' : 
-                              '<span class="status-badge bg-slate-100 text-slate-400">بانتظار الرد...</span>'}
+                              '<span class="status-badge bg-slate-100 text-slate-400">بانتظار رد العميل...</span>'}
                         </td>
                         <td class="p-5 text-center text-[10px] text-slate-400 font-bold">
                             ${new Date(ev.sentAt).toLocaleString('ar-SA')}
