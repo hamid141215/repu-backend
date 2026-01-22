@@ -10,10 +10,8 @@ app.use(express.urlencoded({ extended: true }));
 
 const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-// دالة لتنظيف رقم المرسل لضمان صيغة whatsapp:+1XXXXXXXXXX الصحيحة
-// التنسيق الصارم لمنع خطأ الـ Channel
+// التنسيق الصارم للمرسل لضمان عمل قناة الواتساب الرسمية
 const getTwilioSender = () => {
-    // نستخدم الرقم الخام مباشرة مع البادئة الإجبارية لتويليو
     return "whatsapp:+19713064248"; 
 };
 
@@ -30,9 +28,9 @@ const initMongo = async () => {
         const client = new MongoClient(process.env.MONGO_URL);
         await client.connect();
         db = client.db('mawjat_platform');
-        console.log("🛡️ Mawjat Repu: System Secure & DB Connected");
+        console.log("🛡️ Mawjat Repu: DB Connected & Secure");
     } catch (e) { 
-        console.error("MongoDB Connection Error:", e);
+        console.error("MongoDB Error:", e);
         setTimeout(initMongo, 5000); 
     }
 };
@@ -49,46 +47,39 @@ const authenticate = async (req, res, next) => {
     next();
 };
 
+// --- المسارات الأساسية ---
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/reports', (req, res) => res.sendFile(path.join(__dirname, 'reports.html')));
 app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
 
+// --- API الإرسال والتقارير ---
 app.get('/api/client-info', authenticate, async (req, res) => {
     const total = await db.collection('evaluations').countDocuments({ clientId: req.clientData._id });
     res.json({ name: req.clientData.name, total });
 });
 
-// --- إرسال طلب التقييم بالقالب المعتمد ---
 app.post('/api/send', authenticate, async (req, res) => {
     const { phone, name, branch } = req.body;
     const cleanPhone = normalizePhone(phone);
 
     try {
-        // استبدل جزء الإرسال بهذا الكود النظيف تماماً
-await twilioClient.messages.create({
-    from: 'whatsapp:+19713064248', 
-    to: `whatsapp:+${cleanPhone}`,
-    contentSid: 'HXe54a3f32a20960047a45d78181743d5d',
-    contentVariables: JSON.stringify({
-        "1": name,
-        "2": req.clientData.name
-    })
-});
+        await twilioClient.messages.create({
+            from: getTwilioSender(),
+            to: `whatsapp:+${cleanPhone}`,
+            contentSid: 'HXe54a3f32a20960047a45d78181743d5d', // تأكد من استبداله بـ SID الجديد فور قبوله
+            contentVariables: JSON.stringify({ "1": name, "2": req.clientData.name })
+        });
 
         await db.collection('evaluations').insertOne({ 
             clientId: req.clientData._id, 
             phone: cleanPhone, 
-            name, 
-            branch, 
-            status: 'sent', 
-            sentAt: new Date() 
+            name, branch, 
+            status: 'sent', sentAt: new Date() 
         });
-
         res.json({ success: true });
     } catch (e) {
-        console.error("Twilio Error:", e.message);
-        res.status(500).json({ error: "فشل الإرسال: " + e.message });
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -114,41 +105,34 @@ app.post('/whatsapp/webhook', async (req, res) => {
             if (client) {
                 let replyMsg = "";
 
-                // معالجة الرد الإيجابي (دعم النص والرقم)
                 if (customerAnswer === "1" || customerAnswer.includes("ممتاز")) {
-                    replyMsg = `شكراً لتقييمك لـ ${client.name}! 😍\n📍 يسعدنا جداً أن تشارك تجربتك الرائعة على خرائط جوجل:\n${client.googleLink}`;
+                    replyMsg = `شكراً لتقييمك لـ ${client.name}! 😍\n📍 قيمنا هنا: ${client.googleLink}`;
                     await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '1', repliedAt: new Date() } });
                 } 
-                // معالجة الرد السلبي وتوجيه التنبيه للمدير
                 else if (customerAnswer === "2" || customerAnswer.includes("ملاحظات")) {
-                    replyMsg = `نعتذر جداً عن تجربتك في ${client.name} 😔. تم إرسال ملاحظتك للإدارة فوراً وسيتم التواصل معك قريباً.`;
+                    replyMsg = `نعتذر منك 😔، تم إرسال ملاحظتك لإدارة ${client.name} فوراً.`;
                     await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'complaint', answer: '2', repliedAt: new Date() } });
 
                     if (client.adminPhone) {
                         const adminNum = normalizePhone(client.adminPhone);
-                        const alertMsg = `⚠️ *تنبيه شكوى جديد*\n\nالمطعم: ${client.name}\nالعميل: ${lastEval.name}\nالجوال: ${lastEval.phone}\nالفرع: ${lastEval.branch || 'الرئيسي'}`;
-                        
                         await twilioClient.messages.create({
                             from: getTwilioSender(),
-                            body: alertMsg,
+                            body: `⚠️ شكوى جديدة - ${client.name}\nالعميل: ${lastEval.name}\nالجوال: ${lastEval.phone}`,
                             to: `whatsapp:+${adminNum}`
                         });
                     }
                 }
 
                 if (replyMsg) {
-                    await twilioClient.messages.create({
-                        from: getTwilioSender(),
-                        body: replyMsg,
-                        to: From
-                    });
+                    await twilioClient.messages.create({ from: getTwilioSender(), body: replyMsg, to: From });
                 }
             }
         }
-    } catch (err) { console.error("Webhook Error:", err); }
+    } catch (err) { console.error("Webhook Error"); }
     res.type('text/xml').send('<Response></Response>');
 });
 
+// --- مسارات السوبر أدمن المحدثة (إدارة كاملة) ---
 app.get('/api/clients', async (req, res) => {
     if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: "Unauthorized" });
     const clients = await db.collection('clients').find().toArray();
@@ -163,10 +147,26 @@ app.post('/api/clients/add', async (req, res) => {
     else expiryDate.setFullYear(expiryDate.getFullYear() + 1);
 
     await db.collection('clients').insertOne({ 
-        name, apiKey, googleLink, adminPhone, 
-        plan, durationType, expiryDate, 
-        createdAt: new Date() 
+        name, apiKey, googleLink, adminPhone, plan, durationType, expiryDate, createdAt: new Date() 
     });
+    res.json({ success: true });
+});
+
+// تعديل بيانات مطعم
+app.put('/api/clients/:id', async (req, res) => {
+    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: "Unauthorized" });
+    const { name, googleLink, adminPhone } = req.body;
+    await db.collection('clients').updateOne(
+        { _id: new ObjectId(req.params.id) },
+        { $set: { name, googleLink, adminPhone } }
+    );
+    res.json({ success: true });
+});
+
+// حذف مطعم نهائياً
+app.delete('/api/clients/:id', async (req, res) => {
+    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: "Unauthorized" });
+    await db.collection('clients').deleteOne({ _id: new ObjectId(req.params.id) });
     res.json({ success: true });
 });
 

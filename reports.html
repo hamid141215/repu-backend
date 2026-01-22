@@ -3,70 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تحليلات الأداء | Mawjat Repu</title>
+    <title>تحليلات الأداء والشكاوى | Mawjat Repu</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Cairo', sans-serif; background-color: #f1f5f9; }
-        .status-badge { padding: 4px 12px; border-radius: 99px; font-size: 11px; font-weight: bold; }
+        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
+        .status-badge { padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 800; }
+        .complaint-card { border: 2px solid #fee2e2; background: #fff1f2; transition: all 0.3s; }
+        .complaint-card:hover { transform: translateY(-2px); border-color: #fecaca; }
     </style>
 </head>
-<body class="p-4 md:p-8 text-black">
+<body class="p-4 md:p-8">
 
-    <div id="content" class="hidden max-w-6xl mx-auto space-y-6">
+    <div id="content" class="hidden max-w-6xl mx-auto space-y-6 text-black">
         
-        <header class="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200">
+        <header class="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 text-black">
             <div>
-                <h1 class="text-2xl font-black text-slate-800">📊 تحليلات الأداء</h1>
-                <p id="res_name" class="text-slate-500 text-sm font-bold mt-1 uppercase"></p>
+                <h1 class="text-2xl font-black text-slate-800 tracking-tighter">📊 مركز التحليلات</h1>
+                <p id="res_name" class="text-blue-600 text-sm font-black mt-1 uppercase tracking-widest italic"></p>
             </div>
             <div class="flex gap-3">
-                <button onclick="exportEx()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-2xl text-sm font-black transition-all shadow-lg shadow-emerald-200">
-                    📥 تصدير Excel
+                <button onclick="exportEx()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all shadow-lg shadow-emerald-100 flex items-center gap-2">
+                    <span>تصدير EXCEL</span>
                 </button>
-                <a href="/app" class="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-2xl text-sm font-black transition-all">
-                    العودة للوحة
+                <a href="/app" class="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all shadow-lg">
+                    العودة للوحة الإرسال
                 </a>
             </div>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-black">
-            <div class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
-                <p class="text-slate-400 text-xs font-black uppercase mb-2">إجمالي الطلبات</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm text-black">
+                <p class="text-slate-400 text-[10px] font-black uppercase mb-1">إجمالي طلبات التقييم</p>
                 <h3 id="stat_total" class="text-4xl font-black text-slate-800 tracking-tighter">0</h3>
             </div>
-            <div class="bg-white p-6 rounded-[2rem] border-r-8 border-blue-500 shadow-sm border border-slate-200">
-                <p class="text-slate-400 text-xs font-black uppercase mb-2 text-blue-600">تقييمات ممتازة</p>
+            <div class="bg-white p-6 rounded-[2.5rem] border-b-8 border-blue-500 shadow-sm border border-slate-200">
+                <p class="text-blue-600 text-[10px] font-black uppercase mb-1">تقييمات إيجابية</p>
                 <h3 id="stat_positive" class="text-4xl font-black text-blue-600 tracking-tighter">0</h3>
             </div>
-            <div class="bg-white p-6 rounded-[2rem] border-r-8 border-rose-500 shadow-sm border border-slate-200">
-                <p class="text-slate-400 text-xs font-black uppercase mb-2 text-rose-600">ملاحظات سلبية</p>
+            <div class="bg-white p-6 rounded-[2.5rem] border-b-8 border-rose-500 shadow-sm border border-slate-200">
+                <p class="text-rose-600 text-[10px] font-black uppercase mb-1">شكاوى سلبية ⚠️</p>
                 <h3 id="stat_negative" class="text-4xl font-black text-rose-600 tracking-tighter">0</h3>
             </div>
         </div>
 
+        <div id="urgent_complaints_section" class="hidden space-y-4">
+            <h4 class="font-black text-rose-600 flex items-center gap-2 px-4">
+                <span class="animate-ping w-2 h-2 bg-rose-600 rounded-full"></span>
+                شكاوى تحتاج تدخل سريع
+            </h4>
+            <div id="complaints_grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                </div>
+        </div>
+
         <div class="bg-white rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden">
-            <div class="p-6 border-b bg-slate-50/50">
-                <h4 class="font-black text-slate-700">سجل التفاعلات الأخير</h4>
+            <div class="p-6 border-b bg-slate-50/50 flex justify-between items-center">
+                <h4 class="font-black text-slate-700">سجل التفاعلات العام</h4>
+                <span class="text-[10px] font-bold text-slate-400">تحديث تلقائي</span>
             </div>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto text-black">
                 <table class="w-full text-right border-collapse">
-                    <thead class="bg-slate-50 text-slate-400 text-xs uppercase font-black">
+                    <thead class="bg-slate-50 text-slate-400 text-[10px] uppercase font-black">
                         <tr>
                             <th class="p-5">العميل</th>
-                            <th class="p-5 text-center">الجوال</th>
-                            <th class="p-5 text-center">الرد</th>
+                            <th class="p-5 text-center">رقم الجوال</th>
+                            <th class="p-5 text-center">الفرع</th>
+                            <th class="p-5 text-center">الرد النهائي</th>
                             <th class="p-5 text-center">التوقيت</th>
                         </tr>
                     </thead>
-                    <tbody id="rows" class="divide-y divide-slate-100 text-black"></tbody>
+                    <tbody id="rows" class="divide-y divide-slate-100"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
     <script>
-        const key = localStorage.getItem('repu_key'); // استخدام الجلسة المخزنة
+        const key = localStorage.getItem('repu_key');
         if(!key) { window.location.href='/app'; }
 
         async function load() {
@@ -78,30 +91,50 @@
                 document.getElementById('content').classList.remove('hidden');
                 
                 let pos = 0, neg = 0;
+                const complaintsGrid = document.getElementById('complaints_grid');
+                complaintsGrid.innerHTML = '';
+                
                 data.forEach(e => {
                     if(e.answer === '1') pos++;
-                    if(e.answer === '2') neg++;
+                    if(e.answer === '2') {
+                        neg++;
+                        // إضافة كرت شكوى سريع
+                        complaintsGrid.innerHTML += `
+                            <div class="complaint-card p-5 rounded-3xl flex justify-between items-center">
+                                <div>
+                                    <p class="font-black text-slate-800">${e.name}</p>
+                                    <p class="text-xs font-bold text-slate-500">${e.phone} | ${e.branch || 'الرئيسي'}</p>
+                                </div>
+                                <button onclick="window.open('https://wa.me/${e.phone}')" class="bg-rose-600 text-white p-3 px-5 rounded-2xl text-xs font-black shadow-lg">
+                                    تواصل الآن 📲
+                                </button>
+                            </div>
+                        `;
+                    }
                 });
+
+                if(neg > 0) document.getElementById('urgent_complaints_section').classList.remove('hidden');
 
                 document.getElementById('stat_total').innerText = data.length;
                 document.getElementById('stat_positive').innerText = pos;
                 document.getElementById('stat_negative').innerText = neg;
 
                 document.getElementById('rows').innerHTML = data.map(ev => `
-                    <tr class="hover:bg-slate-50">
-                        <td class="p-5 font-bold">${ev.name}</td>
-                        <td class="p-5 text-center font-mono text-slate-500">${ev.phone}</td>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-5 font-bold text-slate-700">${ev.name}</td>
+                        <td class="p-5 text-center font-mono text-slate-500 text-sm">${ev.phone}</td>
+                        <td class="p-5 text-center text-xs font-bold">${ev.branch || 'الرئيسي'}</td>
                         <td class="p-5 text-center">
-                            ${ev.answer === '1' ? '<span class="status-badge bg-blue-100 text-blue-700">✅ ممتاز</span>' : 
-                              ev.answer === '2' ? '<span class="status-badge bg-rose-100 text-rose-700">⚠️ سلبي</span>' : 
-                              '<span class="status-badge bg-slate-100 text-slate-400">بانتظار الرد</span>'}
+                            ${ev.answer === '1' ? '<span class="status-badge bg-blue-100 text-blue-700">✅ ممتاز جداً</span>' : 
+                              ev.answer === '2' ? '<span class="status-badge bg-rose-100 text-rose-700">⚠️ ملاحظة سلبية</span>' : 
+                              '<span class="status-badge bg-slate-100 text-slate-400">بانتظار الرد...</span>'}
                         </td>
-                        <td class="p-5 text-center text-[10px] text-slate-400">
+                        <td class="p-5 text-center text-[10px] text-slate-400 font-bold">
                             ${new Date(ev.sentAt).toLocaleString('ar-SA')}
                         </td>
                     </tr>
                 `).join('');
-            } catch(e) { window.location.href='/app'; }
+            } catch(e) { console.error(e); }
         }
 
         function exportEx() { window.location.href=`/api/export-excel?apiKey=${key}`; }
