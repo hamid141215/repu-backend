@@ -71,7 +71,7 @@ app.post('/api/send', authenticate, async (req, res) => {
         const messageOptions = {
             messagingServiceSid: MESSAGING_SERVICE_SID,
             to: `whatsapp:+${cleanPhone}`,
-            contentSid: 'HXe54a3f32a20960047a45d78181743d5d',
+            contentSid: 'HXfac5e63d161f07e3ebc652a9931ce1c2',
             contentVariables: JSON.stringify({ "1": name, "2": req.clientData.name })
         };
 
