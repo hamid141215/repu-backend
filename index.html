@@ -11,16 +11,17 @@
         .hero-gradient { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
         .toggle-checkbox:checked { right: 0; border-color: #2563eb; }
         .toggle-checkbox:checked + .toggle-label { background-color: #2563eb; }
-        /* منع ظهور أي تأطير أزرق عند النقر على الأزرار */
+        .whatsapp-bubble { box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-radius: 20px 20px 0 20px; }
         button:focus { outline: none; }
     </style>
 </head>
-<body class="bg-slate-50">
+<body class="bg-slate-50 text-slate-900">
 
     <nav class="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b">
         <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
             <h1 class="text-2xl font-black text-blue-600 tracking-tighter italic uppercase">MAWJAT <span class="text-slate-800">REPU</span></h1>
             <div class="hidden md:flex gap-8 font-bold text-slate-600 items-center">
+                <a href="#how-it-works" class="hover:text-blue-600 transition">كيف يعمل؟</a>
                 <a href="#features" class="hover:text-blue-600 transition">المميزات</a>
                 <a href="#pricing" class="hover:text-blue-600 transition">الأسعار</a>
                 <a href="/app" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">دخول العملاء</a>
@@ -28,118 +29,129 @@
         </div>
     </nav>
 
-    <section class="hero-gradient text-white pt-32 pb-24 px-6">
-        <div class="max-w-4xl mx-auto text-center">
-            <span class="bg-blue-500/20 text-blue-300 px-4 py-1 rounded-full text-xs font-black mb-6 inline-block border border-blue-500/30 uppercase tracking-widest">Mawjat Repu v2.0</span>
-            <h2 class="text-4xl md:text-7xl font-black mb-8 leading-tight uppercase tracking-tighter">MAWJAT REPU</h2>
-            <h3 class="text-2xl md:text-4xl font-bold mb-6 text-blue-400">حوّل كل زبون إلى 5 نجوم على Google Maps</h3>
-            <p class="text-lg opacity-80 mb-10 leading-relaxed max-w-2xl mx-auto">نظام ذكي لأتمتة طلب التقييمات عبر الواتساب، إدارة سمعة مطعمك الرقمية، ومعالجة الشكاوي فورياً قبل أن تصل للعلن.</p>
-            <div class="flex flex-col md:flex-row gap-4 justify-center">
-                <a href="#pricing" class="bg-blue-600 p-4 px-10 rounded-2xl font-black text-lg hover:scale-105 transition shadow-2xl">اشترك الآن</a>
-                <button onclick="contactSales('تجربة النظام')" class="bg-white/10 p-4 px-10 rounded-2xl font-black text-lg border border-white/20 hover:bg-white/20 transition italic tracking-widest">Mawjat Repu Demo</button>
+    <section class="hero-gradient text-white pt-40 pb-32 px-6 overflow-hidden">
+        <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
+            <div class="text-right space-y-8">
+                <span class="bg-blue-500/20 text-blue-300 px-4 py-1 rounded-full text-xs font-black border border-blue-500/30 uppercase tracking-widest italic">الجيل القادم من إدارة السمعة</span>
+                <h2 class="text-5xl md:text-7xl font-900 leading-tight tracking-tighter">لا تترك سمعة مطعمك <br><span class="text-blue-400">للصدفة!</span></h2>
+                <p class="text-xl opacity-80 leading-relaxed max-w-xl">نظام Mawjat Repu الذكي يحول زبائنك الراضين إلى تقييمات 5 نجوم، ويحجز الشكاوى السلبية لمعالجتها سراً قبل أن تصل لخرائط جوجل.</p>
+                <div class="flex flex-col md:flex-row gap-4 pt-4">
+                    <a href="#pricing" class="bg-blue-600 p-5 px-12 rounded-2xl font-black text-xl hover:scale-105 transition shadow-2xl text-center">ابدأ الآن مجاناً</a>
+                    <button onclick="contactSales('تجربة النظام')" class="bg-white/10 p-5 px-12 rounded-2xl font-black text-xl border border-white/20 hover:bg-white/20 transition italic text-center uppercase tracking-widest">Demo Live</button>
+                </div>
+            </div>
+            <div class="relative hidden md:block">
+                <div class="bg-white/5 p-8 rounded-[3rem] border border-white/10 backdrop-blur-sm">
+                    <div class="whatsapp-bubble bg-[#DCF8C6] p-4 text-slate-800 mb-4 ml-12 relative">
+                        <p class="font-bold text-sm">عزيزي العميل، شكراً لزيارتك مطعمنا اليوم.. كيف كانت تجربتك؟ ✨</p>
+                        <span class="text-[10px] opacity-50 block mt-1">10:30 AM</span>
+                    </div>
+                    <div class="space-y-3 mr-12">
+                        <div class="bg-white text-blue-600 p-3 rounded-xl border border-blue-100 font-black text-center shadow-md">🔘 ممتاز جداً 😍</div>
+                        <div class="bg-white text-rose-500 p-3 rounded-xl border border-rose-100 font-black text-center shadow-md">🔘 لدي ملاحظات 😔</div>
+                    </div>
+                </div>
+                <div class="absolute -top-10 -right-10 w-32 h-32 bg-blue-600 rounded-full blur-[80px] opacity-30"></div>
             </div>
         </div>
     </section>
 
-    <section id="features" class="py-24 px-6 max-w-6xl mx-auto">
-        <div class="text-center mb-16">
-            <h2 class="text-3xl font-black text-slate-800 uppercase tracking-tighter">لماذا Mawjat Repu؟</h2>
-            <div class="w-20 h-1.5 bg-blue-600 mx-auto mt-4 rounded-full"></div>
-        </div>
-        
-        <div class="grid md:grid-cols-3 gap-10">
-            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 text-center hover:shadow-xl transition">
-                <div class="text-5xl mb-6">🚀</div>
-                <h3 class="font-black text-xl mb-4 text-slate-800">أتمتة ذكية</h3>
-                <p class="text-slate-500 text-sm leading-relaxed">أرسل طلب التقييم بضغطة زر عبر WhatsApp API الرسمي لضمان وصول الرسالة وتفاعل العميل فوراً.</p>
+    <section id="how-it-works" class="py-24 px-6 bg-white">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-black text-slate-800 italic uppercase">دورة حياة التقييم الذكي</h2>
+                <p class="text-slate-500 font-bold mt-2">كيف نحمي سمعتك الرقمية ونضاعف مبيعاتك؟</p>
             </div>
-            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 text-center hover:shadow-xl transition">
-                <div class="text-5xl mb-6">🛡️</div>
-                <h3 class="font-black text-xl mb-4 text-slate-800">فلترة ذكية</h3>
-                <p class="text-slate-500 text-sm leading-relaxed">نوجه التقييمات الإيجابية لغوغل ماب، ونرسل التقييمات السلبية إليك سراً لتعالجها وتحافظ على سمعة مطعمك.</p>
-            </div>
-            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 text-center hover:shadow-xl transition">
-                <div class="text-5xl mb-6">📊</div>
-                <h3 class="font-black text-xl mb-4 text-slate-800">تقارير Pro</h3>
-                <p class="text-slate-500 text-sm leading-relaxed">لوحة تحكم شاملة لتحليل أداء الفروع مع إمكانية تصدير كافة البيانات لملفات Excel بضغطة واحدة.</p>
+            <div class="grid md:grid-cols-4 gap-4 relative">
+                <div class="text-center p-6">
+                    <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 font-black text-2xl">1</div>
+                    <h4 class="font-black mb-2">زيارة العميل</h4>
+                    <p class="text-xs text-slate-500 font-bold">يستمتع العميل بوجبته في المطعم</p>
+                </div>
+                <div class="text-center p-6 border-t-2 md:border-t-0 md:border-r-2 border-dashed border-slate-100">
+                    <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 font-black text-2xl">2</div>
+                    <h4 class="font-black mb-2">رسالة ذكية</h4>
+                    <p class="text-xs text-slate-500 font-bold">تصل رسالة واتساب آلية بعد 30 دقيقة</p>
+                </div>
+                <div class="text-center p-6 border-t-2 md:border-t-0 md:border-r-2 border-dashed border-slate-100">
+                    <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 font-black text-2xl">✔</div>
+                    <h4 class="font-black mb-2 text-green-600">تقييم إيجابي</h4>
+                    <p class="text-xs text-slate-500 font-bold">توجيه العميل مباشرة لخرائط جوجل</p>
+                </div>
+                <div class="text-center p-6 border-t-2 md:border-t-0 md:border-r-2 border-dashed border-slate-100">
+                    <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 font-black text-2xl">⚠️</div>
+                    <h4 class="font-black mb-2 text-rose-600">شكوى سلبية</h4>
+                    <p class="text-xs text-slate-500 font-bold">تنبيه فوري للمدير لحل المشكلة داخلياً</p>
+                </div>
             </div>
         </div>
     </section>
 
-    <section id="pricing" class="py-24 bg-slate-900 text-white px-6 rounded-[3rem] mx-4 md:mx-10 mb-20">
+    <section id="pricing" class="py-24 bg-slate-900 text-white px-6 rounded-[4rem] mx-4 md:mx-10 mb-20">
         <div class="max-w-6xl mx-auto text-center mb-16">
-            <h2 class="text-4xl font-black mb-6">خطط اشتراك Mawjat Repu</h2>
-            <p class="text-blue-400 font-bold mb-10 italic">وفر حتى 20% عند تفعيل الاشتراك السنوي!</p>
-
+            <h2 class="text-4xl font-900 mb-6 italic">اختر باقة النجاح</h2>
             <div class="flex items-center justify-center gap-6">
                 <span class="font-bold text-slate-400">شهري</span>
                 <label class="relative inline-block w-16 h-8 align-middle select-none transition duration-200 ease-in">
                     <input type="checkbox" id="pricing-toggle" class="toggle-checkbox absolute block w-8 h-8 rounded-full bg-white border-4 appearance-none cursor-pointer transition-all duration-300 right-8 border-blue-600"/>
                     <label for="pricing-toggle" class="toggle-label block overflow-hidden h-8 rounded-full bg-slate-700 cursor-pointer"></label>
                 </label>
-                <span class="font-bold text-blue-400">سنوي (توفير شهرين)</span>
+                <span class="font-bold text-blue-400">سنوي (توفير 20%)</span>
             </div>
         </div>
 
-        <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
-            <div class="bg-slate-800 p-10 rounded-[3rem] border border-slate-700">
-                <h4 class="font-black text-2xl mb-2 text-blue-400">باقة المنطلق</h4>
-                <div class="my-8">
-                    <span class="text-6xl font-black plan-price" data-monthly="299" data-yearly="2490">299</span>
-                    <span class="text-slate-400 font-bold price-unit">ر.س / شهر</span>
+        <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8 items-end">
+            <div class="bg-slate-800 p-10 rounded-[3rem] border border-slate-700 hover:border-blue-500 transition">
+                <h4 class="font-black text-xl mb-2 text-blue-400">باقة المنطلق</h4>
+                <div class="my-6">
+                    <span class="text-5xl font-900 plan-price" data-monthly="299" data-yearly="2490">299</span>
+                    <span class="text-slate-400 font-bold price-unit text-xs">ر.س / شهر</span>
                 </div>
-                <ul class="space-y-4 text-right mb-12 text-slate-300 font-bold text-sm">
+                <ul class="space-y-4 text-right mb-10 text-slate-300 font-bold text-sm border-t border-slate-700 pt-6">
                     <li>✅ فرع واحد فقط</li>
-                    <li>✅ 300 طلب شهرياً</li>
-                    <li>✅ تنبيهات واتساب فورية للمدير</li>
-                    <li>✅ لوحة تحكم أساسية</li>
+                    <li>✅ 300 طلب تقييم شهرياً</li>
+                    <li>✅ تنبيهات شكاوى فورية</li>
+                    <li>✅ تقارير أداء أساسية</li>
                 </ul>
-                <button onclick="contactSales('باقة المنطلق')" class="w-full text-center bg-white text-slate-900 p-4 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition uppercase tracking-tighter">Mawjat Repu Start</button>
+                <button onclick="contactSales('باقة المنطلق')" class="w-full bg-white text-slate-900 p-4 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition uppercase text-sm italic">Mawjat Start</button>
             </div>
 
-            <div class="bg-blue-600 p-10 rounded-[3rem] shadow-2xl scale-105 relative border-4 border-blue-400">
-                <div class="absolute -top-5 right-1/2 translate-x-1/2 bg-white text-blue-600 px-6 py-2 rounded-full text-[10px] font-black shadow-lg uppercase tracking-widest italic">Recommended</div>
+            <div class="bg-blue-600 p-12 rounded-[3.5rem] shadow-2xl scale-105 relative border-4 border-blue-400">
+                <div class="absolute -top-5 right-1/2 translate-x-1/2 bg-white text-blue-600 px-6 py-2 rounded-full text-[10px] font-black shadow-lg uppercase tracking-widest italic">الأكثر طلباً</div>
                 <h4 class="font-black text-2xl mb-2">باقة المتوسع</h4>
-                <div class="my-8 text-white">
-                    <span class="text-6xl font-black plan-price" data-monthly="499" data-yearly="4990">499</span>
-                    <span class="font-bold price-unit">ر.س / شهر</span>
+                <div class="my-6">
+                    <span class="text-6xl font-900 plan-price" data-monthly="1100" data-yearly="11000">1100</span>
+                    <span class="font-bold price-unit text-sm">ر.س / شهر</span>
                 </div>
-                <ul class="space-y-4 text-right mb-12 text-white font-bold text-sm">
+                <ul class="space-y-4 text-right mb-10 text-white font-bold text-sm border-t border-blue-400 pt-6">
                     <li>✅ حتى 3 فروع</li>
-                    <li>✅ 1,500 طلب شهرياً</li>
-                    <li>✅ تصدير التقارير لـ Excel</li>
-                    <li>✅ تحليل أوقات الذروة</li>
+                    <li>✅ 4,500 طلب تقييم شهرياً</li>
+                    <li>✅ تصدير تقارير Excel</li>
+                    <li>✅ رابط واتساب مباشر للعملاء المستائين</li>
                     <li>✅ دعم فني ذو أولوية</li>
                 </ul>
-                <button onclick="contactSales('باقة المتوسع')" class="w-full text-center bg-slate-900 text-white p-4 rounded-2xl font-black shadow-xl hover:opacity-90 transition uppercase tracking-tighter">Mawjat Repu Growth</button>
+                <button onclick="contactSales('باقة المتوسع')" class="w-full bg-slate-900 text-white p-5 rounded-2xl font-black shadow-xl hover:opacity-90 transition uppercase italic">Mawjat Growth</button>
             </div>
 
             <div class="bg-slate-800 p-10 rounded-[3rem] border border-slate-700">
-                <h4 class="font-black text-2xl mb-2 text-blue-400">باقة الشركات</h4>
-                <div class="my-8">
-                    <span class="text-4xl font-black text-white italic">سعر مخصص</span>
+                <h4 class="font-black text-xl mb-2 text-blue-400">باقة الشركات</h4>
+                <div class="my-6">
+                    <span class="text-3xl font-black text-white italic tracking-tighter uppercase">سعر مخصص</span>
                 </div>
-                <p class="text-slate-400 text-sm mb-10 leading-relaxed">مثالية للسلاسل والعلامات التجارية الكبرى التي تحتاج لإدارة شاملة وحلول مخصصة.</p>
-                <ul class="space-y-4 text-right mb-12 text-slate-300 font-bold text-sm">
-                    <li>✅ فروع ورسائل غير محدودة</li>
-                    <li>✅ نظام إدارة الأزمات الفوري</li>
-                    <li>✅ ربط API مخصص لفروعك</li>
-                    <li>✅ مدير حساب مخصص</li>
-                </ul>
-                <button onclick="contactSales('باقة الشركات')" class="w-full text-center bg-blue-600 text-white p-4 rounded-2xl font-black hover:bg-blue-500 transition uppercase tracking-tighter">Contact Enterprise</button>
+                <p class="text-slate-400 text-xs mb-8 font-bold leading-relaxed">حلول مخصصة للسلاسل الكبرى مع ربط API خاص وإدارة كاملة للسمعة الرقمية.</p>
+                <button onclick="contactSales('باقة الشركات')" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black hover:bg-blue-500 transition uppercase text-sm italic">Contact Enterprise</button>
             </div>
         </div>
     </section>
 
     <footer class="py-12 text-center text-slate-400 border-t border-gray-200">
         <div class="max-w-6xl mx-auto px-6">
-            <h2 class="text-xl font-black text-blue-600 mb-4 italic uppercase">MAWJAT REPU</h2>
-            <p class="text-[10px] font-bold uppercase tracking-[0.3em]">Digital Reputation Management System © 2026</p>
+            <h2 class="text-xl font-black text-blue-600 mb-2 italic uppercase tracking-tighter">MAWJAT REPU</h2>
+            <p class="text-[10px] font-bold uppercase tracking-[0.4em] opacity-50">Silent Wave IT Company © 2026</p>
         </div>
     </footer>
 
     <script>
-        // دالة تبديل الأسعار
         const toggle = document.getElementById('pricing-toggle');
         const prices = document.querySelectorAll('.plan-price');
         const units = document.querySelectorAll('.price-unit');
@@ -156,30 +168,16 @@
             });
         });
 
-        // الحل الأمني الجذري: منع ظهور البيانات في الرابط العلوي
-        // دالة الربط المباشر بكتالوج واتساب بزنس المحدثة
-function contactSales(planName) {
-    const phone = "966567156070"; // رقمك المسجل الجديد
-    
-    // روابط المنتجات الدقيقة التي زودتني بها
-    const catalogLinks = {
-        "باقة المنطلق": "https://wa.me/p/25631452069837758/966567156070",
-        "باقة المتوسع": "https://wa.me/p/33501379162810569/966567156070",
-        "تجربة النظام": `https://wa.me/${phone}?text=${encodeURIComponent("مرحباً، أرغب في تجربة نظام موجة ريبو مجاناً")}`
-    };
-
-    // اختيار الرابط المناسب
-    let targetUrl = catalogLinks[planName];
-
-    // إذا كان الضغط على باقة الشركات (التي تم إلغاء رابطها) أو غير موجودة، يتم التحويل للمحادثة العامة
-    if (!targetUrl) {
-        targetUrl = `https://wa.me/${phone}?text=${encodeURIComponent("مرحباً Mawjat Repu، أرغب في الاستفسار عن حلولكم")}`;
-    }
-
-    // فتح الرابط بشكل آمن في نافذة جديدة
-    const newWindow = window.open(targetUrl, '_blank', 'noopener,noreferrer');
-    if (newWindow) newWindow.opener = null;
-}
+        function contactSales(planName) {
+            const phone = "966567156070";
+            const catalogLinks = {
+                "باقة المنطلق": "https://wa.me/p/25631452069837758/966567156070",
+                "باقة المتوسع": "https://wa.me/p/33501379162810569/966567156070",
+                "تجربة النظام": `https://wa.me/${phone}?text=${encodeURIComponent("مرحباً موجة ريبو، أرغب في تجربة النظام مجاناً لمطعمي")}`
+            };
+            let targetUrl = catalogLinks[planName] || `https://wa.me/${phone}?text=${encodeURIComponent("مرحباً، أرغب في الاستفسار عن حلول موجة ريبو لإدارة السمعة")}`;
+            window.open(targetUrl, '_blank', 'noopener,noreferrer');
+        }
     </script>
 </body>
 </html>
