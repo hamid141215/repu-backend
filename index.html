@@ -102,14 +102,14 @@
 
         <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8 items-end">
             <div class="bg-slate-800 p-10 rounded-[3rem] border border-slate-700 hover:border-blue-500 transition">
-                <h4 class="font-black text-xl mb-2 text-blue-400">باقة المنطلق</h4>
+                <h4 class="font-black text-xl mb-2 text-blue-400">باقة الإنطلاق</h4>
                 <div class="my-6">
                     <span class="text-5xl font-900 plan-price" data-monthly="299" data-yearly="2490">299</span>
                     <span class="text-slate-400 font-bold price-unit text-xs">ر.س / شهر</span>
                 </div>
                 <ul class="space-y-4 text-right mb-10 text-slate-300 font-bold text-sm border-t border-slate-700 pt-6">
                     <li>✅ فرع واحد فقط</li>
-                    <li>✅ 300 طلب تقييم شهرياً</li>
+                    <li>✅ 500 طلب تقييم شهرياً</li>
                     <li>✅ تنبيهات شكاوى فورية</li>
                     <li>✅ تقارير أداء أساسية</li>
                 </ul>
@@ -118,14 +118,14 @@
 
             <div class="bg-blue-600 p-12 rounded-[3.5rem] shadow-2xl scale-105 relative border-4 border-blue-400">
                 <div class="absolute -top-5 right-1/2 translate-x-1/2 bg-white text-blue-600 px-6 py-2 rounded-full text-[10px] font-black shadow-lg uppercase tracking-widest italic">الأكثر طلباً</div>
-                <h4 class="font-black text-2xl mb-2">باقة المتوسع</h4>
+                <h4 class="font-black text-2xl mb-2">باقة التوسع</h4>
                 <div class="my-6">
-                    <span class="text-6xl font-900 plan-price" data-monthly="1100" data-yearly="11000">1100</span>
+                    <span class="text-6xl font-900 plan-price" data-monthly="499" data-yearly="4990">499</span>
                     <span class="font-bold price-unit text-sm">ر.س / شهر</span>
                 </div>
                 <ul class="space-y-4 text-right mb-10 text-white font-bold text-sm border-t border-blue-400 pt-6">
                     <li>✅ حتى 3 فروع</li>
-                    <li>✅ 4,500 طلب تقييم شهرياً</li>
+                    <li>✅ 1,800 طلب تقييم شهرياً</li>
                     <li>✅ تصدير تقارير Excel</li>
                     <li>✅ رابط واتساب مباشر للعملاء المستائين</li>
                     <li>✅ دعم فني ذو أولوية</li>
@@ -171,8 +171,8 @@
         function contactSales(planName) {
             const phone = "966567156070";
             const catalogLinks = {
-                "باقة المنطلق": "https://wa.me/p/25631452069837758/966567156070",
-                "باقة المتوسع": "https://wa.me/p/33501379162810569/966567156070",
+                "باقة الإنطلاق": "https://wa.me/p/25631452069837758/966567156070",
+                "باقة التوسع": "https://wa.me/p/33501379162810569/966567156070",
                 "تجربة النظام": `https://wa.me/${phone}?text=${encodeURIComponent("مرحباً موجة ريبو، أرغب في تجربة النظام مجاناً لمطعمي")}`
             };
             let targetUrl = catalogLinks[planName] || `https://wa.me/${phone}?text=${encodeURIComponent("مرحباً، أرغب في الاستفسار عن حلول موجة ريبو لإدارة السمعة")}`;
