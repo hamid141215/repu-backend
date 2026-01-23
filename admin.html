@@ -11,7 +11,7 @@
     </style>
 </head>
 <body class="p-4">
-    <div id="login_screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-6">
+    <div id="login_screen" style="display: none;" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-6">
         <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md text-center shadow-2xl">
             <h2 class="text-3xl font-black text-blue-600 mb-2 italic tracking-tighter">MAWJAT REPU</h2>
             <p class="text-slate-500 text-sm mb-6 font-bold">بوابة إدارة تقييمات العملاء</p>
@@ -152,7 +152,16 @@
         }
 
         function logout() { localStorage.removeItem('repu_key'); location.reload(); }
-        window.onload = () => { if(localStorage.getItem('repu_key')) login(); };
+        window.onload = () => {
+    const savedKey = localStorage.getItem('repu_key');
+    if (savedKey) {
+        // إذا كان المفتاح موجوداً، ادخل مباشرة دون إظهار شاشة الدخول
+        login(); 
+    } else {
+        // إذا لم يكن موجوداً، أظهر شاشة الدخول الآن فقط
+        document.getElementById('login_screen').style.display = 'flex';
+    }
+};
     </script>
 </body>
 </html>
