@@ -26,9 +26,9 @@
         <div id="dash" class="hidden space-y-8">
             <div class="grid lg:grid-cols-4 gap-8">
                 <div class="bg-slate-800 p-6 rounded-[2.5rem] border border-slate-700 space-y-4 shadow-xl">
-                    <h3 class="text-blue-400 font-black italic mb-4">➕ إضافة شريك جديد (مجمع طبي/مطعم)</h3>
-                    <input id="n" type="text" placeholder="اسم المنشأة" class="w-full p-3 rounded-xl border-none text-sm">
-                    <input id="k" type="text" placeholder="API Key (مثال: med-complex-1)" class="w-full p-3 rounded-xl border-none text-sm font-mono">
+                    <h3 class="text-blue-400 font-black italic mb-4">➕ تفعيل شريك جديد</h3>
+                    <input id="n" type="text" placeholder="اسم المنشأة (مثلاً: مجمع رعاية الطبي)" class="w-full p-3 rounded-xl border-none text-sm">
+                    <input id="k" type="text" placeholder="API Key (مثلاً: med-key-1)" class="w-full p-3 rounded-xl border-none text-sm font-mono">
                     <input id="g" type="text" placeholder="رابط Google Maps" class="w-full p-3 rounded-xl border-none text-sm">
                     <input id="p" type="text" placeholder="جوال المدير (966...)" class="w-full p-3 rounded-xl border-none text-sm">
                     
@@ -49,16 +49,16 @@
                 <div class="lg:col-span-3 bg-slate-800 rounded-[2.5rem] border border-slate-700 overflow-hidden shadow-xl">
                     <div class="p-6 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
                         <h4 class="font-black text-slate-300">قائمة الشركاء النشطين</h4>
-                        <span class="text-xs text-slate-500 font-bold">إجمالي المشتركين: <span id="client_count">0</span></span>
+                        <span class="text-xs text-slate-500 font-bold">المشتركين: <span id="client_count">0</span></span>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-right text-sm">
                             <thead class="bg-slate-900/50 text-slate-400 text-[10px] uppercase font-black">
                                 <tr>
-                                    <th class="p-5">المنشأة و الـ API Key</th>
-                                    <th class="p-5 text-center">الاشتراك</th>
-                                    <th class="p-5 text-center">تاريخ الانتهاء</th>
-                                    <th class="p-5 text-center">الإجراءات</th>
+                                    <th class="p-5">المنشأة والـ Key</th>
+                                    <th class="p-5 text-center">الباقة</th>
+                                    <th class="p-5 text-center">الانتهاء</th>
+                                    <th class="p-5 text-center">تحكم</th>
                                 </tr>
                             </thead>
                             <tbody id="list" class="divide-y divide-slate-700/50"></tbody>
@@ -70,17 +70,17 @@
     </div>
 
     <script>
-        // دالة جلب كلمة المرور مع إعطاء الأولوية للمدخل الحالي
+        // دالة قوية لجلب الباسورد
         function getP() { 
-            const inputVal = document.getElementById('admin_pass').value;
-            return inputVal || localStorage.getItem('ap'); 
+            return document.getElementById('admin_pass').value || localStorage.getItem('ap'); 
         }
 
-        async function load() {
-            const pass = getP();
+        async function load(forcedPass = null) {
+            let pass = forcedPass || getP();
+            
             if(!pass) {
-                alert('يرجى إدخال كلمة المرور');
-                return;
+                pass = prompt("🔑 يرجى إدخال كلمة مرور النظام للدخول:");
+                if(!pass) return;
             }
 
             try {
@@ -89,7 +89,7 @@
                 });
                 
                 if(res.ok) {
-                    localStorage.setItem('ap', pass); // تخزينها فقط في حال كانت صحيحة
+                    localStorage.setItem('ap', pass); 
                     document.getElementById('dash').classList.remove('hidden');
                     document.getElementById('auth_form').classList.add('hidden');
                     document.getElementById('logout_btn').classList.remove('hidden');
@@ -108,22 +108,23 @@
                             <td class="p-5 text-center font-mono text-xs">
                                 <span class="${new Date(c.expiryDate) < new Date() ? 'text-rose-500' : 'text-emerald-500'} font-bold">
                                     ${new Date(c.expiryDate).toLocaleDateString('ar-SA')}
-                                    ${new Date(c.expiryDate) < new Date() ? ' (منتهٍ)' : ''}
                                 </span>
                             </td>
-                            <td class="p-5 text-center space-x-2 space-x-reverse">
-                                <button onclick="editClient('${c._id}', '${c.name}', '${c.googleLink}', '${c.adminPhone}')" class="text-blue-400 hover:text-blue-300 text-xs font-bold px-2">تعديل</button>
-                                <button onclick="deleteClient('${c._id}')" class="text-rose-500 hover:text-rose-400 text-xs font-bold px-2">حذف</button>
+                            <td class="p-5 text-center">
+                                <button onclick="deleteClient('${c._id}')" class="text-rose-500 font-bold px-2">حذف</button>
                             </td>
                         </tr>
                     `).join('');
                 } else {
-                    localStorage.removeItem('ap'); // مسح الكلمة الخاطئة من الذاكرة فوراً
-                    alert('❌ كلمة المرور غير صحيحة، حاول مرة أخرى');
+                    localStorage.removeItem('ap');
+                    const retry = confirm('❌ كلمة المرور غير صحيحة. هل تريد المحاولة مرة أخرى؟');
+                    if(retry) {
+                        const newPass = prompt("أدخل كلمة المرور الصحيحة:");
+                        if(newPass) load(newPass);
+                    }
                 }
             } catch(e) { 
-                console.error(e);
-                alert('حدث خطأ أثناء الاتصال بالسيرفر');
+                alert('⚠️ خطأ في الاتصال بالسيرفر. تأكد أن تطبيقك يعمل على Render.');
             }
         }
 
@@ -138,52 +139,36 @@
                 durationType: document.getElementById('dur').value 
             };
             
-            if(!data.name || !data.apiKey) return alert('يرجى تعبئة اسم المنشأة والمفتاح (API Key)');
+            if(!data.name || !data.apiKey) return alert('يرجى تعبئة الاسم والمفتاح');
             
-            try {
-                const res = await fetch('/api/clients/add', { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', 'x-admin-password': pass }, 
-                    body: JSON.stringify(data) 
-                });
-                if(res.ok) { 
-                    alert('✅ تم إضافة وتفعيل الحساب بنجاح'); 
-                    document.querySelectorAll('input:not(#admin_pass)').forEach(i => i.value = '');
-                    load(); 
-                } else {
-                    alert('فشل الإضافة، تأكد من صلاحية الوصول أو تكرار المفتاح');
-                }
-            } catch(e) { alert('خطأ في الشبكة'); }
+            const res = await fetch('/api/clients/add', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'x-admin-password': pass }, 
+                body: JSON.stringify(data) 
+            });
+            if(res.ok) { 
+                alert('✅ تم تفعيل العميل الجديد بنجاح'); 
+                document.querySelectorAll('input:not(#admin_pass)').forEach(i => i.value = '');
+                load(); 
+            } else {
+                alert('فشل الإضافة. تأكد من كلمة المرور.');
+            }
         }
 
         async function deleteClient(id) {
             if(!confirm('🚨 هل أنت متأكد من الحذف؟')) return;
-            const res = await fetch(`/api/clients/${id}`, { 
+            await fetch(`/api/clients/${id}`, { 
                 method: 'DELETE', 
                 headers: { 'x-admin-password': getP() } 
             });
-            if(res.ok) load();
-        }
-
-        async function editClient(id, oldName, oldLink, oldPhone) {
-            const newName = prompt("تعديل اسم المنشأة:", oldName);
-            const newLink = prompt("تعديل رابط جوجل ماب:", oldLink);
-            const newPhone = prompt("تعديل جوال المدير:", oldPhone);
-            
-            if (newName && newLink) {
-                const res = await fetch(`/api/clients/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'x-admin-password': getP() },
-                    body: JSON.stringify({ name: newName, googleLink: newLink, adminPhone: newPhone })
-                });
-                if(res.ok) load();
-            }
+            load();
         }
 
         function logout() { localStorage.removeItem('ap'); location.reload(); }
         
-        // محاولة الدخول التلقائي عند فتح الصفحة إذا كانت الكلمة مخزنة
-        window.onload = () => { if(localStorage.getItem('ap')) load(); };
+        window.onload = () => { 
+            if(localStorage.getItem('ap')) load(); 
+        };
     </script>
 </body>
 </html>
