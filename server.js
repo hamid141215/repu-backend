@@ -111,13 +111,16 @@ app.post('/whatsapp/webhook', async (req, res) => {
                     await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'complaint', answer: '2' } });
 
                     // تنبيه المدير فوراً عبر الواتساب
-                    if (client.adminPhone) {
-                        await twilioClient.messages.create({
-                            messagingServiceSid: MESSAGING_SERVICE_SID,
-                            body: `⚠️ تنبيه شكوى: العميل ${lastEval.name} (${lastEval.phone}) قدم ملاحظة سلبية لفرع ${lastEval.branch || 'الرئيسي'}.`,
-                            to: `whatsapp:+${normalizePhone(client.adminPhone)}`
-                        });
-                    }
+                    // تنبيه المدير مع رابط مباشر لمحادثة العميل
+if (client.adminPhone) {
+    const waLink = `https://wa.me/${lastEval.phone}`; // رابط واتساب المباشر للعميل
+    
+    await twilioClient.messages.create({
+        messagingServiceSid: MESSAGING_SERVICE_SID,
+        body: `⚠️ تنبيه شكوى: العميل ${lastEval.name} قدم ملاحظة سلبية لفرع ${lastEval.branch || 'الرئيسي'}.\n\nللتواصل الفوري مع العميل اضغط هنا:\n${waLink}`,
+        to: `whatsapp:+${normalizePhone(client.adminPhone)}`
+    });
+}
                 }
 
                 if (replyMsg) {
