@@ -3,43 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>التقارير | Mawjat Repu</title>
+    <title>التقارير والتحليلات | Mawjat Repu</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
-        .status-badge { padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 800; }
+        .status-badge { padding: 5px 12px; border-radius: 10px; font-size: 11px; font-weight: 800; }
+        .complaint-card { border: 2px solid #fee2e2; background: #fff1f2; }
     </style>
 </head>
-<body class="p-4 md:p-8">
-    <div id="content" class="hidden max-w-6xl mx-auto space-y-6 text-black">
+<body class="p-4 md:p-8 text-black">
+    <div id="content" class="hidden max-w-6xl mx-auto space-y-6">
         <header class="flex justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200">
             <h1 class="text-xl font-black text-slate-800 text-black">📊 مركز التحليلات</h1>
-            <a href="/app" class="bg-slate-900 text-white px-5 py-2 rounded-xl text-xs font-black">العودة للإرسال</a>
+            <div class="flex gap-2">
+                <button onclick="exportEx()" class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black shadow-lg">تصدير EXCEL</button>
+                <a href="/app" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black text-black">العودة</a>
+            </div>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-white p-6 rounded-[2.5rem] border shadow-sm text-black">
-                <p class="text-slate-400 text-[10px] font-black uppercase">إجمالي الطلبات</p>
-                <h3 id="stat_total" class="text-3xl font-black">0</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-[2.5rem] border shadow-sm">
+                <p class="text-slate-400 text-[10px] font-black uppercase mb-1 text-black">إجمالي الطلبات</p>
+                <h3 id="stat_total" class="text-4xl font-black text-black">0</h3>
             </div>
-            <div class="bg-white p-6 rounded-[2.5rem] border-b-4 border-blue-500 shadow-sm text-black">
-                <p class="text-blue-600 text-[10px] font-black uppercase">إيجابي</p>
-                <h3 id="stat_positive" class="text-3xl font-black">0</h3>
+            <div class="bg-white p-6 rounded-[2.5rem] border-b-8 border-blue-500 shadow-sm">
+                <p class="text-blue-600 text-[10px] font-black uppercase mb-1">تقييم ممتاز</p>
+                <h3 id="stat_positive" class="text-4xl font-black text-blue-600">0</h3>
             </div>
-            <div class="bg-white p-6 rounded-[2.5rem] border-b-4 border-rose-500 shadow-sm text-black">
-                <p class="text-rose-600 text-[10px] font-black uppercase text-black">شكاوى ⚠️</p>
-                <h3 id="stat_negative" class="text-3xl font-black text-black">0</h3>
+            <div class="bg-white p-6 rounded-[2.5rem] border-b-8 border-rose-500 shadow-sm">
+                <p class="text-rose-600 text-[10px] font-black uppercase mb-1">شكاوى ⚠️</p>
+                <h3 id="stat_negative" class="text-4xl font-black text-rose-600">0</h3>
             </div>
+        </div>
+
+        <div id="urgent_section" class="hidden space-y-3">
+            <h4 class="font-black text-rose-600 px-4 text-black text-black">شكاوى تحتاج تواصل سريع</h4>
+            <div id="complaints_grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-black text-black"></div>
         </div>
 
         <div class="bg-white rounded-[2.5rem] shadow-xl border overflow-hidden">
             <table class="w-full text-right">
-                <thead class="bg-slate-50 text-[10px] uppercase font-black text-black text-black">
+                <thead class="bg-slate-50 text-[10px] font-black text-black">
                     <tr>
-                        <th class="p-4 text-black">العميل</th>
-                        <th class="p-4 text-center text-black">الحالة</th>
-                        <th class="p-4 text-center text-black">التوقيت</th>
+                        <th class="p-5 text-black">العميل</th>
+                        <th class="p-5 text-center text-black">الحالة والرد</th>
+                        <th class="p-5 text-center text-black text-black">التوقيت</th>
                     </tr>
                 </thead>
                 <tbody id="rows" class="divide-y divide-slate-100 text-black"></tbody>
@@ -58,26 +67,36 @@
                 document.getElementById('content').classList.remove('hidden');
                 
                 let pos = 0, neg = 0;
+                const grid = document.getElementById('complaints_grid'); grid.innerHTML = '';
+                
                 document.getElementById('rows').innerHTML = data.map(ev => {
-                    if(ev.answer === '1') pos++; if(ev.answer === '2') neg++;
-                    return `
-                    <tr>
-                        <td class="p-4 font-bold text-slate-700 text-black">${ev.name}<br><span class="text-[10px] text-slate-400 font-normal text-black">${ev.phone}</span></td>
-                        <td class="p-4 text-center">
-                            ${ev.status === 'scheduled' ? '<span class="status-badge bg-amber-100 text-amber-700">⏳ قيد الجدولة</span>' : 
+                    if(ev.answer === '1') pos++;
+                    if(ev.answer === '2') {
+                        neg++;
+                        grid.innerHTML += `<div class="complaint-card p-4 rounded-3xl flex justify-between items-center text-black text-black">
+                            <p class="font-bold text-black">${ev.name}<br><span class="text-xs text-black font-normal">${ev.phone}</span></p>
+                            <a href="https://wa.me/${ev.phone}" class="bg-rose-600 text-white px-4 py-2 rounded-xl text-[10px] font-black">تواصل</a>
+                        </div>`;
+                    }
+                    return `<tr>
+                        <td class="p-5 font-bold text-black text-black">${ev.name}<br><span class="text-xs font-normal text-slate-400 text-black">${ev.phone}</span></td>
+                        <td class="p-5 text-center text-black">
+                            ${ev.status === 'scheduled' ? '<span class="status-badge bg-amber-100 text-amber-700">⏳ مجدولة</span>' : 
                               ev.answer === '1' ? '<span class="status-badge bg-blue-100 text-blue-700">✅ ممتاز</span>' : 
                               ev.answer === '2' ? '<span class="status-badge bg-rose-100 text-rose-700">⚠️ شكوى</span>' : 
                               '<span class="status-badge bg-slate-100 text-slate-400">بانتظار الرد</span>'}
                         </td>
-                        <td class="p-4 text-center text-[10px] font-bold text-slate-400 text-black">${new Date(ev.sentAt).toLocaleString('ar-SA')}</td>
+                        <td class="p-5 text-center text-[10px] text-slate-400 font-bold text-black">${new Date(ev.sentAt).toLocaleString('ar-SA')}</td>
                     </tr>`;
                 }).join('');
 
+                if(neg > 0) document.getElementById('urgent_section').classList.remove('hidden');
                 document.getElementById('stat_total').innerText = data.length;
                 document.getElementById('stat_positive').innerText = pos;
                 document.getElementById('stat_negative').innerText = neg;
             } catch(e) {}
         }
+        function exportEx() { window.location.href = `/api/export-excel?apiKey=${key}`; } // دالة التصدير
         load();
     </script>
 </body>

@@ -10,42 +10,50 @@
         body { font-family: 'Cairo', sans-serif; background-color: #f3f4f6; }
     </style>
 </head>
-<body class="p-4">
-    <div id="login_screen" style="display: none;" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-6 text-black">
+<body class="p-4 text-black">
+    <div id="login_screen" style="display: none;" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-6">
         <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md text-center shadow-2xl">
             <h2 class="text-3xl font-black text-blue-600 mb-2 italic tracking-tighter">MAWJAT REPU</h2>
             <p class="text-slate-500 text-sm mb-6 font-bold">بوابة إدارة تقييمات العملاء</p>
             <input id="key_input" type="password" placeholder="أدخل مفتاح الـ API" class="w-full p-4 bg-slate-100 rounded-2xl mb-4 text-center font-bold outline-none border-2 border-transparent focus:border-blue-500 text-black">
-            <button id="login_btn" onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg hover:bg-blue-700 transition transform active:scale-95">دخول النظام</button>
+            <button id="login_btn" onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg hover:bg-blue-700 transition transform active:scale-95 text-black">دخول النظام</button>
         </div>
     </div>
 
-    <div id="main_app" class="hidden max-w-xl mx-auto space-y-4 text-black">
+    <div id="main_app" class="hidden max-w-xl mx-auto space-y-4">
         <header class="bg-white p-5 rounded-3xl shadow-sm flex justify-between items-center border border-gray-200">
             <div>
-                <h1 id="restaurant_name" class="font-black text-lg text-slate-800 tracking-tight">...</h1>
+                <h1 id="restaurant_name" class="font-black text-lg text-slate-800 tracking-tight text-black">...</h1>
                 <span class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-md font-bold uppercase">متصل الآن</span>
             </div>
             <button onclick="logout()" class="text-xs bg-red-50 text-red-600 p-2 px-4 rounded-xl font-bold hover:bg-red-100 transition">خروج</button>
         </header>
 
+        <div id="complaint_alert" class="hidden bg-red-600 text-white p-4 rounded-3xl shadow-lg flex items-center justify-between animate-pulse">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">⚠️</span>
+                <p class="font-black text-sm leading-tight text-black">شكوى عميل جديدة بالتقارير!</p>
+            </div>
+            <a href="/reports" class="bg-white text-red-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm">عرض</a>
+        </div>
+
         <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100">
-            <h3 class="font-black text-slate-800 mb-6 text-center">إرسال طلب تقييم جديد ✨</h3>
+            <h3 class="font-black text-slate-800 mb-6 text-center text-black text-black">إرسال طلب تقييم جديد ✨</h3>
             <div class="space-y-4">
-                <input id="cust_name" type="text" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 rounded-2xl border border-gray-200 text-right font-bold outline-none focus:border-blue-500 text-black transition-all">
-                <input id="cust_phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border border-gray-200 text-center font-bold outline-none focus:border-blue-500 text-black transition-all">
+                <input id="cust_name" type="text" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 rounded-2xl border border-gray-200 text-right font-bold outline-none focus:border-blue-500 text-black">
+                <input id="cust_phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border border-gray-200 text-center font-bold outline-none focus:border-blue-500 text-black">
                 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">الفرع</label>
-                        <select id="branch" class="w-full p-4 bg-slate-50 rounded-2xl border border-gray-200 font-bold text-center outline-none text-black">
+                        <label class="text-[10px] font-black text-gray-400 mr-2 uppercase text-black">الفرع</label>
+                        <select id="branch" class="w-full p-4 bg-slate-50 rounded-2xl border border-gray-200 font-bold text-center text-black">
                             <option>الفرع الرئيسي</option>
                         </select>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">وقت الإرسال</label>
-                        <select id="delay_time" class="w-full p-4 bg-slate-50 rounded-2xl border border-gray-200 font-bold text-center outline-none text-black">
-                            <option value="0">الآن (مباشر)</option>
+                        <label class="text-[10px] font-black text-gray-400 mr-2 uppercase text-black">وقت الإرسال</label>
+                        <select id="delay_time" class="w-full p-4 bg-slate-50 rounded-2xl border border-gray-200 font-bold text-center text-black">
+                            <option value="0">الآن</option>
                             <option value="30" selected>بعد 30 دقيقة</option>
                             <option value="60">بعد ساعة</option>
                         </select>
@@ -53,17 +61,17 @@
                 </div>
 
                 <button id="send_btn" onclick="send()" class="w-full bg-blue-600 text-white p-5 rounded-[2rem] font-black shadow-xl hover:bg-blue-700 transition transform active:scale-95 flex justify-center items-center gap-3">
-                    <span>إرسال الطلب ⏳</span>
+                    <span>إرسال عبر واتساب</span>
                 </button>
             </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4 pb-10">
             <div class="bg-white p-6 rounded-3xl text-center border shadow-sm">
-                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">رسائل اليوم</p>
-                <h2 id="total" class="text-3xl font-black text-slate-800">0</h2>
+                <p class="text-[10px] font-black text-gray-400 uppercase mb-1">رسائل اليوم</p>
+                <h2 id="total" class="text-3xl font-black text-slate-800 text-black">0</h2>
             </div>
-            <a href="/reports" class="bg-slate-900 p-6 rounded-3xl text-center text-white flex flex-col justify-center items-center hover:bg-blue-600 transition shadow-lg">
+            <a href="/reports" class="bg-slate-900 p-6 rounded-3xl text-center text-white flex flex-col justify-center items-center hover:bg-blue-600 transition shadow-lg text-black">
                 <span class="text-sm font-black tracking-tight">التقارير والشكاوى</span>
             </a>
         </div>
@@ -72,7 +80,7 @@
     <script>
         async function login() {
             const key = document.getElementById('key_input').value || localStorage.getItem('repu_key');
-            if(!key) return;
+            if(!key) { document.getElementById('login_screen').style.display = 'flex'; return; }
             try {
                 const res = await fetch('/api/client-info', { headers: { 'x-api-key': key } });
                 if(res.ok) {
@@ -80,48 +88,41 @@
                     localStorage.setItem('repu_key', key);
                     document.getElementById('restaurant_name').innerText = data.name;
                     document.getElementById('total').innerText = data.total;
-                    document.getElementById('login_screen').style.display = 'none'; // إخفاء عند النجاح
+                    document.getElementById('login_screen').style.display = 'none';
                     document.getElementById('main_app').classList.remove('hidden');
+                    checkComplaints(key);
                 } else {
                     localStorage.removeItem('repu_key');
-                    document.getElementById('login_screen').style.display = 'flex'; // إظهار إذا فشل
+                    document.getElementById('login_screen').style.display = 'flex';
                 }
             } catch(e) { console.error(e); }
+        }
+
+        async function checkComplaints(key) {
+            const res = await fetch('/api/my-reports', { headers: { 'x-api-key': key } });
+            const data = await res.json();
+            if(data.some(r => r.answer === '2')) document.getElementById('complaint_alert').classList.remove('hidden');
         }
 
         async function send() {
             const btn = document.getElementById('send_btn');
             const name = document.getElementById('cust_name').value;
             const phone = document.getElementById('cust_phone').value;
-            const delay = document.getElementById('delay_time').value;
-            if(!name || !phone) return alert('يرجى تعبئة كافة الحقول');
-            
+            if(!name || !phone) return alert('أكمل البيانات');
             btn.disabled = true; btn.innerText = "جاري الجدولة...";
-            const key = localStorage.getItem('repu_key');
-
             try {
                 const res = await fetch('/api/send', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': key },
-                    body: JSON.stringify({ name, phone, branch: document.getElementById('branch').value, delayMinutes: delay })
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': localStorage.getItem('repu_key') },
+                    body: JSON.stringify({ name, phone, branch: document.getElementById('branch').value, delayMinutes: document.getElementById('delay_time').value })
                 });
-                if(res.ok) {
-                    alert('✅ تمت العملية بنجاح');
-                    document.getElementById('cust_name').value = '';
-                    document.getElementById('cust_phone').value = '';
-                    login();
-                }
-            } catch(e) { alert('خطأ في الاتصال'); }
-            btn.disabled = false; btn.innerText = "إرسال الطلب ⏳";
+                if(res.ok) { alert('✅ تمت الجدولة بنجاح'); document.getElementById('cust_name').value=''; document.getElementById('cust_phone').value=''; login(); }
+            } catch(e) {}
+            btn.disabled = false; btn.innerText = "إرسال عبر واتساب";
         }
 
         function logout() { localStorage.removeItem('repu_key'); location.reload(); }
-
-        window.onload = () => {
-            const savedKey = localStorage.getItem('repu_key');
-            if (savedKey) { login(); } 
-            else { document.getElementById('login_screen').style.display = 'flex'; } // إظهار فقط عند الحاجة
-        };
+        window.onload = login;
     </script>
 </body>
 </html>
