@@ -2,6 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>إدارة المنصة | Super Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
@@ -13,33 +14,33 @@
 </head>
 <body class="p-4 md:p-8">
     <div class="max-w-7xl mx-auto">
-        <header class="flex justify-between items-center mb-10 bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-2xl">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-10 bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-2xl gap-4">
             <h1 class="text-2xl font-black text-blue-500 italic uppercase tracking-tighter">Mawjat Super Admin</h1>
-            <div id="auth_form" class="flex gap-2">
-                <input id="admin_pass" type="password" placeholder="كلمة مرور النظام" class="p-3 rounded-xl outline-none w-48 text-black shadow-inner">
+            <div id="auth_form" class="flex gap-2 w-full md:w-auto">
+                <input id="admin_pass" type="password" placeholder="كلمة مرور النظام" class="p-3 rounded-xl outline-none flex-grow md:w-48 text-black shadow-inner">
                 <button onclick="load()" class="bg-blue-600 px-8 py-3 rounded-xl font-black hover:bg-blue-500 transition shadow-lg shadow-blue-900/20">دخول</button>
             </div>
-            <button id="logout_btn" onclick="logout()" class="hidden bg-rose-600 hover:bg-rose-700 px-6 py-3 rounded-xl font-black transition">خروج آمن</button>
+            <button id="logout_btn" onclick="logout()" class="hidden bg-rose-600 hover:bg-rose-700 px-6 py-3 rounded-xl font-black transition w-full md:w-auto">خروج آمن</button>
         </header>
 
         <div id="dash" class="hidden space-y-8">
             <div class="grid lg:grid-cols-4 gap-8">
                 <div class="bg-slate-800 p-6 rounded-[2.5rem] border border-slate-700 space-y-4 shadow-xl">
-                    <h3 class="text-blue-400 font-black italic mb-4">➕ إضافة شريك جديد</h3>
-                    <input id="n" type="text" placeholder="اسم المطعم" class="w-full p-3 rounded-xl border-none text-sm">
-                    <input id="k" type="text" placeholder="API Key (فريد)" class="w-full p-3 rounded-xl border-none text-sm font-mono">
+                    <h3 class="text-blue-400 font-black italic mb-4">➕ تفعيل شريك جديد</h3>
+                    <input id="n" type="text" placeholder="اسم المنشأة (مثلاً: مجمع رعاية الطبي)" class="w-full p-3 rounded-xl border-none text-sm">
+                    <input id="k" type="text" placeholder="API Key (مثلاً: med-key-1)" class="w-full p-3 rounded-xl border-none text-sm font-mono">
                     <input id="g" type="text" placeholder="رابط Google Maps" class="w-full p-3 rounded-xl border-none text-sm">
                     <input id="p" type="text" placeholder="جوال المدير (966...)" class="w-full p-3 rounded-xl border-none text-sm">
                     
                     <div class="flex gap-2 text-xs">
-                        <select id="plan" class="w-1/2 p-3 rounded-xl border-none">
-                            <option value="Starter">باقة الانطلاق</option>
+                        <select id="plan" class="w-1/2 p-3 rounded-xl border-none text-black">
+                            <option value="Starter">باقة المنطلق</option>
                             <option value="Pro">باقة التوسع</option>
                             <option value="Enterprise">الشركات</option>
                         </select>
-                        <select id="dur" class="w-1/2 p-3 rounded-xl border-none">
-                            <option value="monthly">اشتراك شهري</option>
-                            <option value="yearly">اشتراك سنوي</option>
+                        <select id="dur" class="w-1/2 p-3 rounded-xl border-none text-black">
+                            <option value="monthly">شهري</option>
+                            <option value="yearly">سنوي</option>
                         </select>
                     </div>
                     <button onclick="add()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg hover:bg-blue-500 transition transform active:scale-95">تفعيل الحساب فوراً</button>
@@ -47,17 +48,17 @@
 
                 <div class="lg:col-span-3 bg-slate-800 rounded-[2.5rem] border border-slate-700 overflow-hidden shadow-xl">
                     <div class="p-6 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
-                        <h4 class="font-black text-slate-300">قائمة المطاعم والمفاتيح النشطة</h4>
-                        <span class="text-xs text-slate-500 font-bold">إجمالي المشتركين: <span id="client_count">0</span></span>
+                        <h4 class="font-black text-slate-300">قائمة الشركاء النشطين</h4>
+                        <span class="text-xs text-slate-500 font-bold">المشتركين: <span id="client_count">0</span></span>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-right text-sm">
                             <thead class="bg-slate-900/50 text-slate-400 text-[10px] uppercase font-black">
                                 <tr>
-                                    <th class="p-5">المطعم و الـ API Key</th>
-                                    <th class="p-5 text-center">الاشتراك</th>
-                                    <th class="p-5 text-center">تاريخ الانتهاء</th>
-                                    <th class="p-5 text-center">الإجراءات</th>
+                                    <th class="p-5">المنشأة والـ Key</th>
+                                    <th class="p-5 text-center">الباقة</th>
+                                    <th class="p-5 text-center">الانتهاء</th>
+                                    <th class="p-5 text-center">تحكم</th>
                                 </tr>
                             </thead>
                             <tbody id="list" class="divide-y divide-slate-700/50"></tbody>
@@ -69,16 +70,26 @@
     </div>
 
     <script>
-        function getP() { return document.getElementById('admin_pass').value || localStorage.getItem('ap'); }
+        // دالة قوية لجلب الباسورد
+        function getP() { 
+            return document.getElementById('admin_pass').value || localStorage.getItem('ap'); 
+        }
 
-        async function load() {
-            const pass = getP();
-            if(!pass) return;
+        async function load(forcedPass = null) {
+            let pass = forcedPass || getP();
+            
+            if(!pass) {
+                pass = prompt("🔑 يرجى إدخال كلمة مرور النظام للدخول:");
+                if(!pass) return;
+            }
 
             try {
-                const res = await fetch('/api/clients', { headers: { 'x-admin-password': pass } });
+                const res = await fetch('/api/clients', { 
+                    headers: { 'x-admin-password': pass } 
+                });
+                
                 if(res.ok) {
-                    localStorage.setItem('ap', pass);
+                    localStorage.setItem('ap', pass); 
                     document.getElementById('dash').classList.remove('hidden');
                     document.getElementById('auth_form').classList.add('hidden');
                     document.getElementById('logout_btn').classList.remove('hidden');
@@ -97,29 +108,37 @@
                             <td class="p-5 text-center font-mono text-xs">
                                 <span class="${new Date(c.expiryDate) < new Date() ? 'text-rose-500' : 'text-emerald-500'} font-bold">
                                     ${new Date(c.expiryDate).toLocaleDateString('ar-SA')}
-                                    ${new Date(c.expiryDate) < new Date() ? ' (منتهٍ)' : ''}
                                 </span>
                             </td>
-                            <td class="p-5 text-center space-x-2 space-x-reverse">
-                                <button onclick="editClient('${c._id}', '${c.name}', '${c.googleLink}', '${c.adminPhone}')" class="text-blue-400 hover:text-blue-300 text-xs font-bold">تعديل</button>
-                                <button onclick="deleteClient('${c._id}')" class="text-rose-500 hover:text-rose-400 text-xs font-bold mr-3">حذف</button>
+                            <td class="p-5 text-center">
+                                <button onclick="deleteClient('${c._id}')" class="text-rose-500 font-bold px-2">حذف</button>
                             </td>
                         </tr>
                     `).join('');
                 } else {
                     localStorage.removeItem('ap');
-                    alert('❌ وصول مرفوض: كلمة المرور غير صحيحة');
+                    const retry = confirm('❌ كلمة المرور غير صحيحة. هل تريد المحاولة مرة أخرى؟');
+                    if(retry) {
+                        const newPass = prompt("أدخل كلمة المرور الصحيحة:");
+                        if(newPass) load(newPass);
+                    }
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) { 
+                alert('⚠️ خطأ في الاتصال بالسيرفر. تأكد أن تطبيقك يعمل على Render.');
+            }
         }
 
         async function add() {
             const pass = getP();
             const data = { 
-                name: document.getElementById('n').value, apiKey: document.getElementById('k').value, 
-                googleLink: document.getElementById('g').value, adminPhone: document.getElementById('p').value, 
-                plan: document.getElementById('plan').value, durationType: document.getElementById('dur').value 
+                name: document.getElementById('n').value, 
+                apiKey: document.getElementById('k').value, 
+                googleLink: document.getElementById('g').value, 
+                adminPhone: document.getElementById('p').value, 
+                plan: document.getElementById('plan').value, 
+                durationType: document.getElementById('dur').value 
             };
+            
             if(!data.name || !data.apiKey) return alert('يرجى تعبئة الاسم والمفتاح');
             
             const res = await fetch('/api/clients/add', { 
@@ -128,38 +147,28 @@
                 body: JSON.stringify(data) 
             });
             if(res.ok) { 
-                alert('✅ تم إضافة وتفعيل المطعم بنجاح'); 
+                alert('✅ تم تفعيل العميل الجديد بنجاح'); 
                 document.querySelectorAll('input:not(#admin_pass)').forEach(i => i.value = '');
                 load(); 
+            } else {
+                alert('فشل الإضافة. تأكد من كلمة المرور.');
             }
         }
 
         async function deleteClient(id) {
-            if(!confirm('🚨 هل أنت متأكد من حذف هذا المطعم نهائياً؟ ستفقد جميع بيانات التقييمات التابعة له.')) return;
-            const res = await fetch(`/api/clients/${id}`, { 
+            if(!confirm('🚨 هل أنت متأكد من الحذف؟')) return;
+            await fetch(`/api/clients/${id}`, { 
                 method: 'DELETE', 
                 headers: { 'x-admin-password': getP() } 
             });
-            if(res.ok) load();
-        }
-
-        async function editClient(id, oldName, oldLink, oldPhone) {
-            const newName = prompt("تعديل اسم المطعم:", oldName);
-            const newLink = prompt("تعديل رابط جوجل ماب:", oldLink);
-            const newPhone = prompt("تعديل جوال المدير:", oldPhone);
-            
-            if (newName && newLink) {
-                const res = await fetch(`/api/clients/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'x-admin-password': getP() },
-                    body: JSON.stringify({ name: newName, googleLink: newLink, adminPhone: newPhone })
-                });
-                if(res.ok) load();
-            }
+            load();
         }
 
         function logout() { localStorage.removeItem('ap'); location.reload(); }
-        window.onload = () => { if(localStorage.getItem('ap')) load(); };
+        
+        window.onload = () => { 
+            if(localStorage.getItem('ap')) load(); 
+        };
     </script>
 </body>
 </html>

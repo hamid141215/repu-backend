@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mawjat Repu | ضاعف تقييمات مطعمك على Google Maps</title>
+    <title>Mawjat Repu | إدارة سمعة المجمعات الطبية والمطاعم</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
@@ -20,11 +20,11 @@
     <nav class="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b">
         <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
             <h1 class="text-2xl font-black text-blue-600 tracking-tighter italic uppercase">MAWJAT <span class="text-slate-800">REPU</span></h1>
-            <div class="hidden md:flex gap-8 font-bold text-slate-600 items-center">
-                <a href="#how-it-works" class="hover:text-blue-600 transition">كيف يعمل؟</a>
-                <a href="#features" class="hover:text-blue-600 transition">المميزات</a>
-                <a href="#pricing" class="hover:text-blue-600 transition">الأسعار</a>
-                <a href="/app" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">دخول العملاء</a>
+            
+            <div class="flex items-center gap-4 font-bold">
+                <a href="/app" class="bg-blue-600 text-white px-5 py-2 rounded-xl font-black shadow-lg hover:bg-blue-700 transition text-sm">
+                    دخول العملاء
+                </a>
             </div>
         </div>
     </nav>
@@ -32,26 +32,26 @@
     <section class="hero-gradient text-white pt-40 pb-32 px-6 overflow-hidden">
         <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
             <div class="text-right space-y-8">
-                <span class="bg-blue-500/20 text-blue-300 px-4 py-1 rounded-full text-xs font-black border border-blue-500/30 uppercase tracking-widest italic">الجيل القادم من إدارة السمعة</span>
-                <h2 class="text-5xl md:text-7xl font-900 leading-tight tracking-tighter">لا تترك سمعة مطعمك <br><span class="text-blue-400">للصدفة!</span></h2>
-                <p class="text-xl opacity-80 leading-relaxed max-w-xl">نظام Mawjat Repu الذكي يحول زبائنك الراضين إلى تقييمات 5 نجوم، ويحجز الشكاوى السلبية لمعالجتها سراً قبل أن تصل لخرائط جوجل.</p>
+                <span class="bg-blue-500/20 text-blue-300 px-4 py-1 rounded-full text-xs font-black border border-blue-500/30 uppercase tracking-widest italic tracking-tight">إدارة السمعة للمجمعات الطبية والمطاعم</span>
+                <h2 class="text-5xl md:text-7xl font-900 leading-tight tracking-tighter">لا تترك سمعة منشأتك <br><span class="text-blue-400">للصدفة!</span></h2>
+                <p class="text-xl opacity-80 leading-relaxed max-w-xl font-medium">نظام Mawjat Repu الذكي يحول رضا مرضاك وعملائك إلى تقييمات 5 نجوم، ويحجز الملاحظات السلبية لمعالجتها سراً قبل أن تصل لخرائط جوجل.</p>
                 <div class="flex flex-col md:flex-row gap-4 pt-4">
-                    <a href="#pricing" class="bg-blue-600 p-5 px-12 rounded-2xl font-black text-xl hover:scale-105 transition shadow-2xl text-center">ابدأ الآن مجاناً</a>
+                    <a href="#pricing" class="bg-blue-600 p-5 px-12 rounded-2xl font-black text-xl hover:scale-105 transition shadow-2xl text-center">ابدأ الآن</a>
                     <button onclick="contactSales('تجربة النظام')" class="bg-white/10 p-5 px-12 rounded-2xl font-black text-xl border border-white/20 hover:bg-white/20 transition italic text-center uppercase tracking-widest">Demo Live</button>
                 </div>
             </div>
+            
             <div class="relative hidden md:block">
                 <div class="bg-white/5 p-8 rounded-[3rem] border border-white/10 backdrop-blur-sm">
                     <div class="whatsapp-bubble bg-[#DCF8C6] p-4 text-slate-800 mb-4 ml-12 relative">
-                        <p class="font-bold text-sm">عزيزي العميل، شكراً لزيارتك مطعمنا اليوم.. كيف كانت تجربتك؟ ✨</p>
-                        <span class="text-[10px] opacity-50 block mt-1">10:30 AM</span>
+                        <p class="font-bold text-sm leading-relaxed">عزيزي المراجع، شكراً لثقتك بمركزنا الطبي اليوم.. كيف تقيم جودة الرعاية المقدمة لك؟ ✨</p>
+                        <span class="text-[10px] opacity-50 block mt-1 text-left">10:30 AM</span>
                     </div>
                     <div class="space-y-3 mr-12">
-                        <div class="bg-white text-blue-600 p-3 rounded-xl border border-blue-100 font-black text-center shadow-md">🔘 ممتاز جداً 😍</div>
+                        <div class="bg-white text-blue-600 p-3 rounded-xl border border-blue-100 font-black text-center shadow-md">🔘 ممتازة جداً 😍</div>
                         <div class="bg-white text-rose-500 p-3 rounded-xl border border-rose-100 font-black text-center shadow-md">🔘 لدي ملاحظات 😔</div>
                     </div>
                 </div>
-                <div class="absolute -top-10 -right-10 w-32 h-32 bg-blue-600 rounded-full blur-[80px] opacity-30"></div>
             </div>
         </div>
     </section>
@@ -60,36 +60,36 @@
         <div class="max-w-6xl mx-auto">
             <div class="text-center mb-16">
                 <h2 class="text-3xl font-black text-slate-800 italic uppercase">دورة حياة التقييم الذكي</h2>
-                <p class="text-slate-500 font-bold mt-2">كيف نحمي سمعتك الرقمية ونضاعف مبيعاتك؟</p>
+                <p class="text-slate-500 font-bold mt-2">كيف نحمي سمعتك الرقمية ونضمن رضا مراجعيك؟</p>
             </div>
             <div class="grid md:grid-cols-4 gap-4 relative">
                 <div class="text-center p-6">
                     <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 font-black text-2xl">1</div>
-                    <h4 class="font-black mb-2">زيارة العميل</h4>
-                    <p class="text-xs text-slate-500 font-bold">يستمتع العميل بوجبته في المطعم</p>
+                    <h4 class="font-black mb-2">تقديم الخدمة</h4>
+                    <p class="text-xs text-slate-500 font-bold leading-relaxed">انتهاء الزيارة الطبية أو الخدمة في منشأتك</p>
                 </div>
                 <div class="text-center p-6 border-t-2 md:border-t-0 md:border-r-2 border-dashed border-slate-100">
                     <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 font-black text-2xl">2</div>
                     <h4 class="font-black mb-2">رسالة ذكية</h4>
-                    <p class="text-xs text-slate-500 font-bold">تصل رسالة واتساب آلية بعد 30 دقيقة</p>
+                    <p class="text-xs text-slate-500 font-bold leading-relaxed">تصل رسالة واتساب آلية في الوقت الذي تحدده</p>
                 </div>
                 <div class="text-center p-6 border-t-2 md:border-t-0 md:border-r-2 border-dashed border-slate-100">
                     <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 font-black text-2xl">✔</div>
                     <h4 class="font-black mb-2 text-green-600">تقييم إيجابي</h4>
-                    <p class="text-xs text-slate-500 font-bold">توجيه العميل مباشرة لخرائط جوجل</p>
+                    <p class="text-xs text-slate-500 font-bold leading-relaxed">توجيه العميل مباشرة لخرائط جوجل لزيادة نجومك</p>
                 </div>
                 <div class="text-center p-6 border-t-2 md:border-t-0 md:border-r-2 border-dashed border-slate-100">
                     <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 font-black text-2xl">⚠️</div>
-                    <h4 class="font-black mb-2 text-rose-600">شكوى سلبية</h4>
-                    <p class="text-xs text-slate-500 font-bold">تنبيه فوري للمدير لحل المشكلة داخلياً</p>
+                    <h4 class="font-black mb-2 text-rose-600">شكوى سرية</h4>
+                    <p class="text-xs text-slate-500 font-bold leading-relaxed">تنبيه فوري للإدارة لحل المشكلة قبل خروج المراجع</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="pricing" class="py-24 bg-slate-900 text-white px-6 rounded-[4rem] mx-4 md:mx-10 mb-20">
+    <section id="pricing" class="py-24 bg-slate-900 text-white px-6 rounded-[4rem] mx-4 md:mx-10 mb-20 shadow-2xl shadow-blue-900/20">
         <div class="max-w-6xl mx-auto text-center mb-16">
-            <h2 class="text-4xl font-900 mb-6 italic">اختر باقة النجاح</h2>
+            <h2 class="text-4xl font-900 mb-6 italic">باقات تناسب نموك</h2>
             <div class="flex items-center justify-center gap-6">
                 <span class="font-bold text-slate-400">شهري</span>
                 <label class="relative inline-block w-16 h-8 align-middle select-none transition duration-200 ease-in">
@@ -101,23 +101,23 @@
         </div>
 
         <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8 items-end">
-            <div class="bg-slate-800 p-10 rounded-[3rem] border border-slate-700 hover:border-blue-500 transition">
+            <div class="bg-slate-800 p-10 rounded-[3rem] border border-slate-700 hover:border-blue-500 transition shadow-xl">
                 <h4 class="font-black text-xl mb-2 text-blue-400">باقة الإنطلاق</h4>
                 <div class="my-6">
                     <span class="text-5xl font-900 plan-price" data-monthly="299" data-yearly="2490">299</span>
                     <span class="text-slate-400 font-bold price-unit text-xs">ر.س / شهر</span>
                 </div>
                 <ul class="space-y-4 text-right mb-10 text-slate-300 font-bold text-sm border-t border-slate-700 pt-6">
-                    <li>✅ فرع واحد فقط</li>
+                    <li>✅ فرع واحد</li>
                     <li>✅ 500 طلب تقييم شهرياً</li>
                     <li>✅ تنبيهات شكاوى فورية</li>
                     <li>✅ تقارير أداء أساسية</li>
                 </ul>
-                <button onclick="contactSales('باقة المنطلق')" class="w-full bg-white text-slate-900 p-4 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition uppercase text-sm italic">Mawjat Start</button>
+                <button onclick="contactSales('باقة الإنطلاق')" class="w-full bg-white text-slate-900 p-4 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition uppercase text-sm italic">Mawjat Start</button>
             </div>
 
             <div class="bg-blue-600 p-12 rounded-[3.5rem] shadow-2xl scale-105 relative border-4 border-blue-400">
-                <div class="absolute -top-5 right-1/2 translate-x-1/2 bg-white text-blue-600 px-6 py-2 rounded-full text-[10px] font-black shadow-lg uppercase tracking-widest italic">الأكثر طلباً</div>
+                <div class="absolute -top-5 right-1/2 translate-x-1/2 bg-white text-blue-600 px-6 py-2 rounded-full text-[10px] font-black shadow-lg uppercase tracking-widest italic">خيار المجمعات الطبية</div>
                 <h4 class="font-black text-2xl mb-2">باقة التوسع</h4>
                 <div class="my-6">
                     <span class="text-6xl font-900 plan-price" data-monthly="499" data-yearly="4990">499</span>
@@ -127,19 +127,19 @@
                     <li>✅ حتى 3 فروع</li>
                     <li>✅ 1,800 طلب تقييم شهرياً</li>
                     <li>✅ تصدير تقارير Excel</li>
-                    <li>✅ رابط واتساب مباشر للعملاء المستائين</li>
+                    <li>✅ رابط واتساب مباشر للمدير</li>
                     <li>✅ دعم فني ذو أولوية</li>
                 </ul>
-                <button onclick="contactSales('باقة المتوسع')" class="w-full bg-slate-900 text-white p-5 rounded-2xl font-black shadow-xl hover:opacity-90 transition uppercase italic">Mawjat Growth</button>
+                <button onclick="contactSales('باقة التوسع')" class="w-full bg-slate-900 text-white p-5 rounded-2xl font-black shadow-xl hover:opacity-90 transition uppercase italic">Mawjat Growth</button>
             </div>
 
             <div class="bg-slate-800 p-10 rounded-[3rem] border border-slate-700">
-                <h4 class="font-black text-xl mb-2 text-blue-400">باقة الشركات</h4>
+                <h4 class="font-black text-xl mb-2 text-blue-400 uppercase tracking-tighter">Enterprise</h4>
                 <div class="my-6">
                     <span class="text-3xl font-black text-white italic tracking-tighter uppercase">سعر مخصص</span>
                 </div>
-                <p class="text-slate-400 text-xs mb-8 font-bold leading-relaxed">حلول مخصصة للسلاسل الكبرى مع ربط API خاص وإدارة كاملة للسمعة الرقمية.</p>
-                <button onclick="contactSales('باقة الشركات')" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black hover:bg-blue-500 transition uppercase text-sm italic">Contact Enterprise</button>
+                <p class="text-slate-400 text-xs mb-8 font-bold leading-relaxed">حلول مخصصة للسلاسل الكبرى مع ربط API خاص وإدارة كاملة للمنظومة.</p>
+                <button onclick="contactSales('باقة الشركات')" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black hover:bg-blue-500 transition uppercase text-sm italic">تواصل معنا</button>
             </div>
         </div>
     </section>
@@ -173,7 +173,7 @@
             const catalogLinks = {
                 "باقة الإنطلاق": "https://wa.me/p/25631452069837758/966567156070",
                 "باقة التوسع": "https://wa.me/p/33501379162810569/966567156070",
-                "تجربة النظام": `https://wa.me/${phone}?text=${encodeURIComponent("مرحباً موجة ريبو، أرغب في تجربة النظام مجاناً لمطعمي")}`
+                "تجربة النظام": `https://wa.me/${phone}?text=${encodeURIComponent("مرحباً موجة ريبو، أرغب في تجربة النظام مجاناً لمنشأتي")}`
             };
             let targetUrl = catalogLinks[planName] || `https://wa.me/${phone}?text=${encodeURIComponent("مرحباً، أرغب في الاستفسار عن حلول موجة ريبو لإدارة السمعة")}`;
             window.open(targetUrl, '_blank', 'noopener,noreferrer');
