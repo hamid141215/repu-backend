@@ -10,14 +10,19 @@ app.use(express.urlencoded({ extended: true }));
 
 const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
+// SID الخدمة الجديد المرتبط بالرقم
 const MESSAGING_SERVICE_SID = 'MG3c5f83c10c1a23b224ec8068c8ddcee7'; 
 
+// دالة تنسيق الأرقام
 const normalizePhone = (phone) => {
     let p = String(phone).replace(/\D/g, '');
     if (p.startsWith('05')) p = '966' + p.substring(1);
     if (p.startsWith('5') && !p.startsWith('966')) p = '966' + p;
     return p;
 };
+
+// دالة التأخير لمحاكاة السلوك البشري
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 let db;
 const initMongo = async () => {
@@ -32,6 +37,7 @@ const initMongo = async () => {
     }
 };
 
+// حماية مسارات العملاء
 const authenticate = async (req, res, next) => {
     const apiKey = req.headers['x-api-key'] || req.query.apiKey;
     if (!apiKey) return res.status(401).json({ error: "Missing API Key" });
@@ -41,6 +47,7 @@ const authenticate = async (req, res, next) => {
     next();
 };
 
+// حماية السوبر أدمن
 const superAdminAuth = (req, res, next) => {
     const adminPass = req.headers['x-admin-password'];
     if (adminPass !== process.env.ADMIN_PASSWORD) {
@@ -49,11 +56,13 @@ const superAdminAuth = (req, res, next) => {
     next();
 };
 
+// --- الصفحات ---
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/reports', (req, res) => res.sendFile(path.join(__dirname, 'reports.html')));
 app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
 
+// --- مسارات السوبر أدمن ---
 app.get('/api/clients', superAdminAuth, async (req, res) => {
     try {
         const clients = await db.collection('clients').find().toArray();
@@ -84,6 +93,7 @@ app.delete('/api/clients/:id', superAdminAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ error: "Delete Error" }); }
 });
 
+// --- مسارات العميل ---
 app.get('/api/client-info', authenticate, async (req, res) => {
     try {
         const total = await db.collection('evaluations').countDocuments({ clientId: req.clientData._id });
@@ -91,17 +101,25 @@ app.get('/api/client-info', authenticate, async (req, res) => {
     } catch (e) { res.status(500).json({ error: "Internal Error" }); }
 });
 
+// إرسال التقييم مع التأخير العشوائي لتجنب السبام
 app.post('/api/send', authenticate, async (req, res) => {
     const { phone, name, branch, delayMinutes } = req.body;
     const cleanPhone = normalizePhone(phone);
     const delay = parseInt(delayMinutes) || 0;
 
     try {
+        // تأخير عشوائي لمحاكاة الإرسال البشري
+        const randomWait = Math.floor(Math.random() * (4000 - 1000 + 1)) + 1000;
+        await sleep(randomWait);
+
         const messageOptions = {
             messagingServiceSid: MESSAGING_SERVICE_SID,
             to: `whatsapp:+${cleanPhone}`,
             contentSid: 'HXfac5e63d161f07e3ebc652a9931ce1c2',
-            contentVariables: JSON.stringify({ "1": name, "2": req.clientData.name })
+            contentVariables: JSON.stringify({ 
+                "1": String(name).trim(), 
+                "2": String(req.clientData.name).trim() 
+            })
         };
 
         if (delay >= 15) {
@@ -109,21 +127,25 @@ app.post('/api/send', authenticate, async (req, res) => {
             messageOptions.scheduleType = 'fixed';
         }
 
-        await twilioClient.messages.create(messageOptions);
+        const message = await twilioClient.messages.create(messageOptions);
 
         await db.collection('evaluations').insertOne({ 
             clientId: req.clientData._id, 
             phone: cleanPhone, 
             name, branch, 
             status: delay >= 15 ? 'scheduled' : 'sent', 
-            sentAt: new Date() 
+            sentAt: new Date(),
+            twilioSid: message.sid
         });
 
         res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) { 
+        console.error("❌ Send Error:", e.message);
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
-// --- الويب هوك (Webhook) المصلح والنهائي ---
+// --- الويب هوك (Webhook) ---
 app.post('/whatsapp/webhook', async (req, res) => {
     const { Body, From } = req.body;
     const customerAnswer = Body ? Body.trim() : "";
@@ -144,7 +166,6 @@ app.post('/whatsapp/webhook', async (req, res) => {
                     replyMsg = `نعتذر منك 😔، تم إرسال ملاحظتك لإدارة ${client.name} فوراً لتحسين تجربتك القادمة.`;
                     await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'complaint', answer: '2' } });
 
-                    // --- تنبيه المدير باستخدام القالب المعتمد ---
                     if (client.adminPhone) {
                         const customerNumber = lastEval.phone.replace(/\D/g, ''); 
                         try {
@@ -158,10 +179,7 @@ app.post('/whatsapp/webhook', async (req, res) => {
                                     "3": customerNumber
                                 })
                             });
-                            console.log("✅ Admin Alert Sent via Template");
-                        } catch (error) {
-                            console.error("❌ Admin Alert Failed:", error.message);
-                        }
+                        } catch (err) { console.error("Admin Alert Failed:", err.message); }
                     }
                 }
 
