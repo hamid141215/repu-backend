@@ -112,15 +112,16 @@ app.post('/api/send', authenticate, async (req, res) => {
         const randomWait = Math.floor(Math.random() * (4000 - 1000 + 1)) + 1000;
         await sleep(randomWait);
 
-        const messageOptions = {
-            messagingServiceSid: MESSAGING_SERVICE_SID,
-            to: `whatsapp:+${cleanPhone}`,
-            contentSid: 'HXfac5e63d161f07e3ebc652a9931ce1c2',
-            contentVariables: JSON.stringify({ 
-                "1": String(name).trim(), 
-                "2": String(req.clientData.name).trim() 
-            })
-        };
+        // في دالة إرسال التقييم
+const messageOptions = {
+    messagingServiceSid: MESSAGING_SERVICE_SID,
+    to: `whatsapp:+${cleanPhone}`,
+    contentSid: 'HX42990e73a87738bbb9618d1b9d218f20', 
+    contentVariables: JSON.stringify({ 
+        "1": String(req.clientData.name).trim(), 
+        "2": String(req.clientData.googleLink).trim() 
+    })
+};
 
         if (delay >= 15) {
             messageOptions.sendAt = new Date(Date.now() + delay * 60000).toISOString();
