@@ -85,7 +85,7 @@ app.post('/api/send', authenticate, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- الويب هوك المحدث لاستقبال الأزرار بذكاء ---
+// --- الويب هوك المحدث لاستقبال الأزرار وتنبيه المدير بالقالب ---
 app.post('/whatsapp/webhook', async (req, res) => {
     const { Body, From } = req.body;
     const customerAnswer = Body ? Body.trim() : "";
@@ -100,26 +100,34 @@ app.post('/whatsapp/webhook', async (req, res) => {
             if (client) {
                 let replyMsg = "";
                 
-                // البحث عن كلمة "ممتاز" أو رقم "1" في الرد
                 if (customerAnswer === "1" || customerAnswer.includes("ممتاز")) {
                     replyMsg = `شكراً لتقييمك لـ ${client.name}! 😍 يسعدنا جداً رضاك. قيمنا على جوجل لنستمر في خدمتك: ${client.googleLink}`;
                     await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '1' } });
                 } 
-                // البحث عن كلمة "ملاحظة" أو رقم "2" في الرد
                 else if (customerAnswer === "2" || customerAnswer.includes("ملاحظات") || customerAnswer.includes("ملاحظة")) {
                     replyMsg = `نعتذر منك 😔، تم إرسال ملاحظتك لإدارة ${client.name} فوراً لتحسين تجربتك القادمة.`;
                     await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'complaint', answer: '2' } });
 
-                    // تنبيه المدير فوراً عبر الواتساب
-                    // تنبيه المدير مع رابط مباشر لمحادثة العميل
+                    // --- تنبيه المدير باستخدام القالب (Template) المعتمد ---
+                    // كود إرسال التنبيه للمدير (محدث للقالب النصي)
 if (client.adminPhone) {
-    const waLink = `https://wa.me/${lastEval.phone}`; // رابط واتساب المباشر للعميل
-    
-    await twilioClient.messages.create({
-        messagingServiceSid: MESSAGING_SERVICE_SID,
-        body: `⚠️ تنبيه شكوى: العميل ${lastEval.name} قدم ملاحظة سلبية لفرع ${lastEval.branch || 'الرئيسي'}.\n\nللتواصل الفوري مع العميل اضغط هنا:\n${waLink}`,
-        to: `whatsapp:+${normalizePhone(client.adminPhone)}`
-    });
+    const customerNumber = lastEval.phone.replace(/\D/g, ''); 
+
+    try {
+        await twilioClient.messages.create({
+            from: MESSAGING_SERVICE_SID,
+            to: `whatsapp:+${normalizePhone(client.adminPhone)}`,
+            contentSid: 'HX0820f9b7ac928e159b018b2c0e905566', // ضعه هنا فور وصوله
+            contentVariables: JSON.stringify({
+                "1": lastEval.name,
+                "2": lastEval.branch || 'الرئيسي',
+                "3": customerNumber
+            })
+        });
+        console.log("✅ تم إرسال تنبيه المدير بالقالب النصي المعتمد");
+    } catch (error) {
+        console.error("❌ فشل إرسال التنبيه:", error.message);
+    }
 }
                 }
 
@@ -129,7 +137,6 @@ if (client.adminPhone) {
                         body: replyMsg,
                         to: From
                     });
-                    console.log(`✅ تم إرسال الرد الآلي بنجاح إلى ${fullPhone}`);
                 }
             }
         }
