@@ -52,8 +52,10 @@ const superAdminAuth = (req, res, next) => {
 
 // --- الويب هوك (تصحيح الأزرار وتنبيه المدير) ---
 app.post('/whatsapp/webhook', async (req, res) => {
-    const { Body, From, To, ButtonPayload } = req.body;
+    // التقاط كل البيانات الممكنة من تويليو
+    const { Body, From, To, ButtonPayload, ButtonText } = req.body;
     const incomingText = (Body || "").trim();
+    const payload = ButtonPayload || "";
     const customerPhone = From.replace('whatsapp:+', '');
 
     try {
@@ -66,11 +68,9 @@ app.post('/whatsapp/webhook', async (req, res) => {
             if (client) {
                 await twilioClient.messages.create({
                     contentSid: 'HXfac5e63d161f07e3ebc652a9931ce1c2',
-                    from: To,
-                    to: From,
+                    from: To, to: From,
                     contentVariables: JSON.stringify({ "1": "عزيزنا", "2": client.name })
                 });
-
                 await db.collection('evaluations').insertOne({ 
                     clientId: client._id, phone: customerPhone, name: "عميل NFC", status: 'pending', sentAt: new Date() 
                 });
@@ -78,43 +78,59 @@ app.post('/whatsapp/webhook', async (req, res) => {
             return res.status(200).end();
         }
 
-        // 2. معالجة الأزرار والشكاوى
+        // 2. معالجة الردود
         const lastEval = await db.collection('evaluations').findOne({ phone: customerPhone }, { sort: { sentAt: -1 } });
         
         if (lastEval) {
             const client = await db.collection('clients').findOne({ _id: lastEval.clientId });
             if (!client) return res.status(200).end();
 
-            // فحص رد العميل (سواء ضغط زر أو كتب نص)
-            const isExcellent = incomingText.includes("ممتاز") || ButtonPayload === "Excellent_Feedback" || incomingText === "1";
-            const isComplaint = incomingText.includes("ملاحظة") || ButtonPayload === "Complaint_Feedback" || incomingText === "2";
+            // فحص ذكي: هل هو تقييم ممتاز؟
+            const isExcellent = payload === "Excellent_Feedback" || 
+                                incomingText.includes("ممتاز") || 
+                                incomingText === "1";
+
+            // فحص ذكي: هل هو شكوى؟ (البحث عن أي كلمة تدل على ملاحظة)
+            const isComplaint = payload === "Complaint_Feedback" || 
+                                incomingText.includes("ملاحظة") || 
+                                incomingText.includes("ملاحظات") || 
+                                incomingText === "2";
 
             if (isExcellent) {
                 await twilioClient.messages.create({
                     from: To, to: From,
-                    body: `شكراً لك! 😍 يسعدنا تقييمك لـ ${client.name} على جوجل ماب: ${client.googleLink}`
+                    body: `شكراً لك! 😍 قيمنا لـ ${client.name} هنا: ${client.googleLink}`
                 });
-                await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '5' } });
+                await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied' } });
             } 
             else if (isComplaint) {
+                // تنفيذ الرد فوراً
                 await twilioClient.messages.create({
                     from: To, to: From,
-                    body: `نعتذر منك 😔، تم إرسال ملاحظتك لإدارة ${client.name} فوراً لتحسين خدمتنا.`
+                    body: `نعتذر منك 😔، تم إرسال ملاحظتك لإدارة ${client.name} فوراً.`
                 });
-                // تحديث الحالة لـ complaint لتظهر باللون الأحمر في التقارير
-                await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'complaint', answer: '1' } });
 
-                // تنبيه المدير فورا
+                // تحديث الداتابيز (هذا هو السطر المسؤول عن ظهور اللون الأحمر)
+                const updateResult = await db.collection('evaluations').updateOne(
+                    { _id: lastEval._id }, 
+                    { $set: { status: 'complaint', answer: '2' } }
+                );
+
+                console.log("✅ Database Updated for Complaint:", updateResult.modifiedCount);
+
+                // إرسال تنبيه للمدير
                 if (client.adminPhone) {
                     await twilioClient.messages.create({
                         from: To,
                         to: `whatsapp:+${normalizePhone(client.adminPhone)}`,
-                        body: `⚠️ *تنبيه شكوى جديدة*\nالمنشأة: ${client.name}\nرقم العميل: ${customerPhone}\nالفرع: ${lastEval.branch || 'الرئيسي'}`
+                        body: `⚠️ *تنبيه شكوى جديدة*\nالمنشأة: ${client.name}\nرقم العميل: ${customerPhone}`
                     });
                 }
             }
         }
-    } catch (err) { console.error("❌ Webhook Error:", err.message); }
+    } catch (err) { 
+        console.error("❌ Webhook Error Detail:", err.message); 
+    }
     res.status(200).send('<Response></Response>');
 });
 
