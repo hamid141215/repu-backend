@@ -50,30 +50,30 @@ const superAdminAuth = (req, res, next) => {
     next();
 };
 
-// --- الويب هوك (تصحيح الأزرار وتنبيه المدير) ---
+// --- الويب هوك الشامل المحدث ---
 app.post('/whatsapp/webhook', async (req, res) => {
-    // التقاط كل البيانات الممكنة من تويليو
     const { Body, From, To, ButtonPayload, ButtonText } = req.body;
     const incomingText = (Body || "").trim();
     const payload = ButtonPayload || "";
     const customerPhone = From.replace('whatsapp:+', '');
 
     try {
-        // 1. نظام الـ NFC (المطور لدعم الرسائل الودودة والكود القديم)
+        // 1. نظام الـ NFC (منطق البحث الذكي المحدث)
         let nfcId = null;
 
         if (incomingText.startsWith("تقييم_")) {
-            // الطريقة القديمة
+            // الطريقة القديمة (الكود المباشر)
             const parts = incomingText.split('_');
             nfcId = parts[parts.length - 1]; 
         } else {
-            // الطريقة الجديدة: البحث عن رقم الـ ID في نهاية الرسالة مهما كان النص
-            const nfcMatch = incomingText.match(/\d+$/); 
+            // الطريقة الجديدة: البحث عن أول رقم يظهر في الرسالة (للنص الودود)
+            // تم إزالة $ لضمان العثور على الرقم حتى لو تبعه رموز أو مسافات
+            const nfcMatch = incomingText.match(/\d+/); 
             if (nfcMatch) nfcId = nfcMatch[0];
         }
 
         if (nfcId) {
-            const client = await db.collection('clients').findOne({ nfcId: nfcId });
+            const client = await db.collection('clients').findOne({ nfcId: nfcId.trim() });
             
             if (client) {
                 await twilioClient.messages.create({
@@ -84,27 +84,19 @@ app.post('/whatsapp/webhook', async (req, res) => {
                 await db.collection('evaluations').insertOne({ 
                     clientId: client._id, phone: customerPhone, name: "عميل NFC", status: 'pending', sentAt: new Date() 
                 });
-                return res.status(200).end(); // إنهاء الطلب هنا لمنع تكرار المعالجة
+                return res.status(200).end(); 
             }
         }
 
-        // 2. معالجة الردود
+        // 2. معالجة الردود (الأزرار)
         const lastEval = await db.collection('evaluations').findOne({ phone: customerPhone }, { sort: { sentAt: -1 } });
         
         if (lastEval) {
             const client = await db.collection('clients').findOne({ _id: lastEval.clientId });
             if (!client) return res.status(200).end();
 
-            // فحص ذكي: هل هو تقييم ممتاز؟
-            const isExcellent = payload === "Excellent_Feedback" || 
-                                incomingText.includes("ممتاز") || 
-                                incomingText === "1";
-
-            // فحص ذكي: هل هو شكوى؟ (البحث عن أي كلمة تدل على ملاحظة)
-            const isComplaint = payload === "Complaint_Feedback" || 
-                                incomingText.includes("ملاحظة") || 
-                                incomingText.includes("ملاحظات") || 
-                                incomingText === "2";
+            const isExcellent = payload === "Excellent_Feedback" || incomingText.includes("ممتاز") || incomingText === "1";
+            const isComplaint = payload === "Complaint_Feedback" || incomingText.includes("ملاحظة") || incomingText.includes("ملاحظات") || incomingText === "2";
 
             if (isExcellent) {
                 await twilioClient.messages.create({
@@ -114,21 +106,16 @@ app.post('/whatsapp/webhook', async (req, res) => {
                 await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied' } });
             } 
             else if (isComplaint) {
-                // تنفيذ الرد فوراً
                 await twilioClient.messages.create({
                     from: To, to: From,
                     body: `نعتذر منك 😔، تم إرسال ملاحظتك لإدارة ${client.name} فوراً.`
                 });
 
-                // تحديث الداتابيز
-                const updateResult = await db.collection('evaluations').updateOne(
+                await db.collection('evaluations').updateOne(
                     { _id: lastEval._id }, 
                     { $set: { status: 'complaint', answer: '2' } }
                 );
 
-                console.log("✅ Database Updated for Complaint:", updateResult.modifiedCount);
-
-                // إرسال تنبيه للمدير
                 if (client.adminPhone) {
                     await twilioClient.messages.create({
                         from: To,
