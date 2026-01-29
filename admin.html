@@ -8,23 +8,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Cairo', sans-serif; background-color: #f3f4f6; }
+        /* تحسين مظهر الحقول لتكون واضحة */
+        input, select { border: 1px solid #e5e7eb !important; }
+        input:focus { border-color: #2563eb !important; ring: 2px #2563eb; }
     </style>
 </head>
-<body class="p-4 text-black">
+<body class="p-4">
     <div id="login_screen" style="display: none;" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-6">
-        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md text-center shadow-2xl">
-            <h2 class="text-3xl font-black text-blue-600 mb-2 italic tracking-tighter">MAWJAT REPU</h2>
+        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md text-center shadow-2xl border border-slate-700">
+            <h2 class="text-3xl font-black text-blue-600 mb-2 italic tracking-tighter uppercase">MAWJAT REPU</h2>
             <p class="text-slate-500 text-sm mb-6 font-bold">بوابة إدارة تقييمات العملاء</p>
-            <input id="key_input" type="password" placeholder="أدخل مفتاح الـ API" class="w-full p-4 bg-slate-100 rounded-2xl mb-4 text-center font-bold outline-none border-2 border-transparent focus:border-blue-500 text-black">
-            <button id="login_btn" onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg hover:bg-blue-700 transition transform active:scale-95 text-black">دخول النظام</button>
+            <input id="key_input" type="password" placeholder="أدخل مفتاح الـ API" class="w-full p-4 bg-slate-100 rounded-2xl mb-4 text-center font-bold outline-none text-black">
+            <button id="login_btn" onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg hover:bg-blue-700 transition transform active:scale-95">دخول النظام</button>
         </div>
     </div>
 
     <div id="main_app" class="hidden max-w-xl mx-auto space-y-4">
         <header class="bg-white p-5 rounded-3xl shadow-sm flex justify-between items-center border border-gray-200">
             <div>
-                <h1 id="restaurant_name" class="font-black text-lg text-slate-800 tracking-tight text-black">...</h1>
-                <span class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-md font-bold uppercase">متصل الآن</span>
+                <h1 id="restaurant_name" class="font-black text-lg text-slate-800 tracking-tight">...</h1>
+                <span class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-md font-bold uppercase">متصل بالنظام</span>
             </div>
             <button onclick="logout()" class="text-xs bg-red-50 text-red-600 p-2 px-4 rounded-xl font-bold hover:bg-red-100 transition">خروج</button>
         </header>
@@ -32,29 +35,37 @@
         <div id="complaint_alert" class="hidden bg-red-600 text-white p-4 rounded-3xl shadow-lg flex items-center justify-between animate-pulse">
             <div class="flex items-center gap-3">
                 <span class="text-2xl">⚠️</span>
-                <p class="font-black text-sm leading-tight text-black">شكوى عميل جديدة بالتقارير!</p>
+                <p class="font-black text-sm leading-tight">تنبيه: توجد شكوى جديدة لم يتم الرد عليها!</p>
             </div>
-            <a href="/reports" class="bg-white text-red-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm">عرض</a>
+            <a href="/reports" class="bg-white text-red-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm">عرض التقارير</a>
         </div>
 
         <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100">
-            <h3 class="font-black text-slate-800 mb-6 text-center text-black text-black">إرسال طلب تقييم جديد ✨</h3>
+            <h3 class="font-black text-slate-800 mb-6 text-center text-xl">إرسال طلب تقييم 🚀</h3>
             <div class="space-y-4">
-                <input id="cust_name" type="text" placeholder="اسم العميل" class="w-full p-4 bg-gray-50 rounded-2xl border border-gray-200 text-right font-bold outline-none focus:border-blue-500 text-black">
-                <input id="cust_phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl border border-gray-200 text-center font-bold outline-none focus:border-blue-500 text-black">
+                <div>
+                    <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">اسم العميل</label>
+                    <input id="cust_name" type="text" placeholder="مثال: محمد أحمد" class="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none text-black">
+                </div>
+                
+                <div>
+                    <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">رقم الجوال</label>
+                    <input id="cust_phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl text-center font-bold outline-none text-black">
+                </div>
                 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-[10px] font-black text-gray-400 mr-2 uppercase text-black">الفرع</label>
-                        <select id="branch" class="w-full p-4 bg-slate-50 rounded-2xl border border-gray-200 font-bold text-center text-black">
+                        <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">الفرع</label>
+                        <select id="branch" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-center text-black">
                             <option>الفرع الرئيسي</option>
+                            <option>فرع الصالحية</option>
                         </select>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-[10px] font-black text-gray-400 mr-2 uppercase text-black">وقت الإرسال</label>
-                        <select id="delay_time" class="w-full p-4 bg-slate-50 rounded-2xl border border-gray-200 font-bold text-center text-black">
-                            <option value="0">الآن</option>
-                            <option value="30" selected>بعد 30 دقيقة</option>
+                        <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">وقت الإرسال</label>
+                        <select id="delay_time" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-center text-black">
+                            <option value="0">الآن فوراً</option>
+                            <option value="30">بعد 30 دقيقة</option>
                             <option value="60">بعد ساعة</option>
                         </select>
                     </div>
@@ -68,21 +79,29 @@
 
         <div class="grid grid-cols-2 gap-4 pb-10">
             <div class="bg-white p-6 rounded-3xl text-center border shadow-sm">
-                <p class="text-[10px] font-black text-gray-400 uppercase mb-1">رسائل اليوم</p>
-                <h2 id="total" class="text-3xl font-black text-slate-800 text-black">0</h2>
+                <p class="text-[10px] font-black text-gray-400 uppercase mb-1">إجمالي التقييمات</p>
+                <h2 id="total" class="text-3xl font-black text-slate-800">0</h2>
             </div>
-            <a href="/reports" class="bg-slate-900 p-6 rounded-3xl text-center text-white flex flex-col justify-center items-center hover:bg-blue-600 transition shadow-lg text-black">
-                <span class="text-sm font-black tracking-tight">التقارير والشكاوى</span>
+            <a href="/reports" class="bg-slate-900 p-6 rounded-3xl text-center text-white flex flex-col justify-center items-center hover:bg-blue-600 transition shadow-lg">
+                <span class="text-sm font-black tracking-tight italic">عرض التقارير والشكاوى</span>
             </a>
         </div>
     </div>
 
     <script>
+        // دالة تسجيل الدخول والتحقق من الـ API Key
         async function login() {
             const key = document.getElementById('key_input').value || localStorage.getItem('repu_key');
-            if(!key) { document.getElementById('login_screen').style.display = 'flex'; return; }
+            if(!key) { 
+                document.getElementById('login_screen').style.display = 'flex'; 
+                return; 
+            }
+
             try {
-                const res = await fetch('/api/client-info', { headers: { 'x-api-key': key } });
+                const res = await fetch('/api/client-info', { 
+                    headers: { 'x-api-key': key } 
+                });
+                
                 if(res.ok) {
                     const data = await res.json();
                     localStorage.setItem('repu_key', key);
@@ -95,33 +114,76 @@
                     localStorage.removeItem('repu_key');
                     document.getElementById('login_screen').style.display = 'flex';
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) { 
+                console.error("Login Error:", e);
+                alert('خطأ في الاتصال بالخادم');
+            }
         }
 
+        // التحقق من وجود شكاوى غير مقروءة (status: 'complaint')
         async function checkComplaints(key) {
-            const res = await fetch('/api/my-reports', { headers: { 'x-api-key': key } });
-            const data = await res.json();
-            if(data.some(r => r.answer === '2')) document.getElementById('complaint_alert').classList.remove('hidden');
+            try {
+                const res = await fetch('/api/my-reports', { headers: { 'x-api-key': key } });
+                const data = await res.json();
+                // إذا وجدنا حالة complaint يظهر التنبيه الأحمر
+                if(data.some(r => r.status === 'complaint')) {
+                    document.getElementById('complaint_alert').classList.remove('hidden');
+                }
+            } catch(e) { console.error("Reports Fetch Error:", e); }
         }
 
+        // دالة إرسال الطلب للسيرفر
         async function send() {
             const btn = document.getElementById('send_btn');
-            const name = document.getElementById('cust_name').value;
-            const phone = document.getElementById('cust_phone').value;
-            if(!name || !phone) return alert('أكمل البيانات');
-            btn.disabled = true; btn.innerText = "جاري الجدولة...";
+            const name = document.getElementById('cust_name').value.trim();
+            const phone = document.getElementById('cust_phone').value.trim();
+            const key = localStorage.getItem('repu_key');
+
+            if(!name || !phone) return alert('يرجى إدخال اسم العميل ورقم الجوال');
+            
+            // تأكد أن الرقم يبدأ بـ 05 وطوله 10
+            if(!/^05\d{8}$/.test(phone)) return alert('يرجى إدخال رقم جوال صحيح (05xxxxxxxx)');
+
+            btn.disabled = true; 
+            btn.innerHTML = `<span>جاري المعالجة...</span>`;
+
             try {
                 const res = await fetch('/api/send', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': localStorage.getItem('repu_key') },
-                    body: JSON.stringify({ name, phone, branch: document.getElementById('branch').value, delayMinutes: document.getElementById('delay_time').value })
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'x-api-key': key 
+                    },
+                    body: JSON.stringify({ 
+                        name, 
+                        phone, 
+                        branch: document.getElementById('branch').value, 
+                        delayMinutes: document.getElementById('delay_time').value 
+                    })
                 });
-                if(res.ok) { alert('✅ تمت الجدولة بنجاح'); document.getElementById('cust_name').value=''; document.getElementById('cust_phone').value=''; login(); }
-            } catch(e) {}
-            btn.disabled = false; btn.innerText = "إرسال عبر واتساب";
+
+                if(res.ok) { 
+                    alert('✅ تمت عملية الإرسال بنجاح'); 
+                    document.getElementById('cust_name').value = ''; 
+                    document.getElementById('cust_phone').value = ''; 
+                    login(); // لتحديث إجمالي الرسائل
+                } else {
+                    const errData = await res.json();
+                    alert('❌ خطأ: ' + (errData.error || 'فشل الإرسال'));
+                }
+            } catch(e) {
+                alert('⚠️ حدث خطأ أثناء الاتصال بالسيرفر');
+            } finally {
+                btn.disabled = false; 
+                btn.innerText = "إرسال عبر واتساب";
+            }
         }
 
-        function logout() { localStorage.removeItem('repu_key'); location.reload(); }
+        function logout() { 
+            localStorage.removeItem('repu_key'); 
+            location.reload(); 
+        }
+
         window.onload = login;
     </script>
 </body>

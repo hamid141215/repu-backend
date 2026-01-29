@@ -10,6 +10,7 @@
         body { font-family: 'Cairo', sans-serif; background-color: #0f172a; color: white; }
         input, select { color: black !important; font-weight: bold; }
         .api-key-box { font-family: monospace; background: #1e293b; padding: 4px 8px; border-radius: 6px; color: #38bdf8; font-size: 10px; }
+        .nfc-link-box { font-size: 9px; color: #94a3b8; word-break: break-all; background: #0f172a; padding: 5px; border-radius: 8px; border: 1px border-slate-700; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -25,10 +26,10 @@
 
         <div id="dash" class="hidden space-y-8">
             <div class="grid lg:grid-cols-4 gap-8">
-                <div class="bg-slate-800 p-6 rounded-[2.5rem] border border-slate-700 space-y-4 shadow-xl">
+                <div class="bg-slate-800 p-6 rounded-[2.5rem] border border-slate-700 space-y-4 shadow-xl h-fit">
                     <h3 class="text-blue-400 font-black italic mb-4">➕ تفعيل شريك جديد</h3>
-                    <input id="n" type="text" placeholder="اسم المنشأة (مثلاً: مجمع رعاية الطبي)" class="w-full p-3 rounded-xl border-none text-sm">
-                    <input id="k" type="text" placeholder="API Key (مثلاً: med-key-1)" class="w-full p-3 rounded-xl border-none text-sm font-mono">
+                    <input id="n" type="text" placeholder="اسم المنشأة" class="w-full p-3 rounded-xl border-none text-sm">
+                    <input id="k" type="text" placeholder="API Key (فريد)" class="w-full p-3 rounded-xl border-none text-sm font-mono">
                     <input id="g" type="text" placeholder="رابط Google Maps" class="w-full p-3 rounded-xl border-none text-sm">
                     <input id="p" type="text" placeholder="جوال المدير (966...)" class="w-full p-3 rounded-xl border-none text-sm">
                     
@@ -36,7 +37,6 @@
                         <select id="plan" class="w-1/2 p-3 rounded-xl border-none text-black">
                             <option value="Starter">باقة المنطلق</option>
                             <option value="Pro">باقة التوسع</option>
-                            <option value="Enterprise">الشركات</option>
                         </select>
                         <select id="dur" class="w-1/2 p-3 rounded-xl border-none text-black">
                             <option value="monthly">شهري</option>
@@ -56,6 +56,7 @@
                             <thead class="bg-slate-900/50 text-slate-400 text-[10px] uppercase font-black">
                                 <tr>
                                     <th class="p-5">المنشأة والـ Key</th>
+                                    <th class="p-5">برمجة بطاقة NFC</th>
                                     <th class="p-5 text-center">الباقة</th>
                                     <th class="p-5 text-center">الانتهاء</th>
                                     <th class="p-5 text-center">تحكم</th>
@@ -70,21 +71,20 @@
     </div>
 
     <script>
-        // دالة قوية لجلب الباسورد
+        // رقم البوت (تأكد من تعديله ليطابق رقمك في Twilio)
+        const BOT_NUMBER = "9665XXXXXXXX"; 
+
         function getP() { 
             return document.getElementById('admin_pass').value || localStorage.getItem('ap'); 
         }
 
         async function load(forcedPass = null) {
             let pass = forcedPass || getP();
-            
-            if(!pass) {
-                pass = prompt("🔑 يرجى إدخال كلمة مرور النظام للدخول:");
-                if(!pass) return;
-            }
+            if(!pass) return;
 
             try {
-                const res = await fetch('/api/clients', { 
+                // نستخدم مسار جلب العملاء الذي يدعم روابط NFC
+                const res = await fetch('/api/super-admin/clients', { 
                     headers: { 'x-admin-password': pass } 
                 });
                 
@@ -96,11 +96,17 @@
                     
                     const data = await res.json();
                     document.getElementById('client_count').innerText = data.length;
-                    document.getElementById('list').innerHTML = data.map(c => `
+                    document.getElementById('list').innerHTML = data.map(c => {
+                        const nfcLink = `https://wa.me/${BOT_NUMBER}?text=تقييم_${c.apiKey}`;
+                        return `
                         <tr class="hover:bg-slate-700/30 transition-colors">
                             <td class="p-5">
                                 <div class="font-black text-blue-300 mb-1">${c.name}</div>
                                 <div class="api-key-box select-all">🔑 ${c.apiKey}</div>
+                            </td>
+                            <td class="p-5">
+                                <div class="nfc-link-box mb-2 select-all">${nfcLink}</div>
+                                <button onclick="copyLink('${nfcLink}')" class="text-[10px] bg-blue-900/30 text-blue-400 px-3 py-1 rounded-lg border border-blue-800/50 hover:bg-blue-600 hover:text-white transition">نسخ للبرمجة 📋</button>
                             </td>
                             <td class="p-5 text-center">
                                 <span class="bg-slate-700 px-3 py-1 rounded-full text-[10px] font-bold">${c.plan}</span>
@@ -111,21 +117,20 @@
                                 </span>
                             </td>
                             <td class="p-5 text-center">
-                                <button onclick="deleteClient('${c._id}')" class="text-rose-500 font-bold px-2">حذف</button>
+                                <button onclick="deleteClient('${c._id}')" class="text-rose-500 font-bold px-2 hover:scale-110 transition inline-block">حذف</button>
                             </td>
                         </tr>
-                    `).join('');
+                    `}).join('');
                 } else {
                     localStorage.removeItem('ap');
-                    const retry = confirm('❌ كلمة المرور غير صحيحة. هل تريد المحاولة مرة أخرى؟');
-                    if(retry) {
-                        const newPass = prompt("أدخل كلمة المرور الصحيحة:");
-                        if(newPass) load(newPass);
-                    }
+                    alert('كلمة مرور خاطئة');
                 }
-            } catch(e) { 
-                alert('⚠️ خطأ في الاتصال بالسيرفر. تأكد أن تطبيقك يعمل على Render.');
-            }
+            } catch(e) { alert('خطأ في الاتصال بالسيرفر'); }
+        }
+
+        function copyLink(text) {
+            navigator.clipboard.writeText(text);
+            alert('تم نسخ رابط البرمجة بنجاح! الصقه الآن في تطبيق NFC Tools');
         }
 
         async function add() {
@@ -139,7 +144,7 @@
                 durationType: document.getElementById('dur').value 
             };
             
-            if(!data.name || !data.apiKey) return alert('يرجى تعبئة الاسم والمفتاح');
+            if(!data.name || !data.apiKey) return alert('يرجى تعبئة البيانات');
             
             const res = await fetch('/api/clients/add', { 
                 method: 'POST', 
@@ -147,16 +152,13 @@
                 body: JSON.stringify(data) 
             });
             if(res.ok) { 
-                alert('✅ تم تفعيل العميل الجديد بنجاح'); 
-                document.querySelectorAll('input:not(#admin_pass)').forEach(i => i.value = '');
+                alert('✅ تم تفعيل المنشأة'); 
                 load(); 
-            } else {
-                alert('فشل الإضافة. تأكد من كلمة المرور.');
             }
         }
 
         async function deleteClient(id) {
-            if(!confirm('🚨 هل أنت متأكد من الحذف؟')) return;
+            if(!confirm('🚨 حذف نهائي؟')) return;
             await fetch(`/api/clients/${id}`, { 
                 method: 'DELETE', 
                 headers: { 'x-admin-password': getP() } 
@@ -165,10 +167,7 @@
         }
 
         function logout() { localStorage.removeItem('ap'); location.reload(); }
-        
-        window.onload = () => { 
-            if(localStorage.getItem('ap')) load(); 
-        };
+        window.onload = () => { if(localStorage.getItem('ap')) load(); };
     </script>
 </body>
 </html>
