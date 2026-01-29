@@ -91,60 +91,84 @@ app.post('/whatsapp/webhook', async (req, res) => {
     const phone = From.replace('whatsapp:+', '');
 
     try {
-        // 1. معالجة مسح NFC (تقييم_apiKey)
+        // 1. معالجة مسح NFC (التنسيق المتوقع: تقييم_اسم_المنشأة_ID)
         if (incomingText.startsWith("تقييم_")) {
-            const apiKey = incomingText.split('_')[1];
-            const client = await db.collection('clients').findOne({ apiKey });
+            // استخراج الـ nfcId من آخر النص (مثلاً من: تقييم_مطعم_البيت_101 يأخذ 101)
+            const parts = incomingText.split('_');
+            const nfcId = parts[parts.length - 1]; 
+
+            // البحث عن المنشأة باستخدام الـ nfcId بدلاً من الـ apiKey
+            const client = await db.collection('clients').findOne({ nfcId: nfcId });
+            
             if (client) {
                 await twilioClient.messages.create({
                     messagingServiceSid: MESSAGING_SERVICE_SID,
                     to: From,
                     contentSid: 'HXfac5e63d161f07e3ebc652a9931ce1c2',
-                    contentVariables: JSON.stringify({ "1": "عزيزنا", "2": client.name })
+                    contentVariables: JSON.stringify({ 
+                        "1": "عزيزنا", 
+                        "2": client.name 
+                    })
                 });
-                // ربط العملية بالمنشأة
+                
+                // تسجيل العملية وربطها بالمنشأة (status: pending)
                 await db.collection('evaluations').insertOne({ 
-                    clientId: client._id, phone, name: "عميل NFC", status: 'nfc_scanned', sentAt: new Date() 
+                    clientId: client._id, 
+                    phone, 
+                    name: "عميل NFC", 
+                    status: 'pending', 
+                    sentAt: new Date() 
                 });
+            } else {
+                console.error("❌ NFC ID not found in database:", nfcId);
             }
             return res.status(200).end();
         }
 
         // 2. معالجة الردود (أزرار أو نص)
+        // نبحث عن آخر تقييم مرسل لهذا الرقم لربط الرد بالمنشأة الصحيحة
         const lastEval = await db.collection('evaluations').findOne({ phone }, { sort: { sentAt: -1 } });
+        
         if (lastEval) {
             const client = await db.collection('clients').findOne({ _id: lastEval.clientId });
             if (!client) return res.status(200).end();
 
-            // زر ممتاز جداً
-            if (incomingText.includes("ممتاز") || ButtonPayload === "Excellent_Feedback") {
+            // حالة العميل ضغط "ممتاز جداً"
+            if (incomingText.includes("ممتاز") || ButtonPayload === "Excellent_Feedback" || incomingText === "1") {
                 await twilioClient.messages.create({
                     messagingServiceSid: MESSAGING_SERVICE_SID,
                     to: From,
-                    body: `شكراً لك! 😍 يسعدنا تقييمك لـ ${client.name} على جوجل ماب عبر الرابط: ${client.googleLink}`
+                    body: `شكراً لك! 😍 يسعدنا تقييمك لـ ${client.name} على جوجل ماب عبر الرابط التالي: ${client.googleLink}`
                 });
                 await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied', answer: '5' } });
             } 
-            // زر لدي ملاحظة
-            else if (incomingText.includes("ملاحظة") || ButtonPayload === "Complaint_Feedback") {
+            // حالة العميل ضغط "لدى ملاحظة"
+            else if (incomingText.includes("ملاحظة") || ButtonPayload === "Complaint_Feedback" || incomingText === "2") {
                 await twilioClient.messages.create({
                     messagingServiceSid: MESSAGING_SERVICE_SID,
                     to: From,
                     body: `نعتذر منك 😔، تم إرسال ملاحظتك لإدارة ${client.name} فوراً لتحسين خدمتنا.`
                 });
+                // تحديث الحالة لـ complaint ليظهر التنبيه الأحمر في لوحة التحكم
                 await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'complaint', answer: '1' } });
 
-                // تنبيه المدير فوراً
+                // تنبيه المدير فوراً عبر الواتساب
                 if (client.adminPhone) {
-                    await twilioClient.messages.create({
-                        messagingServiceSid: MESSAGING_SERVICE_SID,
-                        to: `whatsapp:+${normalizePhone(client.adminPhone)}`,
-                        body: `⚠️ تنبيه من Mawjat: شكوى جديدة من عميل رقم (${phone}) تتبع منشأة (${client.name}).`
-                    });
+                    try {
+                        await twilioClient.messages.create({
+                            messagingServiceSid: MESSAGING_SERVICE_SID,
+                            to: `whatsapp:+${normalizePhone(client.adminPhone)}`,
+                            body: `⚠️ تنبيه Mawjat: شكوى جديدة من عميل رقم (${phone}) تتبع منشأة (${client.name}). يرجى مراجعة التقارير.`
+                        });
+                    } catch (twilioErr) {
+                        console.error("❌ Failed to notify admin:", twilioErr.message);
+                    }
                 }
             }
         }
-    } catch (err) { console.error("Webhook Error:", err); }
+    } catch (err) { 
+        console.error("Webhook Error:", err); 
+    }
     res.status(200).end();
 });
 
