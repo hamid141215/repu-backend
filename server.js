@@ -99,12 +99,12 @@ app.delete('/api/clients/:id', superAdminAuth, async (req, res) => {
 
 // --- الويب هوك الشامل (NFC + أزرار + تنبيهات) ---
 app.post('/whatsapp/webhook', async (req, res) => {
-    const { Body, From, ButtonPayload } = req.body;
+    const { Body, From, To } = req.body; // أضفنا To هنا وهو رقم البوت المستلم
     const incomingText = Body ? Body.trim() : "";
-    const phone = From.replace('whatsapp:+', '');
+    const customerPhone = From; // هذا يكون بتنسيق whatsapp:+9665...
 
     try {
-        // 1. معالجة NFC (تقييم_اسم_ID)
+        // 1. معالجة مسح NFC
         if (incomingText.startsWith("تقييم_")) {
             const parts = incomingText.split('_');
             const nfcId = parts[parts.length - 1]; 
@@ -112,49 +112,60 @@ app.post('/whatsapp/webhook', async (req, res) => {
             
             if (client) {
                 await twilioClient.messages.create({
-                    messagingService_sid: MESSAGING_SERVICE_SID,
-                    to: From,
                     contentSid: 'HXfac5e63d161f07e3ebc652a9931ce1c2',
+                    from: To, // نستخدم نفس الرقم الذي استلم الرسالة لضمان عدم وجود خطأ From
+                    to: customerPhone,
                     contentVariables: JSON.stringify({ "1": "عزيزنا", "2": client.name })
                 });
+
                 await db.collection('evaluations').insertOne({ 
-                    clientId: client._id, phone, name: "عميل NFC", status: 'pending', sentAt: new Date() 
+                    clientId: client._id, 
+                    phone: customerPhone.replace('whatsapp:+', ''), 
+                    name: "عميل NFC", 
+                    status: 'pending', 
+                    sentAt: new Date() 
                 });
             }
             return res.status(200).end();
         }
 
-        // 2. معالجة الردود والشكاوى
-        const lastEval = await db.collection('evaluations').findOne({ phone }, { sort: { sentAt: -1 } });
+        // 2. معالجة الأزرار (ممتاز / ملاحظة)
+        const lastEval = await db.collection('evaluations').findOne({ 
+            phone: customerPhone.replace('whatsapp:+', '') 
+        }, { sort: { sentAt: -1 } });
+
         if (lastEval) {
             const client = await db.collection('clients').findOne({ _id: lastEval.clientId });
             if (!client) return res.status(200).end();
 
-            if (incomingText.includes("ممتاز") || ButtonPayload === "Excellent_Feedback") {
-                await twilioClient.messages.create({
-                    messagingServiceSid: MESSAGING_SERVICE_SID, to: From,
-                    body: `شكراً لك! 😍 قيمنا هنا: ${client.googleLink}`
-                });
-                await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied' } });
-            } 
-            else if (incomingText.includes("ملاحظة") || ButtonPayload === "Complaint_Feedback") {
-                await twilioClient.messages.create({
-                    messagingServiceSid: MESSAGING_SERVICE_SID, to: From,
-                    body: `نعتذر منك 😔، تم إرسال ملاحظتك للإدارة فوراً.`
-                });
-                await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'complaint' } });
-
+            let replyContent = "";
+            if (incomingText.includes("ممتاز") || incomingText === "1") {
+                replyContent = `شكراً لك! 😍 قيمنا هنا: ${client.googleLink}`;
+            } else if (incomingText.includes("ملاحظة") || incomingText === "2") {
+                replyContent = `نعتذر منك 😔، تم إرسال ملاحظتك للإدارة فوراً.`;
+                
+                // تنبيه المدير
                 if (client.adminPhone) {
                     await twilioClient.messages.create({
-                        messagingServiceSid: MESSAGING_SERVICE_SID,
+                        from: To,
                         to: `whatsapp:+${normalizePhone(client.adminPhone)}`,
-                        body: `⚠️ تنبيه شكوى: عميل رقم (${phone}) في (${client.name}) لديه ملاحظة.`
+                        body: `⚠️ تنبيه شكوى: عميل رقم (${customerPhone}) في (${client.name}) لديه ملاحظة.`
                     });
                 }
             }
+
+            if (replyContent) {
+                await twilioClient.messages.create({
+                    from: To,
+                    to: customerPhone,
+                    body: replyContent
+                });
+            }
         }
-    } catch (err) { console.error("Webhook Error:", err); }
-    res.status(200).end();
+    } catch (err) { 
+        console.error("❌ Webhook Error Detail:", err.message); 
+    }
+    res.status(200).send('<Response></Response>');
 });
 
 // --- مسارات العميل ---
