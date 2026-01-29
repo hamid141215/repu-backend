@@ -113,15 +113,15 @@ app.post('/api/send', authenticate, async (req, res) => {
         await sleep(randomWait);
 
         // في دالة إرسال التقييم
-const messageOptions = {
-    messagingServiceSid: MESSAGING_SERVICE_SID,
-    to: `whatsapp:+${cleanPhone}`,
-    contentSid: 'HXfac5e63d161f07e3ebc652a9931ce1c2', 
-    contentVariables: JSON.stringify({ 
-        "2": String(req.clientData.name).trim(), 
-        "1": String(req.clientData.googleLink).trim() 
-    })
-};
+        const messageOptions = {
+            messagingServiceSid: MESSAGING_SERVICE_SID,
+            to: `whatsapp:+${cleanPhone}`,
+            contentSid: 'HX_الجديد_بعد_الموافقة', 
+            contentVariables: JSON.stringify({ 
+                "1": String(name).trim(),                  // {{1}} اسم العميل القادم من النموذج
+                "2": String(req.clientData.name).trim()    // {{2}} اسم المقهى من الداتابيز
+            })
+        };
 
         if (delay >= 15) {
             messageOptions.sendAt = new Date(Date.now() + delay * 60000).toISOString();
