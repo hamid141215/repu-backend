@@ -59,10 +59,20 @@ app.post('/whatsapp/webhook', async (req, res) => {
     const customerPhone = From.replace('whatsapp:+', '');
 
     try {
-        // 1. نظام الـ NFC
+        // 1. نظام الـ NFC (المطور لدعم الرسائل الودودة والكود القديم)
+        let nfcId = null;
+
         if (incomingText.startsWith("تقييم_")) {
+            // الطريقة القديمة
             const parts = incomingText.split('_');
-            const nfcId = parts[parts.length - 1]; 
+            nfcId = parts[parts.length - 1]; 
+        } else {
+            // الطريقة الجديدة: البحث عن رقم الـ ID في نهاية الرسالة مهما كان النص
+            const nfcMatch = incomingText.match(/\d+$/); 
+            if (nfcMatch) nfcId = nfcMatch[0];
+        }
+
+        if (nfcId) {
             const client = await db.collection('clients').findOne({ nfcId: nfcId });
             
             if (client) {
@@ -74,8 +84,8 @@ app.post('/whatsapp/webhook', async (req, res) => {
                 await db.collection('evaluations').insertOne({ 
                     clientId: client._id, phone: customerPhone, name: "عميل NFC", status: 'pending', sentAt: new Date() 
                 });
+                return res.status(200).end(); // إنهاء الطلب هنا لمنع تكرار المعالجة
             }
-            return res.status(200).end();
         }
 
         // 2. معالجة الردود
@@ -110,7 +120,7 @@ app.post('/whatsapp/webhook', async (req, res) => {
                     body: `نعتذر منك 😔، تم إرسال ملاحظتك لإدارة ${client.name} فوراً.`
                 });
 
-                // تحديث الداتابيز (هذا هو السطر المسؤول عن ظهور اللون الأحمر)
+                // تحديث الداتابيز
                 const updateResult = await db.collection('evaluations').updateOne(
                     { _id: lastEval._id }, 
                     { $set: { status: 'complaint', answer: '2' } }
