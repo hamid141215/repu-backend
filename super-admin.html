@@ -10,7 +10,7 @@
         body { font-family: 'Cairo', sans-serif; background-color: #0f172a; color: white; }
         input, select { color: black !important; font-weight: bold; }
         .api-key-box { font-family: monospace; background: #1e293b; padding: 4px 8px; border-radius: 6px; color: #38bdf8; font-size: 10px; }
-        .nfc-link-box { font-size: 9px; color: #94a3b8; word-break: break-all; background: #0f172a; padding: 5px; border-radius: 8px; border: 1px solid #334155; }
+        .nfc-link-box { font-size: 10px; color: #94a3b8; word-break: break-all; background: #0f172a; padding: 8px; border-radius: 12px; border: 1px solid #334155; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -29,7 +29,7 @@
                 <div class="bg-slate-800 p-6 rounded-[2.5rem] border border-slate-700 space-y-4 shadow-xl h-fit">
                     <h3 class="text-blue-400 font-black italic mb-4">➕ تفعيل شريك جديد</h3>
                     <input id="n" type="text" placeholder="اسم المنشأة" class="w-full p-3 rounded-xl border-none text-sm">
-                    <input id="nfcId" type="text" placeholder="NFC ID (مثلاً: 101)" class="w-full p-3 rounded-xl border-none text-sm font-bold bg-blue-50">
+                    <input id="nfcId" type="text" placeholder="ID (مثلاً: 101)" class="w-full p-3 rounded-xl border-none text-sm font-bold bg-blue-50">
                     <input id="k" type="text" placeholder="API Key السري" class="w-full p-3 rounded-xl border-none text-sm font-mono">
                     <input id="g" type="text" placeholder="رابط Google Maps" class="w-full p-3 rounded-xl border-none text-sm">
                     <input id="p" type="text" placeholder="جوال المدير (966...)" class="w-full p-3 rounded-xl border-none text-sm">
@@ -44,22 +44,21 @@
                             <option value="yearly">سنوي</option>
                         </select>
                     </div>
-                    <button onclick="add()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg hover:bg-blue-500 transition transform active:scale-95">حفظ وتفعيل الحساب</button>
+                    <button onclick="add()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg hover:bg-blue-500 transition transform active:scale-95">تفعيل الحساب</button>
                 </div>
 
                 <div class="lg:col-span-3 bg-slate-800 rounded-[2.5rem] border border-slate-700 overflow-hidden shadow-xl">
                     <div class="p-6 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
-                        <h4 class="font-black text-slate-300">قائمة الشركاء والروابط الأمنية</h4>
-                        <span class="text-xs text-slate-500 font-bold">العدد الإجمالي: <span id="client_count">0</span></span>
+                        <h4 class="font-black text-slate-300">قائمة الشركاء والروابط الودودة</h4>
+                        <span class="text-xs text-slate-500 font-bold">المشتركين: <span id="client_count">0</span></span>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-right text-sm">
                             <thead class="bg-slate-900/50 text-slate-400 text-[10px] uppercase font-black">
                                 <tr>
                                     <th class="p-5">المنشأة والبيانات</th>
-                                    <th class="p-5">رابط برمجة NFC (آمن)</th>
+                                    <th class="p-5">رابط NFC (النص الودود)</th>
                                     <th class="p-5 text-center">الباقة</th>
-                                    <th class="p-5 text-center">الحالة</th>
                                     <th class="p-5 text-center">تحكم</th>
                                 </tr>
                             </thead>
@@ -72,8 +71,8 @@
     </div>
 
     <script>
-        // *** رقم البوت الرسمي لنظام موجة ***
-        const BOT_NUMBER = "9665XXXXXXXX"; 
+        // *** رقم البوت الرسمي (عدله هنا) ***
+        const BOT_NUMBER = "966567156070"; 
 
         function getP() { return document.getElementById('admin_pass').value || localStorage.getItem('ap'); }
 
@@ -92,31 +91,25 @@
                     const data = await res.json();
                     document.getElementById('client_count').innerText = data.length;
                     document.getElementById('list').innerHTML = data.map(c => {
-                        // إنشاء النص الآمن للـ NFC: تقييم_اسم_المطعم_ID
-                        const safeName = c.name.replace(/\s+/g, '_');
-                        const nfcText = `تقييم_${safeName}_${c.nfcId || '000'}`;
-                        const nfcLink = `https://wa.me/${BOT_NUMBER}?text=${encodeURIComponent(nfcText)}`;
+                        // توليد النص الودود للعميل
+                        const friendlyText = `مرحباً ${c.name}، أود تقييم تجربتي معكم اليوم.. شكراً لكم. (Ref: ${c.nfcId || '000'})`;
+                        const nfcLink = `https://wa.me/${BOT_NUMBER}?text=${encodeURIComponent(friendlyText)}`;
                         
                         return `
                         <tr class="hover:bg-slate-700/30 transition-colors">
                             <td class="p-5">
                                 <div class="font-black text-blue-300 mb-1">${c.name}</div>
                                 <div class="flex gap-2">
-                                    <span class="api-key-box select-all italic text-gray-400">ID: ${c.nfcId || '---'}</span>
-                                    <span class="api-key-box select-all">🔑 ${c.apiKey}</span>
+                                    <span class="api-key-box">ID: ${c.nfcId || '---'}</span>
+                                    <span class="api-key-box italic">🔑 ${c.apiKey}</span>
                                 </div>
                             </td>
-                            <td class="p-5 w-1/3">
-                                <div class="nfc-link-box mb-2 p-2 select-all font-mono">${nfcLink}</div>
-                                <button onclick="copyLink('${nfcLink}')" class="text-[10px] bg-blue-600 text-white px-3 py-1 rounded-lg font-bold hover:bg-blue-400 transition">نسخ الرابط للبطاقة 📋</button>
+                            <td class="p-5 w-2/5">
+                                <div class="nfc-link-box mb-2 italic">"${friendlyText}"</div>
+                                <button onclick="copyLink('${nfcLink}')" class="text-[10px] bg-emerald-600 text-white px-3 py-1 rounded-lg font-bold hover:bg-emerald-500 transition shadow-lg shadow-emerald-900/20">نسخ رابط البرمجة 📋</button>
                             </td>
                             <td class="p-5 text-center">
                                 <span class="bg-slate-700 px-3 py-1 rounded-full text-[10px] font-bold">${c.plan}</span>
-                            </td>
-                            <td class="p-5 text-center">
-                                <span class="text-[10px] font-bold ${new Date(c.expiryDate) < new Date() ? 'text-rose-500' : 'text-emerald-500'}">
-                                    ${new Date(c.expiryDate).toLocaleDateString('ar-SA')}
-                                </span>
                             </td>
                             <td class="p-5 text-center">
                                 <button onclick="deleteClient('${c._id}')" class="text-rose-500 hover:text-rose-300 font-black">حذف</button>
@@ -127,19 +120,19 @@
                     localStorage.removeItem('ap');
                     alert('خطأ في كلمة المرور');
                 }
-            } catch(e) { alert('خطأ في الاتصال بالسيرفر'); }
+            } catch(e) { alert('خطأ في الاتصال بالخادم'); }
         }
 
         function copyLink(text) {
             navigator.clipboard.writeText(text);
-            alert('تم النسخ! برمج بطاقة الـ NFC بهذا الرابط الآن.');
+            alert('✅ تم نسخ الرابط الودود! برمج بطاقة الـ NFC الآن.');
         }
 
         async function add() {
             const pass = getP();
             const data = { 
                 name: document.getElementById('n').value,
-                nfcId: document.getElementById('nfcId').value, // إضافة الـ ID الجديد
+                nfcId: document.getElementById('nfcId').value,
                 apiKey: document.getElementById('k').value, 
                 googleLink: document.getElementById('g').value, 
                 adminPhone: document.getElementById('p').value, 
@@ -147,7 +140,7 @@
                 durationType: document.getElementById('dur').value 
             };
             
-            if(!data.name || !data.apiKey || !data.nfcId) return alert('يرجى تعبئة الاسم، الـ ID، والمفتاح السري');
+            if(!data.name || !data.nfcId) return alert('يرجى تعبئة الاسم والـ ID');
             
             const res = await fetch('/api/clients/add', { 
                 method: 'POST', 
@@ -155,17 +148,16 @@
                 body: JSON.stringify(data) 
             });
             if(res.ok) { 
-                alert('✅ تم تفعيل العميل بنجاح'); 
+                alert('✅ تم التفعيل'); 
                 load(); 
-                // مسح الحقول
-                document.getElementById('n').value = '';
-                document.getElementById('nfcId').value = '';
-                document.getElementById('k').value = '';
+                document.querySelectorAll('input:not(#admin_pass)').forEach(i => i.value = '');
+            } else {
+                alert('فشل الإضافة، ربما الـ ID مكرر');
             }
         }
 
         async function deleteClient(id) {
-            if(!confirm('🚨 حذف نهائي للمنشأة وبياناتها؟')) return;
+            if(!confirm('🚨 حذف نهائي؟')) return;
             await fetch(`/api/clients/${id}`, { method: 'DELETE', headers: { 'x-admin-password': getP() } });
             load();
         }
