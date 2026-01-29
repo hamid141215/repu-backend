@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mawjat Repu | إدارة سمعة المجمعات الطبية والمطاعم والتقييم الذكي</title>
+    <title>Mawjat Repu | التقييم الذكي وتقنية NFC</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
@@ -11,99 +11,135 @@
         .hero-gradient { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
         .toggle-checkbox:checked { right: 0; border-color: #2563eb; }
         .toggle-checkbox:checked + .toggle-label { background-color: #2563eb; }
-        .whatsapp-bubble { box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-radius: 20px 20px 0 20px; }
-        button:focus { outline: none; }
-        /* أنيميشن بسيط لجذب الانتباه للـ NFC */
-        .nfc-pulse { animation: pulse 2s infinite; }
-        @keyframes pulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body class="bg-slate-50">
 
     <nav class="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b">
         <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-            <h1 class="text-2xl font-black text-blue-600 tracking-tighter italic uppercase">MAWJAT <span class="text-slate-800">REPU</span></h1>
-            
-            <div class="flex items-center gap-4 font-bold">
-                <a href="/app" class="bg-blue-600 text-white px-5 py-2 rounded-xl font-black shadow-lg hover:bg-blue-700 transition text-sm">
-                    دخول العملاء
-                </a>
+            <h1 class="text-2xl font-black text-blue-600 uppercase italic">MAWJAT <span class="text-slate-800">REPU</span></h1>
+            <div class="flex gap-4">
+                <a href="#pricing" class="hidden md:block py-2 font-bold text-slate-600">الباقات</a>
+                <a href="/app" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-black shadow-lg hover:bg-blue-700 transition">دخول العملاء</a>
             </div>
         </div>
     </nav>
 
-    <section class="hero-gradient text-white pt-40 pb-32 px-6 overflow-hidden">
-        <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
-            <div class="text-right space-y-8">
-                <span class="bg-blue-500/20 text-blue-300 px-4 py-1 rounded-full text-xs font-black border border-blue-500/30 uppercase italic tracking-tight">إدارة السمعة للمجمعات الطبية والمطاعم</span>
-                <h2 class="text-5xl md:text-7xl font-900 leading-tight tracking-tighter">تقييمك الذكي يبدأ <br><span class="text-blue-400">بلمسة NFC!</span></h2>
-                <p class="text-xl opacity-80 leading-relaxed max-w-xl font-medium">نظام Mawjat Repu يحول رضا مراجعيك إلى نجوم على خرائط جوجل عبر تقنية الـ NFC والواتساب، مع نظام فلترة ذكي يحجز الشكاوى سراً.</p>
-                <div class="flex flex-col md:flex-row gap-4 pt-4">
-                    <a href="#pricing" class="bg-blue-600 p-5 px-12 rounded-2xl font-black text-xl hover:scale-105 transition shadow-2xl text-center">ابدأ الآن</a>
-                    <button onclick="contactSales('تجربة النظام')" class="bg-white/10 p-5 px-12 rounded-2xl font-black text-xl border border-white/20 hover:bg-white/20 transition italic text-center uppercase tracking-widest">Demo Live</button>
-                </div>
-            </div>
-            
-            <div class="relative hidden md:block">
-                <div class="bg-white/5 p-8 rounded-[3rem] border border-white/10 backdrop-blur-sm relative">
-                    <div class="absolute -top-10 -right-10 bg-blue-600 p-6 rounded-full nfc-pulse border-4 border-slate-900">
-                        <span class="text-4xl">📶</span>
-                    </div>
-                    <div class="whatsapp-bubble bg-[#DCF8C6] p-4 text-slate-800 mb-4 ml-12 relative">
-                        <p class="font-bold text-sm leading-relaxed">أهلاً بك في "وايت هارت" ☕.. كيف كانت تجربتك معنا اليوم؟</p>
-                    </div>
-                    <div class="space-y-3 mr-12">
-                        <div class="bg-white text-blue-600 p-3 rounded-xl border border-blue-100 font-black text-center shadow-md">🔘 ممتاز جداً 😍</div>
-                        <div class="bg-white text-rose-500 p-3 rounded-xl border border-rose-100 font-black text-center shadow-md">🔘 لدي ملاحظات 😔</div>
-                    </div>
-                </div>
+    <section class="hero-gradient text-white pt-32 pb-20 px-6">
+        <div class="max-w-6xl mx-auto text-center space-y-8">
+            <span class="bg-blue-500/20 text-blue-300 px-4 py-1 rounded-full text-xs font-black border border-blue-500/30 italic">نظام إدارة السمعة الذكي 📶</span>
+            <h2 class="text-5xl md:text-7xl font-900 leading-tight tracking-tighter">حول رضا مراجعيك إلى <br><span class="text-blue-400">نجوم على خرائط جوجل</span></h2>
+            <p class="text-xl opacity-80 max-w-2xl mx-auto font-medium">عبر تقنية NFC والواتساب، امنح عملاءك أسرع تجربة تقييم في العالم، واحمِ منشأتك من التقييمات السلبية سراً.</p>
+            <div class="flex flex-col md:flex-row gap-4 justify-center">
+                <a href="#pricing" class="bg-blue-600 p-5 px-12 rounded-2xl font-black text-xl hover:scale-105 transition shadow-2xl">اشترك الآن</a>
+                <a href="https://wa.me/966567156070" class="bg-white/10 p-5 px-12 rounded-2xl font-black text-xl border border-white/20 hover:bg-white/20 transition">اطلب نسخة تجريبية</a>
             </div>
         </div>
     </section>
 
-    <section id="features" class="py-24 px-6 bg-white">
+    <section class="py-20 px-6 bg-white">
         <div class="max-w-6xl mx-auto">
             <div class="text-center mb-16">
-                <h2 class="text-3xl font-black text-slate-800 italic uppercase">لماذا تختار موجة ريبو؟</h2>
+                <h2 class="text-3xl font-black text-slate-800 italic">كيف يعمل نظام موجة ريبو؟</h2>
+                <p class="text-slate-500 font-bold mt-2">رحلة العميل من لمسة البطاقة وحتى جوجل ماب</p>
             </div>
-            <div class="grid md:grid-cols-3 gap-8">
-                <div class="p-8 bg-slate-50 rounded-3xl border border-slate-100 text-center">
-                    <div class="text-4xl mb-4">💳</div>
-                    <h4 class="font-black text-lg mb-2">تقنية الـ NFC</h4>
-                    <p class="text-sm text-slate-500 font-bold">بمجرد لمسة من جوال العميل للبطاقة، يفتح الواتساب ويبدأ التقييم فوراً دون كتابة أرقام.</p>
+            
+            <div class="grid md:grid-cols-4 gap-8">
+                <div class="text-center space-y-4">
+                    <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-black italic">01</div>
+                    <h4 class="font-black text-lg text-slate-800">لمس بطاقة NFC</h4>
+                    <p class="text-sm text-slate-500 leading-relaxed font-bold">يقوم العميل بلمس جواله للبطاقة الموجودة على الطاولة أو الكاونتر.</p>
                 </div>
-                <div class="p-8 bg-slate-50 rounded-3xl border border-slate-100 text-center">
-                    <div class="text-4xl mb-4">🛡️</div>
-                    <h4 class="font-black text-lg mb-2">فلترة الشكاوى</h4>
-                    <p class="text-sm text-slate-500 font-bold">التقييمات الممتازة تذهب لجوجل ماب، والشكاوى تصل لبريد الإدارة والمدير فوراً وبشكل سري.</p>
+                <div class="text-center space-y-4">
+                    <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-black italic">02</div>
+                    <h4 class="font-black text-lg text-slate-800">فتح الواتساب</h4>
+                    <p class="text-sm text-slate-500 leading-relaxed font-bold">يفتح الواتساب تلقائياً برسالة جاهزة، بمجرد إرسالها يصل قالب التقييم.</p>
                 </div>
-                <div class="p-8 bg-slate-50 rounded-3xl border border-slate-100 text-center">
-                    <div class="text-4xl mb-4">📊</div>
-                    <h4 class="font-black text-lg mb-2">تقارير لحظية</h4>
-                    <p class="text-sm text-slate-500 font-bold">لوحة تحكم خاصة بكل منشأة تظهر عدد التقييمات، الشكاوى، وأداء الموظفين بدقة.</p>
+                <div class="text-center space-y-4">
+                    <div class="w-16 h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-black italic">✔</div>
+                    <h4 class="font-black text-lg text-green-600">تقييم ممتاز</h4>
+                    <p class="text-sm text-slate-500 leading-relaxed font-bold">إذا اختار العميل "ممتاز"، يصله رابط جوجل ماب فوراً لزيادة نجومك.</p>
+                </div>
+                <div class="text-center space-y-4">
+                    <div class="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-black italic">⚠️</div>
+                    <h4 class="font-black text-lg text-red-600">لدى ملاحظة</h4>
+                    <p class="text-sm text-slate-500 leading-relaxed font-bold">يتم حجز الشكوى سراً وإرسال تنبيه فوري لجوال المدير لمعالجتها.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <footer class="py-12 text-center text-slate-400 border-t border-gray-200">
-        <div class="max-w-6xl mx-auto px-6">
-            <h2 class="text-xl font-black text-blue-600 mb-2 italic uppercase tracking-tighter">MAWJAT REPU</h2>
-            <p class="text-[10px] font-bold uppercase tracking-[0.4em] opacity-50">شركة موجة الصمت لتقنية المعلومات © 2026</p>
+    <section id="pricing" class="py-24 bg-slate-900 text-white px-6">
+        <div class="max-w-6xl mx-auto text-center mb-16">
+            <h2 class="text-4xl font-black mb-8 italic">باقات تناسب طموحك</h2>
+            <div class="flex items-center justify-center gap-6">
+                <span class="font-bold text-slate-400">شهري</span>
+                <label class="relative inline-block w-16 h-8">
+                    <input type="checkbox" id="pricing-toggle" class="toggle-checkbox absolute block w-8 h-8 rounded-full bg-white border-4 appearance-none cursor-pointer transition-all duration-300 right-8 border-blue-600"/>
+                    <label for="pricing-toggle" class="toggle-label block overflow-hidden h-8 rounded-full bg-slate-700 cursor-pointer"></label>
+                </label>
+                <span class="font-bold text-blue-400">سنوي (توفير 20%)</span>
+            </div>
         </div>
+
+        <div class="max-w-5xl mx-auto grid md:grid-cols-2 gap-10">
+            <div class="bg-slate-800 p-10 rounded-[3rem] border border-slate-700 hover:border-blue-500 transition">
+                <h4 class="font-black text-xl mb-2 text-blue-400">باقة الإنطلاق</h4>
+                <div class="my-6">
+                    <span class="text-5xl font-black plan-price" data-monthly="299" data-yearly="2990">299</span>
+                    <span class="text-slate-400 font-bold unit">ر.س / شهر</span>
+                </div>
+                <ul class="space-y-4 text-right mb-10 text-slate-300 font-bold border-t border-slate-700 pt-6">
+                    <li>✅ منشأة واحدة</li>
+                    <li>✅ بطاقة NFC مبرمجة مجاناً</li>
+                    <li>✅ تقارير أداء شهرية</li>
+                    <li>✅ تنبيهات شكاوى فورية</li>
+                </ul>
+                <button onclick="contact('الإنطلاق')" class="w-full bg-blue-600 p-4 rounded-2xl font-black hover:bg-blue-500 transition">اشترك الآن</button>
+            </div>
+
+            <div class="bg-blue-600 p-10 rounded-[3rem] relative transform md:scale-105 shadow-2xl">
+                <div class="absolute -top-5 right-10 bg-white text-blue-600 px-4 py-1 rounded-full text-xs font-black uppercase italic">الأكثر طلباً</div>
+                <h4 class="font-black text-xl mb-2">باقة التوسع (برو)</h4>
+                <div class="my-6">
+                    <span class="text-5xl font-black plan-price" data-monthly="499" data-yearly="4990">499</span>
+                    <span class="font-bold unit text-blue-200">ر.س / شهر</span>
+                </div>
+                <ul class="space-y-4 text-right mb-10 font-bold border-t border-blue-400 pt-6">
+                    <li>✅ حتى 3 فروع</li>
+                    <li>✅ 3 بطاقات NFC مجاناً</li>
+                    <li>✅ ربط مباشر مع جوال المدير</li>
+                    <li>✅ تصدير التقارير بصيغة Excel</li>
+                </ul>
+                <button onclick="contact('التوسع')" class="w-full bg-slate-900 text-white p-4 rounded-2xl font-black hover:opacity-90 transition">اشترك الآن</button>
+            </div>
+        </div>
+    </section>
+
+    <footer class="py-12 bg-white text-center">
+        <h2 class="text-xl font-black text-blue-600 italic">MAWJAT REPU</h2>
+        <p class="text-xs text-slate-400 font-bold mt-2 uppercase tracking-widest">© 2026 Silent Wave IT Company</p>
     </footer>
 
     <script>
-        // ... (نفس السكريبت الخاص بالأسعار وتغيير القيم) ...
-        
-        function contactSales(planName) {
-            const phone = "966567156070";
-            let message = encodeURIComponent(`مرحباً موجة ريبو، أرغب في الاستفسار عن ${planName}`);
-            window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+        const toggle = document.getElementById('pricing-toggle');
+        const prices = document.querySelectorAll('.plan-price');
+        const units = document.querySelectorAll('.unit');
+
+        toggle.addEventListener('change', function() {
+            prices.forEach((price, index) => {
+                if (this.checked) {
+                    price.innerText = price.getAttribute('data-yearly');
+                    units[index].innerText = 'ر.س / سنة';
+                } else {
+                    price.innerText = price.getAttribute('data-monthly');
+                    units[index].innerText = 'ر.س / شهر';
+                }
+            });
+        });
+
+        function contact(plan) {
+            window.open(`https://wa.me/966567156070?text=أرغب في الاشتراك في ${plan}`, '_blank');
         }
     </script>
 </body>
