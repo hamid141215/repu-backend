@@ -108,23 +108,27 @@ app.post('/whatsapp/webhook', async (req, res) => {
                     { $set: { status: 'complaint', answer: '2' } }
                 );
 
-                if (client.adminPhone) {
-                    try {
-                        await twilioClient.messages.create({
-                            from: To,
-                            to: `whatsapp:+${normalizePhone(client.adminPhone)}`,
-                            contentSid: 'HX0820f9b7ac928e159b018b2c0e905566',
-                            contentVariables: JSON.stringify({
-                                "1": customerPhone,
-                                "2": client.name,
-                                "3": "شكوى/ملاحظة"
-                            })
-                        });
-                        console.log("✅ Admin Notified!");
-                    } catch (adminErr) {
-                        console.error("❌ Template Error:", adminErr.message);
-                    }
-                }
+                // التعديل لإصلاح رابط التواصل مع العميل
+if (client.adminPhone) {
+    try {
+        // تجهيز رقم العميل بدون إضافات للرابط
+        const cleanCustomerNumber = customerPhone.replace(/\D/g, ''); 
+
+        await twilioClient.messages.create({
+            from: To,
+            to: `whatsapp:+${normalizePhone(client.adminPhone)}`,
+            contentSid: 'HX0820f9b7ac928e159b018b2c0e905566',
+            contentVariables: JSON.stringify({
+                "1": customerPhone,    // رقم العميل (للعرض)
+                "2": client.name,       // اسم المنشأة
+                "3": `https://wa.me/${cleanCustomerNumber}` // رابط واتساب العميل الصحيح
+            })
+        });
+        console.log("✅ Admin Notified with working WhatsApp link");
+    } catch (adminErr) {
+        console.error("❌ Template Error:", adminErr.message);
+    }
+}
             }
         }
     } catch (err) { 
