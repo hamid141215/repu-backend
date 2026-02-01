@@ -121,7 +121,7 @@ if (client.adminPhone) {
             contentVariables: JSON.stringify({
                 "1": customerPhone,    // رقم العميل (للعرض)
                 "2": client.name,       // اسم المنشأة
-                "3": `${cleanCustomerNumber}` // رابط واتساب العميل الصحيح
+                "3": cleanCustomerNumber, // رابط واتساب العميل الصحيح
             })
         });
         console.log("✅ Admin Notified with working WhatsApp link");
