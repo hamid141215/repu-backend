@@ -10,10 +10,8 @@ app.use(express.urlencoded({ extended: true }));
 
 const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-// SID الخدمة
 const MESSAGING_SERVICE_SID = 'MG3c5f83c10c1a23b224ec8068c8ddcee7'; 
 
-// دالة تنسيق الأرقام
 const normalizePhone = (phone) => {
     let p = String(phone).replace(/\D/g, '');
     if (p.startsWith('05')) p = '966' + p.substring(1);
@@ -34,7 +32,6 @@ const initMongo = async () => {
     }
 };
 
-// --- الحماية ---
 const authenticate = async (req, res, next) => {
     const apiKey = req.headers['x-api-key'] || req.query.apiKey;
     if (!apiKey) return res.status(401).json({ error: "Missing API Key" });
@@ -52,29 +49,24 @@ const superAdminAuth = (req, res, next) => {
 
 // --- الويب هوك الشامل المحدث ---
 app.post('/whatsapp/webhook', async (req, res) => {
-    const { Body, From, To, ButtonPayload, ButtonText } = req.body;
+    const { Body, From, To, ButtonPayload } = req.body;
     const incomingText = (Body || "").trim();
     const payload = ButtonPayload || "";
     const customerPhone = From.replace('whatsapp:+', '');
 
     try {
-        // 1. نظام الـ NFC (منطق البحث الذكي المحدث)
+        // 1. نظام الـ NFC
         let nfcId = null;
-
         if (incomingText.startsWith("تقييم_")) {
-            // الطريقة القديمة (الكود المباشر)
             const parts = incomingText.split('_');
             nfcId = parts[parts.length - 1]; 
         } else {
-            // الطريقة الجديدة: البحث عن أول رقم يظهر في الرسالة (للنص الودود)
-            // تم إزالة $ لضمان العثور على الرقم حتى لو تبعه رموز أو مسافات
             const nfcMatch = incomingText.match(/\d+/); 
             if (nfcMatch) nfcId = nfcMatch[0];
         }
 
         if (nfcId) {
             const client = await db.collection('clients').findOne({ nfcId: nfcId.trim() });
-            
             if (client) {
                 await twilioClient.messages.create({
                     contentSid: 'HXfac5e63d161f07e3ebc652a9931ce1c2',
@@ -88,7 +80,7 @@ app.post('/whatsapp/webhook', async (req, res) => {
             }
         }
 
-        // 2. معالجة الردود (الأزرار)
+        // 2. معالجة الردود
         const lastEval = await db.collection('evaluations').findOne({ phone: customerPhone }, { sort: { sentAt: -1 } });
         
         if (lastEval) {
@@ -117,11 +109,21 @@ app.post('/whatsapp/webhook', async (req, res) => {
                 );
 
                 if (client.adminPhone) {
-                    await twilioClient.messages.create({
-                        from: To,
-                        to: `whatsapp:+${normalizePhone(client.adminPhone)}`,
-                        body: `⚠️ *تنبيه شكوى جديدة*\nالمنشأة: ${client.name}\nرقم العميل: ${customerPhone}`
-                    });
+                    try {
+                        await twilioClient.messages.create({
+                            from: To,
+                            to: `whatsapp:+${normalizePhone(client.adminPhone)}`,
+                            contentSid: 'HX0820f9b7ac928e159b018b2c0e905566',
+                            contentVariables: JSON.stringify({
+                                "1": client.name,
+                                "2": customerPhone,
+                                "3": "شكوى/ملاحظة"
+                            })
+                        });
+                        console.log("✅ Admin Notified!");
+                    } catch (adminErr) {
+                        console.error("❌ Template Error:", adminErr.message);
+                    }
                 }
             }
         }
