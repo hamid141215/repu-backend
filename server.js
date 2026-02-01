@@ -115,8 +115,8 @@ app.post('/whatsapp/webhook', async (req, res) => {
                             to: `whatsapp:+${normalizePhone(client.adminPhone)}`,
                             contentSid: 'HX0820f9b7ac928e159b018b2c0e905566',
                             contentVariables: JSON.stringify({
-                                "1": client.name,
-                                "2": customerPhone,
+                                "1": customerPhone,
+                                "2": client.name,
                                 "3": "شكوى/ملاحظة"
                             })
                         });
