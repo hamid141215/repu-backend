@@ -98,37 +98,41 @@ app.post('/whatsapp/webhook', async (req, res) => {
                 await db.collection('evaluations').updateOne({ _id: lastEval._id }, { $set: { status: 'replied' } });
             } 
             else if (isComplaint) {
+                // 1. الرد الفوري على العميل
                 await twilioClient.messages.create({
                     from: To, to: From,
                     body: `نعتذر منك 😔، تم إرسال ملاحظتك لإدارة ${client.name} فوراً.`
                 });
 
+                // 2. تحديث الحالة في الداتابيز
                 await db.collection('evaluations').updateOne(
                     { _id: lastEval._id }, 
                     { $set: { status: 'complaint', answer: '2' } }
                 );
 
-                // التعديل لإصلاح رابط التواصل مع العميل
-if (client.adminPhone) {
-    try {
-        // تجهيز رقم العميل بدون إضافات للرابط
-        const cleanCustomerNumber = customerPhone.replace(/\D/g, ''); 
+                // 3. تنبيه المدير برابط "نظيف" ومشفر
+                if (client.adminPhone) {
+                    try {
+                        // تنظيف رقم العميل تماماً من أي رموز أو مسافات
+                        const rawPhone = customerPhone.replace(/\D/g, ''); 
+                        // بناء الرابط بشكل تقني صحيح
+                        const directLink = `https://wa.me/${rawPhone}`;
 
-        await twilioClient.messages.create({
-            from: To,
-            to: `whatsapp:+${normalizePhone(client.adminPhone)}`,
-            contentSid: 'HX0820f9b7ac928e159b018b2c0e905566',
-            contentVariables: JSON.stringify({
-                "1": customerPhone,    // رقم العميل (للعرض)
-                "2": client.name,       // اسم المنشأة
-                "3": cleanCustomerNumber, // رابط واتساب العميل الصحيح
-            })
-        });
-        console.log("✅ Admin Notified with working WhatsApp link");
-    } catch (adminErr) {
-        console.error("❌ Template Error:", adminErr.message);
-    }
-}
+                        await twilioClient.messages.create({
+                            from: To,
+                            to: `whatsapp:+${normalizePhone(client.adminPhone)}`,
+                            contentSid: 'HX0820f9b7ac928e159b018b2c0e905566',
+                            contentVariables: JSON.stringify({
+                                "1": client.name,       // اسم المنشأة (تأكد من ترتيب المتغيرات في القالب)
+                                "2": customerPhone,    // رقم العميل للعرض
+                                "3": directLink        // الرابط الصحيح القابل للضغط
+                            })
+                        });
+                        console.log("✅ Admin Notified Safely");
+                    } catch (adminErr) {
+                        console.error("❌ Notification Error:", adminErr.message);
+                    }
+                }
             }
         }
     } catch (err) { 
