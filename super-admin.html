@@ -92,16 +92,16 @@
                     document.getElementById('client_count').innerText = data.length;
                     document.getElementById('list').innerHTML = data.map(c => {
                         // توليد النص الودود للعميل
-                        const friendlyText = `مرحباً ${c.name}، أود تقييم تجربتي معكم اليوم.. شكراً لكم. (Ref: ${c.nfcId || '000'})`;
+                        const friendlyText = `مرحباً ${c.name}، أود تقييم تجربتي معكم اليوم.. شكراً لكم. (Ref: ${c.nfc_id || '000'})`;
                         const nfcLink = `https://wa.me/${BOT_NUMBER}?text=${encodeURIComponent(friendlyText)}`;
-                        
+
                         return `
                         <tr class="hover:bg-slate-700/30 transition-colors">
                             <td class="p-5">
                                 <div class="font-black text-blue-300 mb-1">${c.name}</div>
                                 <div class="flex gap-2">
-                                    <span class="api-key-box">ID: ${c.nfcId || '---'}</span>
-                                    <span class="api-key-box italic">🔑 ${c.apiKey}</span>
+                                    <span class="api-key-box">ID: ${c.nfc_id || '---'}</span>
+                                    <span class="api-key-box italic">🔑 ${c.api_key}</span>
                                 </div>
                             </td>
                             <td class="p-5 w-2/5">
@@ -112,7 +112,7 @@
                                 <span class="bg-slate-700 px-3 py-1 rounded-full text-[10px] font-bold">${c.plan}</span>
                             </td>
                             <td class="p-5 text-center">
-                                <button onclick="deleteClient('${c._id}')" class="text-rose-500 hover:text-rose-300 font-black">حذف</button>
+                                <button onclick="deleteClient('${c.id}')" class="text-rose-500 hover:text-rose-300 font-black">حذف</button>
                             </td>
                         </tr>
                     `}).join('');
