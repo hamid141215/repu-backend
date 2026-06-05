@@ -11,9 +11,30 @@
         /* تحسين مظهر الحقول لتكون واضحة */
         input, select { border: 1px solid #e5e7eb !important; }
         input:focus { border-color: #2563eb !important; ring: 2px #2563eb; }
+        #complaint_alert p { font-size: 0.75rem; font-weight: 700; }
+        #complaint_alert span { font-size: 1.125rem; }
+        #complaint_alert a { background-color: #fee2e2; color: #b91c1c; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-weight: 700; box-shadow: none; }
+        #send_section h3 { margin-bottom: 1rem; text-align: right; font-size: 1.125rem; }
+        #send_section input, #send_section select { padding: 0.75rem !important; border-radius: 0.75rem !important; font-size: 0.875rem; font-weight: 600; }
+        #main_app aside .tailadmin-sidebar nav a, #main_app aside .tailadmin-sidebar nav > div > div > span.flex { align-items: center !important; border-radius: 0.625rem !important; gap: 0.75rem !important; min-height: 44px !important; height: 44px !important; padding: 0 0.75rem !important; font-size: 0.875rem !important; font-weight: 500 !important; box-shadow: none !important; }
+        #main_app aside .tailadmin-sidebar ~ div { display: none !important; }
+        #main_app aside .tailadmin-sidebar .nav-icon { width: 20px; height: 20px; flex-shrink: 0; color: currentColor; }
+        #main_app aside nav a[href="#main_app"] { background-color: #EEF4FF !important; color: #465FFF !important; }
+        #main_app aside nav a:not([href="#main_app"]) { color: #344054 !important; background-color: transparent !important; }
+        #main_app aside nav a:not([href="#main_app"]):hover { background-color: #f9fafb !important; color: #111827 !important; }
+        #main_app aside .tailadmin-sidebar nav > div > div > span.flex { color: #9ca3af !important; background-color: transparent !important; }
+        #main_app aside .nav-child { align-items: center !important; min-height: 36px !important; height: 36px !important; padding: 0 0.75rem !important; border-radius: 0.5rem !important; background-color: #f8fbff !important; color: #465FFF !important; font-size: 0.8125rem !important; }
+        #main_app aside > div:last-child { border: 0 !important; background-color: transparent !important; border-radius: 0 !important; padding: 0 !important; }
+        #main_app aside > div:last-child p { color: #6b7280 !important; }
+        #main_app aside > div:last-child span:first-child { color: #374151 !important; font-weight: 500 !important; }
+        #main_app aside > div:last-child span:last-child { background-color: #f0fdf4 !important; color: #15803d !important; border: 0 !important; font-size: 0.75rem !important; font-weight: 500 !important; }
+        #main_app aside > div:last-child button { margin-top: 0.5rem !important; color: #667085 !important; font-size: 0.8125rem !important; font-weight: 500 !important; }
+        #main_app header h1 { font-size: 0.875rem !important; font-weight: 600 !important; color: #1f2937 !important; }
+        #main_app header button[onclick="logout()"] { border: 1px solid #d1d5db !important; background-color: #ffffff !important; color: #374151 !important; border-radius: 0.5rem !important; padding: 0.5rem 0.75rem !important; font-size: 0.875rem !important; font-weight: 500 !important; }
+        #main_app header button[onclick="logout()"]:hover { background-color: #f9fafb !important; }
     </style>
 </head>
-<body class="p-4">
+<body class="p-0">
     <div id="login_screen" style="display: none;" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-6">
         <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md text-center shadow-2xl border border-slate-700">
             <h2 class="text-3xl font-black text-blue-600 mb-2 italic tracking-tighter uppercase">MAWJAT REPU</h2>
@@ -23,26 +44,114 @@
         </div>
     </div>
 
-    <div id="main_app" class="hidden max-w-xl mx-auto space-y-4">
-        <header class="bg-white p-5 rounded-3xl shadow-sm flex justify-between items-center border border-gray-200">
+    <div id="main_app" class="hidden min-h-screen bg-[#F9FAFB] text-gray-900">
+        <aside class="hidden lg:flex fixed right-0 top-0 z-40 h-screen w-[290px] flex-col justify-between overflow-y-auto border-l border-gray-200 bg-white p-5">
+            <div class="tailadmin-sidebar flex h-full flex-col justify-between">
+                <div>
+                    <div class="mb-5 flex h-14 items-start gap-2">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#465FFF] text-sm font-black text-white">R</div>
+                        <div>
+                            <h2 class="text-[20px] font-bold leading-6 text-gray-900">RepuSystem</h2>
+                            <p class="mt-1 text-xs text-gray-500">نظام إدارة السمعة</p>
+                        </div>
+                    </div>
+
+                    <nav class="space-y-4">
+                        <div>
+                            <h3 class="mb-2 text-xs font-medium uppercase leading-4 tracking-wide text-gray-400">القائمة</h3>
+                            <div class="space-y-1.5">
+                                <a href="#main_app" class="flex items-center gap-3 rounded-xl bg-[#EEF4FF] px-3 py-0 text-sm font-medium text-[#465FFF]">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5.5C4 4.67 4.67 4 5.5 4H10v7H4V5.5ZM14 4h4.5c.83 0 1.5.67 1.5 1.5V11h-6V4ZM4 14h6v6H5.5A1.5 1.5 0 0 1 4 18.5V14ZM14 14h6v4.5c0 .83-.67 1.5-1.5 1.5H14v-6Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+                                    <span>الرئيسية</span>
+                                </a>
+                                <a href="#main_app" class="nav-child mr-8 flex items-center text-sm font-medium">لوحة العميل</a>
+                                <a href="#send_section" class="flex items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 7.5h14M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2 7h6m-6 3h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <span>إرسال تقييم</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="mb-2 text-xs font-medium uppercase leading-4 tracking-wide text-gray-400">أدوات</h3>
+                            <div class="space-y-1.5">
+                                <a href="/reports" class="flex items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v14H5V5Zm4 4h6M9 12h6M9 15h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <span>التقارير</span>
+                                </a>
+                                <span class="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-400">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Zm7.5 3.5a7.5 7.5 0 0 0-.12-1.35l2.02-1.55-2-3.46-2.4.96a7.3 7.3 0 0 0-2.34-1.36L14.3 2.7h-4.6l-.36 2.54A7.3 7.3 0 0 0 7 6.6l-2.4-.96-2 3.46 2.02 1.55a7.5 7.5 0 0 0 0 2.7L2.6 14.9l2 3.46 2.4-.96a7.3 7.3 0 0 0 2.34 1.36l.36 2.54h4.6l.36-2.54A7.3 7.3 0 0 0 17 17.4l2.4.96 2-3.46-2.02-1.55c.08-.44.12-.89.12-1.35Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+                                    <span>الإعدادات قريباً</span>
+                                </span>
+                            </div>
+                        </div>
+                    </nav>
+                </div>
+
+                <div class="pb-0">
+                    <div class="text-sm font-medium leading-5 text-gray-800">لوحة العميل</div>
+                    <div class="mt-0.5 flex items-center gap-2 text-xs leading-4 text-gray-500">
+                        <span class="h-2 w-2 rounded-full bg-green-500"></span>
+                        <span>متصل</span>
+                    </div>
+                    <button onclick="logout()" class="mt-1.5 text-xs font-medium text-gray-500 hover:text-gray-700">تسجيل الخروج</button>
+                </div>
+            </div>
+            <div>
+                <div class="mb-8 flex items-center gap-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-sm font-black text-white">R</div>
+                    <div>
+                    <h2 class="text-lg font-bold text-gray-900">RepuSystem</h2>
+                    <p class="text-sm text-slate-400 mt-1">نظام إدارة السمعة</p>
+                    </div>
+                </div>
+
+                <nav>
+                    <h3 class="mb-4 text-xs font-medium uppercase leading-5 text-gray-400">القائمة</h3>
+                    <a href="#main_app" class="block rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black shadow-lg shadow-blue-950/30">الرئيسية</a>
+                    <a href="#send_section" class="block rounded-2xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white transition">إرسال تقييم</a>
+                    <a href="/reports" class="block rounded-2xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white transition">التقارير</a>
+                    <span class="block rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 cursor-not-allowed">الإعدادات قريباً</span>
+                </nav>
+            </div>
+
+            <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div>
+                    <p class="text-xs text-slate-400 mb-2">حالة الحساب</p>
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-sm font-black">لوحة العميل</span>
+                        <span class="text-[10px] bg-green-500/10 text-green-300 border border-green-500/20 px-2 py-1 rounded-full font-bold">متصل</span>
+                    </div>
+                </div>
+                <button onclick="logout()" class="w-full text-right text-sm font-black text-red-300 hover:text-red-200 transition">خروج</button>
+            </div>
+        </aside>
+
+        <main class="min-h-screen space-y-4 p-4 md:p-6 lg:mr-[290px] lg:space-y-6">
+        <header class="sticky top-0 z-30 -mx-4 -mt-4 mb-4 flex flex-col gap-3 border-b border-gray-200 bg-white px-4 py-3 md:-mx-6 md:-mt-6 md:mb-6 md:flex-row md:items-center md:justify-between md:px-6 md:py-4">
             <div>
                 <h1 id="restaurant_name" class="font-black text-lg text-slate-800 tracking-tight">...</h1>
                 <span class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-md font-bold uppercase">متصل بالنظام</span>
             </div>
             <button onclick="logout()" class="text-xs bg-red-50 text-red-600 p-2 px-4 rounded-xl font-bold hover:bg-red-100 transition">خروج</button>
+            <div class="relative w-full md:max-w-sm">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
+                <input type="text" placeholder="بحث أو أمر سريع..." class="h-11 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pr-9 pl-4 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10">
+            </div>
         </header>
 
-        <div id="complaint_alert" class="hidden bg-red-600 text-white p-4 rounded-3xl shadow-lg flex items-center justify-between animate-pulse">
-            <div class="flex items-center gap-3">
+        <div class="mx-auto max-w-screen-2xl space-y-4 md:space-y-6">
+        <div id="complaint_alert" class="hidden bg-red-50 text-red-800 p-3 rounded-xl border border-red-200 shadow-sm flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
                 <span class="text-2xl">⚠️</span>
                 <p class="font-black text-sm leading-tight">تنبيه: توجد شكوى جديدة لم يتم الرد عليها!</p>
             </div>
             <a href="/reports" class="bg-white text-red-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm">عرض التقارير</a>
         </div>
 
-        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100">
+        <div id="send_section" class="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-gray-200 max-w-2xl">
             <h3 class="font-black text-slate-800 mb-6 text-center text-xl">إرسال طلب تقييم 🚀</h3>
-            <div class="space-y-4">
+            <div class="space-y-3">
                 <div>
                     <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">اسم العميل</label>
                     <input id="cust_name" type="text" placeholder="مثال: محمد أحمد" class="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none text-black">
@@ -71,21 +180,23 @@
                     </div>
                 </div>
 
-                <button id="send_btn" onclick="send()" class="w-full bg-blue-600 text-white p-5 rounded-[2rem] font-black shadow-xl hover:bg-blue-700 transition transform active:scale-95 flex justify-center items-center gap-3">
+                <button id="send_btn" onclick="send()" class="w-full h-12 bg-blue-600 text-white rounded-xl font-bold shadow-sm hover:bg-blue-700 transition flex justify-center items-center gap-3">
                     <span>إرسال عبر واتساب</span>
                 </button>
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4 pb-10">
-            <div class="bg-white p-6 rounded-3xl text-center border shadow-sm">
+        <div class="grid grid-cols-2 gap-4 pb-10 max-w-2xl">
+            <div class="bg-white p-4 rounded-2xl text-center border border-gray-200 shadow-sm">
                 <p class="text-[10px] font-black text-gray-400 uppercase mb-1">إجمالي التقييمات</p>
-                <h2 id="total" class="text-3xl font-black text-slate-800">0</h2>
+                <h2 id="total" class="text-2xl font-black text-slate-800">0</h2>
             </div>
-            <a href="/reports" class="bg-slate-900 p-6 rounded-3xl text-center text-white flex flex-col justify-center items-center hover:bg-blue-600 transition shadow-lg">
+            <a href="/reports" class="bg-white p-4 rounded-2xl text-center text-slate-700 border border-gray-200 flex flex-col justify-center items-center hover:bg-slate-50 transition shadow-sm">
                 <span class="text-sm font-black tracking-tight italic">عرض التقارير والشكاوى</span>
             </a>
         </div>
+        </div>
+        </main>
     </div>
 
     <script>
