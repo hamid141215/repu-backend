@@ -14,8 +14,9 @@
         #complaint_alert p { font-size: 0.75rem; font-weight: 700; }
         #complaint_alert span { font-size: 1.125rem; }
         #complaint_alert a { background-color: #fee2e2; color: #b91c1c; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-weight: 700; box-shadow: none; }
-        #send_section h3 { margin-bottom: 1rem; text-align: right; font-size: 1.125rem; }
-        #send_section input, #send_section select { padding: 0.75rem !important; border-radius: 0.75rem !important; font-size: 0.875rem; font-weight: 600; }
+        #send_section h3 { margin-bottom: 0.25rem; text-align: right; font-size: 1.125rem; }
+        #send_section input, #send_section select { height: 2.75rem !important; padding: 0 1rem !important; border-radius: 0.5rem !important; border-color: #d1d5db !important; background-color: transparent !important; font-size: 0.875rem; font-weight: 400; }
+        #send_section input:focus, #send_section select:focus { border-color: #465fff !important; box-shadow: 0 0 0 2px #dbeafe !important; outline: none !important; }
         #send_section + .grid { display: none !important; }
         #main_app aside .tailadmin-sidebar nav a, #main_app aside .tailadmin-sidebar nav > div > div > span.flex { align-items: center !important; border-radius: 0.625rem !important; gap: 0.75rem !important; min-height: 44px !important; height: 44px !important; padding: 0 0.75rem !important; font-size: 0.875rem !important; font-weight: 500 !important; box-shadow: none !important; }
         #main_app aside .tailadmin-sidebar ~ div { display: none !important; }
@@ -196,30 +197,35 @@
             </div>
         </div>
 
-        <div id="send_section" class="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-gray-200 max-w-2xl">
-            <h3 class="font-black text-slate-800 mb-6 text-center text-xl">إرسال طلب تقييم 🚀</h3>
-            <div class="space-y-3">
+        <div id="send_section" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+            <div class="mb-5">
+                <h3 class="font-semibold text-gray-800">إرسال طلب تقييم</h3>
+                <p class="mt-1 text-sm text-gray-500">سيتم إرسال رسالة واتساب للعميل لطلب تقييم التجربة</p>
+            </div>
+            <div class="space-y-5">
+                <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div>
-                    <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">اسم العميل</label>
-                    <input id="cust_name" type="text" placeholder="مثال: محمد أحمد" class="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none text-black">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">اسم العميل</label>
+                    <input id="cust_name" type="text" placeholder="مثال: محمد أحمد" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
                 </div>
                 
                 <div>
-                    <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">رقم الجوال</label>
-                    <input id="cust_phone" type="tel" placeholder="05xxxxxxxx" class="w-full p-4 bg-gray-50 rounded-2xl text-center font-bold outline-none text-black">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">رقم الجوال</label>
+                    <input id="cust_phone" type="tel" placeholder="05xxxxxxxx" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
+                </div>
                 </div>
                 
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">الفرع</label>
-                        <select id="branch" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-center text-black">
+                <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700">الفرع</label>
+                        <select id="branch" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
                             <option>الفرع الرئيسي</option>
                             <option>فرع الصالحية</option>
                         </select>
                     </div>
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">وقت الإرسال</label>
-                        <select id="delay_time" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-center text-black">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700">وقت الإرسال</label>
+                        <select id="delay_time" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
                             <option value="0">الآن فوراً</option>
                             <option value="30">بعد 30 دقيقة</option>
                             <option value="60">بعد ساعة</option>
@@ -227,7 +233,7 @@
                     </div>
                 </div>
 
-                <button id="send_btn" onclick="send()" class="w-full h-12 bg-blue-600 text-white rounded-xl font-bold shadow-sm hover:bg-blue-700 transition flex justify-center items-center gap-3">
+                <button id="send_btn" onclick="send()" class="flex h-11 w-full items-center justify-center gap-3 rounded-lg bg-[#465fff] text-sm font-medium text-white shadow-sm transition hover:bg-[#3641f5]">
                     <span>إرسال عبر واتساب</span>
                 </button>
             </div>
