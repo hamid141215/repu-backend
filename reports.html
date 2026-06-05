@@ -7,53 +7,127 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
-        .status-badge { padding: 5px 12px; border-radius: 10px; font-size: 11px; font-weight: 800; }
-        .complaint-card { border: 2px solid #fee2e2; background: #fff1f2; }
+        body { font-family: 'Cairo', sans-serif; background-color: #F9FAFB; }
+        .status-badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+        .complaint-card { border: 1px solid #fecaca; background: #ffffff; }
     </style>
 </head>
-<body class="p-4 md:p-8 text-black">
-    <div id="content" class="hidden max-w-6xl mx-auto space-y-6">
-        <header class="flex justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200">
-            <h1 class="text-xl font-black text-slate-800 text-black">📊 مركز التحليلات</h1>
-            <div class="flex gap-2">
-                <button onclick="exportEx()" class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black shadow-lg">تصدير EXCEL</button>
-                <a href="/app" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black text-black">العودة</a>
+<body class="p-0 text-black">
+    <div id="content" class="hidden min-h-screen bg-[#F9FAFB] text-gray-900">
+        <aside class="hidden lg:flex fixed right-0 top-0 z-40 h-screen w-[290px] flex-col justify-between overflow-y-auto border-l border-gray-200 bg-white p-5">
+            <div class="flex h-full flex-col justify-between">
+                <div>
+                    <div class="mb-5 flex h-14 items-start gap-2">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#465FFF] text-sm font-black text-white">R</div>
+                        <div>
+                            <h2 class="text-[20px] font-bold leading-6 text-gray-900">RepuSystem</h2>
+                            <p class="mt-1 text-xs text-gray-500">نظام إدارة السمعة</p>
+                        </div>
+                    </div>
+
+                    <nav class="space-y-4">
+                        <div>
+                            <h3 class="mb-2 text-xs font-medium uppercase leading-4 tracking-wide text-gray-400">القائمة</h3>
+                            <div class="space-y-1.5">
+                                <a href="/admin.html" class="flex h-11 items-center gap-3 rounded-[10px] px-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                    <span class="text-lg leading-none">▦</span>
+                                    <span>الرئيسية</span>
+                                </a>
+                                <a href="/admin.html#send_section" class="flex h-11 items-center gap-3 rounded-[10px] px-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                    <span class="text-lg leading-none">✉</span>
+                                    <span>إرسال تقييم</span>
+                                </a>
+                                <a href="#content" class="flex h-11 items-center gap-3 rounded-[10px] bg-[#EEF4FF] px-3 text-sm font-medium text-[#465FFF]">
+                                    <span class="text-lg leading-none">▤</span>
+                                    <span>التقارير</span>
+                                </a>
+                                <span class="flex h-11 cursor-not-allowed items-center gap-3 rounded-[10px] px-3 text-sm font-medium text-gray-400">
+                                    <span class="text-lg leading-none">⚙</span>
+                                    <span>الإعدادات قريباً</span>
+                                </span>
+                            </div>
+                        </div>
+                    </nav>
+                </div>
+
+                <div class="pb-0">
+                    <div class="text-sm font-medium leading-5 text-gray-800">لوحة التقارير</div>
+                    <div class="mt-0.5 flex items-center gap-2 text-xs leading-4 text-gray-500">
+                        <span class="h-2 w-2 rounded-full bg-green-500"></span>
+                        <span>متصل</span>
+                    </div>
+                    <a href="/admin.html" class="mt-1.5 inline-block text-xs font-medium text-gray-500 hover:text-gray-700">العودة للوحة</a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="min-h-screen space-y-4 p-4 md:p-6 lg:mr-[290px] lg:space-y-6">
+        <header class="sticky top-0 z-30 -mx-4 -mt-4 mb-4 flex flex-col gap-3 border-b border-gray-200 bg-white px-4 py-3 md:-mx-6 md:-mt-6 md:mb-6 md:px-6 md:py-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+                <h1 class="text-lg font-semibold text-gray-800">التقارير والتحليلات</h1>
+                <p class="mt-1 text-sm text-gray-500">تابع تقييمات العملاء والشكاوى من مكان واحد</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">مطعم التجربة</span>
+                <button onclick="exportEx()" class="inline-flex h-10 items-center justify-center rounded-lg bg-[#465fff] px-4 text-sm font-medium text-white shadow-sm transition hover:bg-[#3641f5]">تصدير EXCEL</button>
+                <a href="/app" class="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">العودة</a>
             </div>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="bg-white p-6 rounded-[2.5rem] border shadow-sm">
-                <p class="text-slate-400 text-[10px] font-black uppercase mb-1 text-black">إجمالي الطلبات</p>
-                <h3 id="stat_total" class="text-4xl font-black text-black">0</h3>
+        <div class="mx-auto max-w-screen-2xl space-y-6">
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-3">
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-700">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v14H5V5Zm4 4h6M9 12h6M9 15h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="mt-5">
+                    <p class="text-sm text-gray-500">إجمالي الطلبات</p>
+                    <h3 id="stat_total" class="mt-2 text-3xl font-bold text-gray-900">0</h3>
+                </div>
             </div>
-            <div class="bg-white p-6 rounded-[2.5rem] border-b-8 border-blue-500 shadow-sm">
-                <p class="text-blue-600 text-[10px] font-black uppercase mb-1">تقييم ممتاز</p>
-                <h3 id="stat_positive" class="text-4xl font-black text-blue-600">0</h3>
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-700">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m8 12 3 3 5-6M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="mt-5">
+                    <p class="text-sm text-gray-500">تقييم ممتاز</p>
+                    <h3 id="stat_positive" class="mt-2 text-3xl font-bold text-gray-900">0</h3>
+                </div>
             </div>
-            <div class="bg-white p-6 rounded-[2.5rem] border-b-8 border-rose-500 shadow-sm">
-                <p class="text-rose-600 text-[10px] font-black uppercase mb-1">شكاوى ⚠️</p>
-                <h3 id="stat_negative" class="text-4xl font-black text-rose-600">0</h3>
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-700">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v5m0 3h.01M10.3 4.5 3.4 16.4A2 2 0 0 0 5.1 19h13.8a2 2 0 0 0 1.7-2.6L13.7 4.5a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="mt-5">
+                    <p class="text-sm text-gray-500">شكاوى</p>
+                    <h3 id="stat_negative" class="mt-2 text-3xl font-bold text-gray-900">0</h3>
+                </div>
             </div>
         </div>
 
-        <div id="urgent_section" class="hidden space-y-3">
-            <h4 class="font-black text-rose-600 px-4 text-black text-black">شكاوى تحتاج تواصل سريع</h4>
-            <div id="complaints_grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-black text-black"></div>
+        <div id="urgent_section" class="hidden rounded-2xl border border-red-200 bg-red-50 p-4 md:p-5">
+            <div class="mb-4">
+                <h4 class="text-sm font-semibold text-gray-800">شكاوى تحتاج تواصل سريع</h4>
+                <p class="mt-1 text-sm text-gray-500">تواصل مع العملاء غير الراضين لمعالجة التجربة</p>
+            </div>
+            <div id="complaints_grid" class="grid grid-cols-1 gap-3 md:grid-cols-2"></div>
         </div>
 
-        <div class="bg-white rounded-[2.5rem] shadow-xl border overflow-hidden">
+        <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
             <table class="w-full text-right">
-                <thead class="bg-slate-50 text-[10px] font-black text-black">
-                    <tr>
-                        <th class="p-5 text-black">العميل</th>
-                        <th class="p-5 text-center text-black">الحالة والرد</th>
-                        <th class="p-5 text-center text-black text-black">التوقيت</th>
+                <thead class="bg-gray-50 text-xs font-medium text-gray-500">
+                    <tr class="border-b border-gray-100">
+                        <th class="px-5 py-3">العميل</th>
+                        <th class="px-5 py-3 text-center">الحالة والرد</th>
+                        <th class="px-5 py-3 text-center">التوقيت</th>
                     </tr>
                 </thead>
-                <tbody id="rows" class="divide-y divide-slate-100 text-black"></tbody>
+                <tbody id="rows" class="divide-y divide-gray-100"></tbody>
             </table>
         </div>
+        </div>
+        </main>
     </div>
 
     <script>
@@ -73,22 +147,25 @@
                     if(ev.answer === '1') pos++;
                     if(ev.answer === '2') {
                         neg++;
-                        grid.innerHTML += `<div class="complaint-card p-4 rounded-3xl flex justify-between items-center text-black text-black">
-                            <p class="font-bold text-black">${ev.name}<br><span class="text-xs text-black font-normal">${ev.phone}</span></p>
-                            <a href="https://wa.me/${ev.phone}" class="bg-rose-600 text-white px-4 py-2 rounded-xl text-[10px] font-black">تواصل</a>
+                        grid.innerHTML += `<div class="complaint-card flex items-center justify-between gap-3 rounded-xl p-3">
+                            <p class="text-sm font-medium text-gray-800">${ev.name}<br><span class="text-xs font-normal text-gray-500">${ev.phone}</span></p>
+                            <a href="https://wa.me/${ev.phone}" class="inline-flex h-9 items-center justify-center rounded-lg bg-rose-600 px-3 text-xs font-medium text-white hover:bg-rose-700">تواصل</a>
                         </div>`;
                     }
                     return `<tr>
-                        <td class="p-5 font-bold text-black text-black">${ev.name}<br><span class="text-xs font-normal text-slate-400 text-black">${ev.phone}</span></td>
-                        <td class="p-5 text-center text-black">
+                        <td class="px-5 py-3 text-sm font-medium text-gray-800">${ev.name}<br><span class="text-xs font-normal text-gray-500">${ev.phone}</span></td>
+                        <td class="px-5 py-3 text-center">
                             ${ev.status === 'scheduled' ? '<span class="status-badge bg-amber-100 text-amber-700">⏳ مجدولة</span>' : 
                               ev.answer === '1' ? '<span class="status-badge bg-blue-100 text-blue-700">✅ ممتاز</span>' : 
                               ev.answer === '2' ? '<span class="status-badge bg-rose-100 text-rose-700">⚠️ شكوى</span>' : 
                               '<span class="status-badge bg-slate-100 text-slate-400">بانتظار الرد</span>'}
                         </td>
-                        <td class="p-5 text-center text-[10px] text-slate-400 font-bold text-black">${new Date(ev.sent_at).toLocaleString('ar-SA')}</td>
+                        <td class="px-5 py-3 text-center text-xs font-medium text-gray-500">${new Date(ev.sent_at).toLocaleString('ar-SA')}</td>
                     </tr>`;
                 }).join('');
+                if(data.length === 0) {
+                    document.getElementById('rows').innerHTML = '<tr><td colspan="3" class="px-5 py-8 text-center text-sm text-gray-500">لا توجد بيانات بعد</td></tr>';
+                }
 
                 if(neg > 0) document.getElementById('urgent_section').classList.remove('hidden');
                 document.getElementById('stat_total').innerText = data.length;
