@@ -197,6 +197,8 @@
             </div>
         </div>
 
+        <div class="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-12">
+        <div class="lg:col-span-8">
         <div id="send_section" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
             <div class="mb-5">
                 <h3 class="font-semibold text-gray-800">إرسال طلب تقييم</h3>
@@ -238,15 +240,40 @@
                 </button>
             </div>
         </div>
+        </div>
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
+        <div class="lg:col-span-4">
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">آخر النشاط</h3>
+                    <p class="mt-1 text-sm text-gray-500">آخر طلبات التقييم والردود</p>
+                </div>
+
+                <div class="rounded-xl border border-gray-100">
+                    <div class="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                        <span class="text-sm font-medium text-gray-700">النشاط</span>
+                        <span class="text-xs text-gray-400">الحالة</span>
+                    </div>
+                    <div class="px-4 py-8 text-center">
+                        <p class="text-sm text-gray-500">لا توجد بيانات حديثة</p>
+                    </div>
+                </div>
+
+                <a href="/reports.html" class="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
+                    عرض كل التقارير
+                </a>
+            </div>
+        </div>
+        </div>
+
+        <div class="hidden grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
             <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-700">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 7.5h14M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2 7h6m-6 3h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
                 <div class="mt-5">
                     <span class="text-sm text-gray-500">إجمالي الرسائل</span>
-                    <h4 id="total" class="mt-2 text-3xl font-bold text-gray-800">0</h4>
+                    <h4 class="mt-2 text-3xl font-bold text-gray-800">0</h4>
                 </div>
             </div>
 
