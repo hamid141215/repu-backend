@@ -355,12 +355,12 @@ app.get('/api/export-excel', async (req, res) => {
         [client.id]
     );
 
-    const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-    const csvRows = [
+    const escapeTsv = (value) => String(value ?? '').replace(/[\t\r\n]+/g, ' ');
+    const tsvRows = [
         ['العميل', 'رقم الجوال', 'الفرع', 'الحالة', 'الرد', 'التوقيت'],
         ...rows.map(row => [
             row.name,
-            row.phone,
+            row.phone == null ? '' : `="${String(row.phone).replace(/"/g, '""')}"`,
             row.branch,
             row.status,
             row.answer,
@@ -368,10 +368,12 @@ app.get('/api/export-excel', async (req, res) => {
         ])
     ];
 
-    const csv = '\uFEFF' + csvRows.map(row => row.map(escapeCsv).join(',')).join('\n');
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="repusystem-reports.csv"');
-    res.send(csv);
+    const content = tsvRows.map(row => row.map(escapeTsv).join('\t')).join('\r\n');
+    const bom = Buffer.from([0xff, 0xfe]);
+    const bodyBuffer = Buffer.from(content, 'utf16le');
+    res.setHeader('Content-Type', 'application/vnd.ms-excel; charset=utf-16le');
+    res.setHeader('Content-Disposition', 'attachment; filename="repusystem-reports.xls"');
+    res.send(Buffer.concat([bom, bodyBuffer]));
 });
 
 // ─── Start ─────────────────────────────────────────────────────────────────
