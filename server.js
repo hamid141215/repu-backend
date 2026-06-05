@@ -336,6 +336,44 @@ app.get('/api/my-reports', authenticate, async (req, res) => {
     res.json(rows);
 });
 
+app.get('/api/export-excel', async (req, res) => {
+    const apiKey = req.query.apiKey;
+    if (!apiKey) return res.status(401).json({ error: 'Missing API Key' });
+
+    const { rows: clientRows } = await pool.query(
+        'SELECT id FROM clients WHERE api_key = $1',
+        [String(apiKey).trim()]
+    );
+    const client = clientRows[0];
+    if (!client) return res.status(401).json({ error: 'Invalid API Key' });
+
+    const { rows } = await pool.query(
+        `SELECT name, phone, branch, status, answer, sent_at
+         FROM evaluations
+         WHERE client_id = $1
+         ORDER BY sent_at DESC`,
+        [client.id]
+    );
+
+    const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const csvRows = [
+        ['العميل', 'رقم الجوال', 'الفرع', 'الحالة', 'الرد', 'التوقيت'],
+        ...rows.map(row => [
+            row.name,
+            row.phone,
+            row.branch,
+            row.status,
+            row.answer,
+            row.sent_at ? new Date(row.sent_at).toLocaleString('ar-SA') : ''
+        ])
+    ];
+
+    const csv = '\uFEFF' + csvRows.map(row => row.map(escapeCsv).join(',')).join('\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="repusystem-reports.csv"');
+    res.send(csv);
+});
+
 // ─── Start ─────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 
