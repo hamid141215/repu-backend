@@ -120,7 +120,7 @@ const authenticate = async (req, res, next) => {
 };
 
 const superAdminAuth = (req, res, next) => {
-    const adminPass = req.headers['x-admin-password'];
+    const adminPass = req.headers['x-admin-password'] || req.body?.adminPassword || req.body?.password;
     if (adminPass !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
     next();
 };
@@ -309,6 +309,31 @@ app.post('/api/clients/add', superAdminAuth, async (req, res) => {
 app.delete('/api/clients/:id', superAdminAuth, async (req, res) => {
     await pool.query('DELETE FROM clients WHERE id = $1', [parseInt(req.params.id, 10)]);
     res.json({ success: true });
+});
+
+app.patch('/api/clients/:id/complaint-settings', superAdminAuth, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const complaintAction = String(req.body.complaint_action || '').trim();
+    const discountCode = String(req.body.discount_code || '').trim();
+    const complaintMessage = String(req.body.complaint_message || '').trim() || 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.';
+
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid client ID' });
+    if (!['contact', 'discount', 'contact_discount'].includes(complaintAction)) {
+        return res.status(400).json({ error: 'Invalid complaint action' });
+    }
+
+    try {
+        const { rowCount } = await pool.query(
+            `UPDATE clients
+             SET complaint_action = $1, discount_code = $2, complaint_message = $3
+             WHERE id = $4`,
+            [complaintAction, discountCode || null, complaintMessage, id]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'Client not found' });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Database Error' });
+    }
 });
 
 // Public NFC/QR review APIs

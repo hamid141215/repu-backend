@@ -158,6 +158,22 @@
 
         function getP() { return document.getElementById('admin_pass').value || localStorage.getItem('ap'); }
 
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[char]));
+        }
+
+        function complaintActionLabel(action) {
+            if (action === 'discount') return 'كود خصم فقط';
+            if (action === 'contact_discount') return 'تواصل + كود خصم';
+            return 'تواصل فقط';
+        }
+
         async function load(forcedPass = null) {
             let pass = forcedPass || getP();
             if(!pass) return;
@@ -177,6 +193,9 @@
                         const friendlyText = `مرحباً ${c.name}، أود تقييم تجربتي معكم اليوم.. شكراً لكم. (Ref: ${c.nfc_id || '000'})`;
                         const nfcLink = `https://wa.me/${BOT_NUMBER}?text=${encodeURIComponent(friendlyText)}`;
                         const reviewUrl = c.nfc_id ? `${window.location.origin}/r/${encodeURIComponent(c.nfc_id)}` : '';
+                        const complaintAction = ['contact', 'discount', 'contact_discount'].includes(c.complaint_action) ? c.complaint_action : 'contact';
+                        const discountCode = c.discount_code || '';
+                        const complaintMessage = c.complaint_message || 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.';
 
                         return `
                         <tr class="bg-white hover:bg-gray-50 transition-colors">
@@ -200,6 +219,26 @@
                                 `}
                                 <div class="mb-2 max-w-sm truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">WhatsApp: "${friendlyText}"</div>
                                 <button onclick="copyLink('${nfcLink}')" class="inline-flex h-8 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50">نسخ رابط واتساب القديم</button>
+                                <div class="mt-4 max-w-sm rounded-xl border border-gray-200 bg-white p-3">
+                                    <div class="mb-3">
+                                        <div class="text-xs font-semibold text-gray-700">إعدادات الشكوى</div>
+                                        <div class="mt-1 flex flex-wrap gap-2 text-[11px] text-gray-500">
+                                            <span class="rounded-full bg-gray-100 px-2 py-1">${complaintActionLabel(complaintAction)}</span>
+                                            <span class="rounded-full bg-gray-100 px-2 py-1">الكود: ${escapeHtml(discountCode || 'غير محدد')}</span>
+                                        </div>
+                                        <p class="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">${escapeHtml(complaintMessage)}</p>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <select id="complaint_action_${c.id}" class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
+                                            <option value="contact" ${complaintAction === 'contact' ? 'selected' : ''}>تواصل فقط</option>
+                                            <option value="discount" ${complaintAction === 'discount' ? 'selected' : ''}>كود خصم فقط</option>
+                                            <option value="contact_discount" ${complaintAction === 'contact_discount' ? 'selected' : ''}>تواصل + كود خصم</option>
+                                        </select>
+                                        <input id="discount_code_${c.id}" value="${escapeHtml(discountCode)}" placeholder="كود الخصم" class="h-9 w-full rounded-lg border border-gray-300 px-3 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
+                                        <textarea id="complaint_message_${c.id}" rows="2" placeholder="رسالة الشكوى" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">${escapeHtml(complaintMessage)}</textarea>
+                                        <button onclick="saveComplaintSettings('${c.id}')" class="inline-flex h-8 items-center rounded-lg bg-[#465fff] px-3 text-xs font-medium text-white transition hover:bg-[#3641f5]">حفظ إعدادات الشكوى</button>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-5 py-4 text-center md:px-6">
                                 <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">${c.plan}</span>
@@ -219,6 +258,34 @@
         function copyLink(text) {
             navigator.clipboard.writeText(text);
             alert('✅ تم نسخ الرابط الودود! برمج بطاقة الـ NFC الآن.');
+        }
+
+        async function saveComplaintSettings(id) {
+            const pass = getP();
+            const body = {
+                adminPassword: pass,
+                complaint_action: document.getElementById(`complaint_action_${id}`).value,
+                discount_code: document.getElementById(`discount_code_${id}`).value.trim(),
+                complaint_message: document.getElementById(`complaint_message_${id}`).value.trim()
+            };
+
+            const res = await fetch(`/api/clients/${id}/complaint-settings`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-admin-password': pass
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (res.ok) {
+                alert('تم حفظ إعدادات الشكوى');
+                load();
+            } else {
+                const data = await res.json().catch(() => ({}));
+                console.error('Complaint settings save failed', { status: res.status, response: data });
+                alert(data.error || 'تعذر حفظ إعدادات الشكوى');
+            }
         }
 
         async function add() {
