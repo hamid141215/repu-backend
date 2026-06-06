@@ -56,9 +56,13 @@
 
             <div id="thankYouState" class="hidden rounded-xl bg-emerald-50 p-5 text-center">
                 <h2 class="mb-2 text-lg font-bold text-emerald-700">شكراً لك</h2>
-                <p class="text-sm leading-6 text-emerald-700">
+                <p id="thankYouMessage" class="text-sm leading-6 text-emerald-700">
                     تم استلام ملاحظتك، ونقدّر وقتك في مساعدتنا على التحسين.
                 </p>
+                <div id="discountBox" class="mt-4 hidden rounded-xl border border-emerald-200 bg-white px-4 py-3">
+                    <p class="mb-2 text-xs font-semibold text-emerald-700">كود الخصم</p>
+                    <div id="discountCode" class="font-mono text-2xl font-bold tracking-wide text-emerald-700" dir="ltr"></div>
+                </div>
             </div>
 
             <div id="errorState" class="mt-4 hidden rounded-xl bg-red-50 p-4 text-center text-sm text-red-700"></div>
@@ -72,6 +76,9 @@
         const choiceState = document.getElementById('choiceState');
         const complaintForm = document.getElementById('complaintForm');
         const thankYouState = document.getElementById('thankYouState');
+        const thankYouMessage = document.getElementById('thankYouMessage');
+        const discountBox = document.getElementById('discountBox');
+        const discountCode = document.getElementById('discountCode');
         const errorState = document.getElementById('errorState');
         const excellentBtn = document.getElementById('excellentBtn');
         const complaintBtn = document.getElementById('complaintBtn');
@@ -103,6 +110,32 @@
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || 'تعذر إرسال التقييم');
             return data;
+        };
+
+        const renderComplaintRecovery = (data) => {
+            const fallbackMessage = 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.';
+            const action = data.complaintAction || 'contact';
+            const message = data.complaintMessage || fallbackMessage;
+            const code = data.discountCode;
+
+            discountBox.classList.add('hidden');
+            discountCode.textContent = '';
+
+            if (action === 'discount' && code) {
+                thankYouMessage.textContent = 'نعتذر لك عن التجربة. يسعدنا تعويضك بكود خصم:';
+                discountCode.textContent = code;
+                discountBox.classList.remove('hidden');
+                return;
+            }
+
+            if (action === 'contact_discount' && code) {
+                thankYouMessage.innerHTML = `${message}<br><span class="mt-3 inline-block">وكاعتذار بسيط، يمكنك استخدام كود الخصم:</span>`;
+                discountCode.textContent = code;
+                discountBox.classList.remove('hidden');
+                return;
+            }
+
+            thankYouMessage.textContent = message || fallbackMessage;
         };
 
         const loadClient = async () => {
@@ -170,13 +203,14 @@
 
             setBusy(true);
             try {
-                await postReview({
+                const data = await postReview({
                     nfcId,
                     answer: '2',
                     name: document.getElementById('name').value.trim(),
                     phone: document.getElementById('phone').value.trim(),
                     feedback
                 });
+                renderComplaintRecovery(data);
                 complaintForm.classList.add('hidden');
                 thankYouState.classList.remove('hidden');
             } catch (error) {
