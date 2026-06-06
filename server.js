@@ -77,6 +77,9 @@ const initDB = async (retries = 10) => {
             )
         `);
 
+        await pool.query("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'dashboard'");
+        await pool.query('ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS feedback TEXT');
+
         await pool.query('CREATE INDEX IF NOT EXISTS idx_clients_api_key       ON clients (api_key)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_clients_nfc_id        ON clients (nfc_id)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_evaluations_phone     ON evaluations (phone)');
@@ -296,6 +299,65 @@ app.post('/api/clients/add', superAdminAuth, async (req, res) => {
 app.delete('/api/clients/:id', superAdminAuth, async (req, res) => {
     await pool.query('DELETE FROM clients WHERE id = $1', [parseInt(req.params.id, 10)]);
     res.json({ success: true });
+});
+
+// Public NFC/QR review APIs
+app.get('/api/public/client/:nfcId', async (req, res) => {
+    const nfcId = String(req.params.nfcId || '').trim();
+    if (!nfcId) return res.status(400).json({ error: 'Missing NFC ID' });
+
+    try {
+        const { rows } = await pool.query(
+            'SELECT name, google_link FROM clients WHERE nfc_id = $1',
+            [nfcId]
+        );
+        const client = rows[0];
+        if (!client) return res.status(404).json({ error: 'Client not found' });
+
+        res.json({
+            name: client.name,
+            googleLink: client.google_link
+        });
+    } catch (e) {
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.post('/api/public/review', async (req, res) => {
+    const nfcId = String(req.body.nfcId || '').trim();
+    const answer = String(req.body.answer || '').trim();
+    const name = String(req.body.name || '').trim() || null;
+    const phoneInput = String(req.body.phone || '').trim();
+    const phone = phoneInput ? normalizePhone(phoneInput) : '';
+    const feedback = String(req.body.feedback || '').trim() || null;
+
+    if (!nfcId) return res.status(400).json({ error: 'Missing NFC ID' });
+    if (!['1', '2'].includes(answer)) return res.status(400).json({ error: 'Invalid answer' });
+    if (answer === '2' && !feedback) return res.status(400).json({ error: 'Feedback is required' });
+
+    try {
+        const { rows } = await pool.query(
+            'SELECT id, google_link FROM clients WHERE nfc_id = $1',
+            [nfcId]
+        );
+        const client = rows[0];
+        if (!client) return res.status(404).json({ error: 'Client not found' });
+
+        const status = answer === '1' ? 'replied' : 'complaint';
+        await pool.query(
+            `INSERT INTO evaluations (client_id, phone, name, status, answer, source, feedback)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [client.id, phone, name, status, answer, 'nfc', feedback]
+        );
+
+        res.json({
+            success: true,
+            status,
+            googleLink: answer === '1' ? client.google_link : undefined
+        });
+    } catch (e) {
+        res.status(500).json({ error: 'Database Error' });
+    }
 });
 
 // ─── Client APIs ───────────────────────────────────────────────────────────
