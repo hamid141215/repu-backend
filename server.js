@@ -17,6 +17,11 @@ const normalizePhone = (phone) => {
     return p;
 };
 
+const normalizeComplaintAction = (action) => {
+    const value = String(action || '').trim();
+    return ['contact', 'discount', 'contact_discount'].includes(value) ? value : 'contact';
+};
+
 // ─── Meta WhatsApp Cloud API ───────────────────────────────────────────────
 const isMockMode = () =>
     process.env.META_WHATSAPP_TOKEN === 'dummy' ||
@@ -78,6 +83,9 @@ const initDB = async (retries = 10) => {
             )
         `);
 
+        await pool.query("ALTER TABLE clients ADD COLUMN IF NOT EXISTS complaint_action TEXT DEFAULT 'contact'");
+        await pool.query('ALTER TABLE clients ADD COLUMN IF NOT EXISTS discount_code TEXT');
+        await pool.query("ALTER TABLE clients ADD COLUMN IF NOT EXISTS complaint_message TEXT DEFAULT 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.'");
         await pool.query("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'dashboard'");
         await pool.query('ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS feedback TEXT');
 
@@ -310,7 +318,9 @@ app.get('/api/public/client/:nfcId', async (req, res) => {
 
     try {
         const { rows } = await pool.query(
-            'SELECT name, google_link FROM clients WHERE nfc_id = $1',
+            `SELECT name, google_link, complaint_action, discount_code, complaint_message
+             FROM clients
+             WHERE nfc_id = $1`,
             [nfcId]
         );
         const client = rows[0];
@@ -318,7 +328,10 @@ app.get('/api/public/client/:nfcId', async (req, res) => {
 
         res.json({
             name: client.name,
-            googleLink: client.google_link
+            googleLink: client.google_link,
+            complaint_action: normalizeComplaintAction(client.complaint_action),
+            discount_code: client.discount_code,
+            complaint_message: client.complaint_message
         });
     } catch (e) {
         res.status(500).json({ error: 'Database Error' });
@@ -339,7 +352,9 @@ app.post('/api/public/review', async (req, res) => {
 
     try {
         const { rows } = await pool.query(
-            'SELECT id, google_link FROM clients WHERE nfc_id = $1',
+            `SELECT id, google_link, complaint_action, discount_code, complaint_message
+             FROM clients
+             WHERE nfc_id = $1`,
             [nfcId]
         );
         const client = rows[0];
@@ -352,11 +367,19 @@ app.post('/api/public/review', async (req, res) => {
             [client.id, phone, name, status, answer, 'nfc', feedback]
         );
 
-        res.json({
+        const response = {
             success: true,
             status,
             googleLink: answer === '1' ? client.google_link : undefined
-        });
+        };
+
+        if (answer === '2') {
+            response.complaintAction = normalizeComplaintAction(client.complaint_action);
+            response.discountCode = client.discount_code || null;
+            response.complaintMessage = client.complaint_message || 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.';
+        }
+
+        res.json(response);
     } catch (e) {
         res.status(500).json({ error: 'Database Error' });
     }
