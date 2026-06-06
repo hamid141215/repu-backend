@@ -137,7 +137,7 @@
                             <thead class="bg-gray-50 text-xs font-medium text-gray-500">
                                 <tr>
                                     <th class="px-5 py-3 md:px-6">المنشأة والبيانات</th>
-                                    <th class="px-5 py-3 md:px-6">NFC / رابط التقييم</th>
+                                    <th class="px-5 py-3 md:px-6">رابط التقييم / NFC</th>
                                     <th class="px-5 py-3 text-center md:px-6">الباقة</th>
                                     <th class="px-5 py-3 text-center md:px-6">تحكم</th>
                                 </tr>
@@ -176,6 +176,7 @@
                         // توليد النص الودود للعميل
                         const friendlyText = `مرحباً ${c.name}، أود تقييم تجربتي معكم اليوم.. شكراً لكم. (Ref: ${c.nfc_id || '000'})`;
                         const nfcLink = `https://wa.me/${BOT_NUMBER}?text=${encodeURIComponent(friendlyText)}`;
+                        const reviewUrl = c.nfc_id ? `${window.location.origin}/r/${encodeURIComponent(c.nfc_id)}` : '';
 
                         return `
                         <tr class="bg-white hover:bg-gray-50 transition-colors">
@@ -187,8 +188,15 @@
                                 </div>
                             </td>
                             <td class="w-2/5 px-5 py-4 md:px-6">
-                                <div class="mb-2 max-w-sm truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">"${friendlyText}"</div>
-                                <button onclick="copyLink('${nfcLink}')" class="inline-flex h-8 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50">نسخ الرابط</button>
+                                ${reviewUrl ? `
+                                    <div class="mb-2 text-xs font-semibold text-gray-700">رابط التقييم / NFC</div>
+                                    <div class="mb-2 max-w-sm truncate rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 font-mono text-xs text-[#465fff]">${reviewUrl}</div>
+                                    <button onclick="copyLink('${reviewUrl}')" class="mb-3 inline-flex h-8 items-center rounded-lg bg-[#465fff] px-3 text-xs font-medium text-white transition hover:bg-[#3641f5]">نسخ رابط التقييم</button>
+                                ` : `
+                                    <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">لا يوجد NFC ID</div>
+                                `}
+                                <div class="mb-2 max-w-sm truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">WhatsApp: "${friendlyText}"</div>
+                                <button onclick="copyLink('${nfcLink}')" class="inline-flex h-8 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50">نسخ رابط واتساب القديم</button>
                             </td>
                             <td class="px-5 py-4 text-center md:px-6">
                                 <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">${c.plan}</span>
