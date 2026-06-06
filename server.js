@@ -265,6 +265,7 @@ app.get('/reports',         (req, res) => res.sendFile(path.join(__dirname, 'rep
 app.get('/reports.html',    (req, res) => res.sendFile(path.join(__dirname, 'reports.html')));
 app.get('/super-admin',     (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
 app.get('/super-admin.html',(req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
+app.get('/r/:nfcId',        (req, res) => res.sendFile(path.join(__dirname, 'review.html')));
 
 // ─── Super admin APIs ──────────────────────────────────────────────────────
 app.get('/api/super-admin/clients', superAdminAuth, async (req, res) => {

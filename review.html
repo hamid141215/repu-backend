@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تقييم التجربة | RepuSystem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
+    <main class="flex min-h-screen items-center justify-center px-4 py-8">
+        <section class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="mb-6 text-center">
+                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-2xl text-[#465fff]">
+                    ★
+                </div>
+                <p class="mb-2 text-sm font-medium text-slate-500">قيّم تجربتك</p>
+                <h1 id="businessName" class="text-2xl font-bold text-slate-900">جاري التحميل...</h1>
+            </div>
+
+            <div id="loadingState" class="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">
+                يتم تحميل بيانات المنشأة.
+            </div>
+
+            <div id="choiceState" class="hidden space-y-3">
+                <p class="mb-4 text-center text-sm leading-6 text-slate-600">
+                    كيف كانت تجربتك معنا اليوم؟
+                </p>
+                <button id="excellentBtn" type="button" class="flex h-14 w-full items-center justify-center rounded-xl bg-[#465fff] px-4 text-base font-semibold text-white shadow-sm transition hover:bg-[#3449d6] disabled:cursor-not-allowed disabled:opacity-60">
+                    ممتازة
+                </button>
+                <button id="complaintBtn" type="button" class="flex h-14 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-base font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                    تحتاج تحسين
+                </button>
+            </div>
+
+            <form id="complaintForm" class="hidden space-y-4">
+                <div>
+                    <label for="name" class="mb-1.5 block text-sm font-medium text-slate-700">الاسم اختياري</label>
+                    <input id="name" name="name" type="text" autocomplete="name" class="h-12 w-full rounded-xl border border-slate-300 px-4 text-sm outline-none transition focus:border-[#465fff] focus:ring-4 focus:ring-blue-50">
+                </div>
+                <div>
+                    <label for="phone" class="mb-1.5 block text-sm font-medium text-slate-700">رقم الجوال اختياري</label>
+                    <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" class="h-12 w-full rounded-xl border border-slate-300 px-4 text-sm outline-none transition focus:border-[#465fff] focus:ring-4 focus:ring-blue-50">
+                </div>
+                <div>
+                    <label for="feedback" class="mb-1.5 block text-sm font-medium text-slate-700">ملاحظتك</label>
+                    <textarea id="feedback" name="feedback" rows="5" required class="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-[#465fff] focus:ring-4 focus:ring-blue-50" placeholder="اكتب ملاحظتك هنا"></textarea>
+                </div>
+                <button id="submitComplaintBtn" type="submit" class="flex h-12 w-full items-center justify-center rounded-xl bg-[#465fff] px-4 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-[#3449d6] disabled:cursor-not-allowed disabled:opacity-60">
+                    إرسال الملاحظة
+                </button>
+                <button id="backBtn" type="button" class="w-full py-2 text-sm font-medium text-slate-500">
+                    رجوع
+                </button>
+            </form>
+
+            <div id="thankYouState" class="hidden rounded-xl bg-emerald-50 p-5 text-center">
+                <h2 class="mb-2 text-lg font-bold text-emerald-700">شكراً لك</h2>
+                <p class="text-sm leading-6 text-emerald-700">
+                    تم استلام ملاحظتك، ونقدّر وقتك في مساعدتنا على التحسين.
+                </p>
+            </div>
+
+            <div id="errorState" class="mt-4 hidden rounded-xl bg-red-50 p-4 text-center text-sm text-red-700"></div>
+        </section>
+    </main>
+
+    <script>
+        const nfcId = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).pop() || '').trim();
+        const businessName = document.getElementById('businessName');
+        const loadingState = document.getElementById('loadingState');
+        const choiceState = document.getElementById('choiceState');
+        const complaintForm = document.getElementById('complaintForm');
+        const thankYouState = document.getElementById('thankYouState');
+        const errorState = document.getElementById('errorState');
+        const excellentBtn = document.getElementById('excellentBtn');
+        const complaintBtn = document.getElementById('complaintBtn');
+        const submitComplaintBtn = document.getElementById('submitComplaintBtn');
+        const backBtn = document.getElementById('backBtn');
+
+        const showError = (message) => {
+            errorState.textContent = message;
+            errorState.classList.remove('hidden');
+        };
+
+        const clearError = () => {
+            errorState.textContent = '';
+            errorState.classList.add('hidden');
+        };
+
+        const setBusy = (busy) => {
+            excellentBtn.disabled = busy;
+            complaintBtn.disabled = busy;
+            submitComplaintBtn.disabled = busy;
+        };
+
+        const postReview = async (payload) => {
+            const res = await fetch('/api/public/review', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'تعذر إرسال التقييم');
+            return data;
+        };
+
+        const loadClient = async () => {
+            if (!nfcId) {
+                loadingState.classList.add('hidden');
+                businessName.textContent = 'رابط غير صحيح';
+                showError('لم يتم العثور على رقم NFC في الرابط.');
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/public/client/${encodeURIComponent(nfcId)}`);
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || 'تعذر تحميل بيانات المنشأة');
+
+                businessName.textContent = data.name || 'المنشأة';
+                loadingState.classList.add('hidden');
+                choiceState.classList.remove('hidden');
+            } catch (error) {
+                loadingState.classList.add('hidden');
+                businessName.textContent = 'تعذر التحميل';
+                showError(error.message);
+            }
+        };
+
+        excellentBtn.addEventListener('click', async () => {
+            clearError();
+            setBusy(true);
+            try {
+                const data = await postReview({ nfcId, answer: '1' });
+                if (data.googleLink) {
+                    window.location.href = data.googleLink;
+                    return;
+                }
+                choiceState.classList.add('hidden');
+                thankYouState.classList.remove('hidden');
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                setBusy(false);
+            }
+        });
+
+        complaintBtn.addEventListener('click', () => {
+            clearError();
+            choiceState.classList.add('hidden');
+            complaintForm.classList.remove('hidden');
+        });
+
+        backBtn.addEventListener('click', () => {
+            clearError();
+            complaintForm.classList.add('hidden');
+            choiceState.classList.remove('hidden');
+        });
+
+        complaintForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            clearError();
+
+            const feedback = document.getElementById('feedback').value.trim();
+            if (!feedback) {
+                showError('يرجى كتابة الملاحظة قبل الإرسال.');
+                return;
+            }
+
+            setBusy(true);
+            try {
+                await postReview({
+                    nfcId,
+                    answer: '2',
+                    name: document.getElementById('name').value.trim(),
+                    phone: document.getElementById('phone').value.trim(),
+                    feedback
+                });
+                complaintForm.classList.add('hidden');
+                thankYouState.classList.remove('hidden');
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                setBusy(false);
+            }
+        });
+
+        loadClient();
+    </script>
+</body>
+</html>
