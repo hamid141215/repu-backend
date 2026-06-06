@@ -3,6 +3,7 @@ const express = require('express');
 const { Pool }  = require('pg');
 const axios     = require('axios');
 const path      = require('path');
+const QRCode    = require('qrcode');
 
 const app = express();
 app.use(express.json());
@@ -358,6 +359,32 @@ app.post('/api/public/review', async (req, res) => {
         });
     } catch (e) {
         res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.get('/api/qr/:nfcId', async (req, res) => {
+    const nfcId = String(req.params.nfcId || '').trim();
+    if (!nfcId || nfcId.length > 100 || !/^[A-Za-z0-9_-]+$/.test(nfcId)) {
+        return res.status(400).json({ error: 'Invalid NFC ID' });
+    }
+
+    try {
+        const { rows } = await pool.query(
+            'SELECT id FROM clients WHERE nfc_id = $1',
+            [nfcId]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'Client not found' });
+
+        const baseUrl = (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+        const reviewUrl = `${baseUrl}/r/${encodeURIComponent(nfcId)}`;
+        const safeNfcId = nfcId.replace(/[^A-Za-z0-9_-]/g, '') || 'review';
+        const png = await QRCode.toBuffer(reviewUrl, { type: 'png', width: 1024, margin: 2 });
+
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Content-Disposition', `attachment; filename="repusystem-review-${safeNfcId}.png"`);
+        res.send(png);
+    } catch (e) {
+        res.status(500).json({ error: 'QR generation failed' });
     }
 });
 
