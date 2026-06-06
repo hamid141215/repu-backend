@@ -450,6 +450,33 @@ app.get('/api/client-info', authenticate, async (req, res) => {
     });
 });
 
+app.get('/api/client-recent', async (req, res) => {
+    const apiKey = String(req.query.apiKey || '').trim();
+    if (!apiKey) return res.status(401).json({ error: 'Missing API Key' });
+
+    try {
+        const { rows: clientRows } = await pool.query(
+            'SELECT id FROM clients WHERE api_key = $1',
+            [apiKey]
+        );
+        const client = clientRows[0];
+        if (!client) return res.status(401).json({ error: 'Invalid API Key' });
+
+        const { rows } = await pool.query(
+            `SELECT id, name, phone, branch, status, answer, source, feedback, sent_at
+             FROM evaluations
+             WHERE client_id = $1
+             ORDER BY sent_at DESC
+             LIMIT 5`,
+            [client.id]
+        );
+
+        res.json({ success: true, items: rows });
+    } catch (e) {
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
 app.post('/api/send', authenticate, async (req, res) => {
     const { phone, name, branch } = req.body;
     const cleanPhone = normalizePhone(phone);

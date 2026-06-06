@@ -270,7 +270,7 @@
                         <span class="text-sm font-medium text-gray-700">النشاط</span>
                         <span class="text-xs text-gray-400">الحالة</span>
                     </div>
-                    <div class="px-4 py-8 text-center">
+                    <div id="latest_activity" class="px-4 py-8 text-center">
                         <p class="text-sm text-gray-500">لا توجد بيانات حديثة</p>
                     </div>
                 </div>
@@ -361,6 +361,79 @@
             alert('تم نسخ رابط التقييم');
         }
 
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[char]));
+        }
+
+        function activitySourceLabel(source) {
+            if (source === 'nfc') return 'NFC / QR';
+            if (source === 'dashboard') return 'لوحة العميل';
+            if (source === 'whatsapp') return 'واتساب';
+            return 'غير محدد';
+        }
+
+        function activityStatusLabel(ev) {
+            if (ev.status === 'complaint') return 'شكوى';
+            if (ev.status === 'replied' && ev.answer === '1') return 'ممتاز';
+            if (ev.status === 'sent') return 'بانتظار الرد';
+            return ev.status || 'غير محدد';
+        }
+
+        function activityTitle(ev) {
+            if (ev.source === 'nfc' && ev.status === 'complaint') return 'NFC / QR - شكوى';
+            if (ev.source === 'nfc' && ev.answer === '1') return 'NFC / QR - تقييم ممتاز';
+            if (ev.source === 'dashboard' && ev.status === 'sent') return 'لوحة العميل - تم الإرسال';
+            if (ev.source === 'whatsapp') return `واتساب - ${ev.status || 'نشاط جديد'}`;
+            return 'نشاط جديد';
+        }
+
+        function renderLatestActivity(items) {
+            const container = document.getElementById('latest_activity');
+            const recent = Array.isArray(items) ? items : [];
+
+            if (recent.length === 0) {
+                container.className = 'px-4 py-8 text-center';
+                container.innerHTML = '<p class="text-sm text-gray-500">لا توجد بيانات حديثة</p>';
+                return;
+            }
+
+            container.className = 'divide-y divide-gray-100';
+            container.innerHTML = recent.map(ev => {
+                const status = activityStatusLabel(ev);
+                const statusClass = status === 'ممتاز'
+                    ? 'bg-blue-50 text-blue-700'
+                    : status === 'شكوى'
+                        ? 'bg-rose-50 text-rose-700'
+                        : 'bg-slate-100 text-slate-500';
+                const feedback = ev.feedback ? `<p class="mt-1 text-xs leading-5 text-gray-500">${escapeHtml(ev.feedback)}</p>` : '';
+
+                return `<div class="flex items-start justify-between gap-3 px-4 py-3 text-right">
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-gray-800">${escapeHtml(activityTitle(ev))}</p>
+                        ${feedback}
+                    </div>
+                    <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusClass}">${status}</span>
+                </div>`;
+            }).join('');
+        }
+
+        async function loadLatestActivity(apiKey) {
+            try {
+                const res = await fetch(`/api/client-recent?apiKey=${encodeURIComponent(apiKey)}`);
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                renderLatestActivity(data.items || []);
+            } catch (e) {
+                console.error('Latest activity fetch failed:', e);
+            }
+        }
+
         // دالة تسجيل الدخول والتحقق من الـ API Key
         async function login() {
             const key = document.getElementById('key_input').value || localStorage.getItem('repu_key');
@@ -382,6 +455,7 @@
                     updateReviewLink(data.nfc_id || data.nfcId);
                     document.getElementById('login_screen').style.display = 'none';
                     document.getElementById('main_app').classList.remove('hidden');
+                    loadLatestActivity(key);
                     checkComplaints(key);
                 } else {
                     localStorage.removeItem('repu_key');
