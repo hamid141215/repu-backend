@@ -367,7 +367,12 @@ app.get('/api/client-info', authenticate, async (req, res) => {
         'SELECT COUNT(*)::int AS count FROM evaluations WHERE client_id = $1',
         [req.clientData.id]
     );
-    res.json({ name: req.clientData.name, total: rows[0].count });
+    res.json({
+        name: req.clientData.name,
+        total: rows[0].count,
+        nfc_id: req.clientData.nfc_id,
+        nfcId: req.clientData.nfc_id
+    });
 });
 
 app.post('/api/send', authenticate, async (req, res) => {

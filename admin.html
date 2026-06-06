@@ -197,6 +197,22 @@
             </div>
         </div>
 
+        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">رابط التقييم الخاص بك</h3>
+                <p class="mt-1 text-sm text-gray-500">استخدمه في QR أو NFC لجمع التقييمات داخل الفرع</p>
+            </div>
+            <div id="review_link_ready" class="hidden flex flex-col gap-3 sm:flex-row">
+                <input id="review_link_input" type="text" readonly class="h-11 min-w-0 flex-1 rounded-lg border border-gray-300 bg-gray-50 px-4 text-left font-mono text-sm text-gray-700 outline-none" dir="ltr">
+                <button type="button" onclick="copyReviewLink()" class="inline-flex h-11 items-center justify-center rounded-lg bg-[#465fff] px-5 text-sm font-medium text-white shadow-sm transition hover:bg-[#3641f5]">
+                    نسخ الرابط
+                </button>
+            </div>
+            <div id="review_link_missing" class="hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
+                لم يتم تعيين NFC ID لهذا الحساب
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-12">
         <div class="lg:col-span-8">
         <div id="send_section" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
@@ -322,6 +338,29 @@
     </div>
 
     <script>
+        function updateReviewLink(nfcId) {
+            const ready = document.getElementById('review_link_ready');
+            const missing = document.getElementById('review_link_missing');
+            const input = document.getElementById('review_link_input');
+
+            if (nfcId) {
+                input.value = `${window.location.origin}/r/${encodeURIComponent(nfcId)}`;
+                ready.classList.remove('hidden');
+                missing.classList.add('hidden');
+            } else {
+                input.value = '';
+                ready.classList.add('hidden');
+                missing.classList.remove('hidden');
+            }
+        }
+
+        function copyReviewLink() {
+            const input = document.getElementById('review_link_input');
+            if (!input.value) return;
+            navigator.clipboard.writeText(input.value);
+            alert('تم نسخ رابط التقييم');
+        }
+
         // دالة تسجيل الدخول والتحقق من الـ API Key
         async function login() {
             const key = document.getElementById('key_input').value || localStorage.getItem('repu_key');
@@ -340,6 +379,7 @@
                     localStorage.setItem('repu_key', key);
                     document.getElementById('restaurant_name').innerText = data.name;
                     document.getElementById('total').innerText = data.total;
+                    updateReviewLink(data.nfc_id || data.nfcId);
                     document.getElementById('login_screen').style.display = 'none';
                     document.getElementById('main_app').classList.remove('hidden');
                     checkComplaints(key);
