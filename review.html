@@ -39,7 +39,7 @@
                     <input id="name" name="name" type="text" autocomplete="name" class="h-12 w-full rounded-xl border border-slate-300 px-4 text-sm outline-none transition focus:border-[#465fff] focus:ring-4 focus:ring-blue-50">
                 </div>
                 <div>
-                    <label for="phone" class="mb-1.5 block text-sm font-medium text-slate-700">رقم الجوال اختياري</label>
+                    <label id="phoneLabel" for="phone" class="mb-1.5 block text-sm font-medium text-slate-700">رقم الجوال (اختياري)</label>
                     <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" class="h-12 w-full rounded-xl border border-slate-300 px-4 text-sm outline-none transition focus:border-[#465fff] focus:ring-4 focus:ring-blue-50">
                 </div>
                 <div>
@@ -84,6 +84,16 @@
         const complaintBtn = document.getElementById('complaintBtn');
         const submitComplaintBtn = document.getElementById('submitComplaintBtn');
         const backBtn = document.getElementById('backBtn');
+        const phoneLabel = document.getElementById('phoneLabel');
+        const phoneInput = document.getElementById('phone');
+        let complaintAction = 'contact';
+
+        const requiresComplaintPhone = () => ['contact', 'contact_discount'].includes(complaintAction);
+
+        const updatePhoneRequirement = () => {
+            phoneLabel.textContent = requiresComplaintPhone() ? 'رقم الجوال *' : 'رقم الجوال (اختياري)';
+            phoneInput.setAttribute('aria-required', requiresComplaintPhone() ? 'true' : 'false');
+        };
 
         const showError = (message) => {
             errorState.textContent = message;
@@ -151,6 +161,8 @@
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(data.error || 'تعذر تحميل بيانات المنشأة');
 
+                complaintAction = data.complaint_action || data.complaintAction || 'contact';
+                updatePhoneRequirement();
                 businessName.textContent = data.name || 'المنشأة';
                 loadingState.classList.add('hidden');
                 choiceState.classList.remove('hidden');
@@ -196,8 +208,13 @@
             clearError();
 
             const feedback = document.getElementById('feedback').value.trim();
+            const phone = phoneInput.value.trim();
             if (!feedback) {
                 showError('يرجى كتابة الملاحظة قبل الإرسال.');
+                return;
+            }
+            if (requiresComplaintPhone() && !phone) {
+                showError('فضلاً أدخل رقم الجوال حتى نتمكن من التواصل معك.');
                 return;
             }
 
@@ -207,7 +224,7 @@
                     nfcId,
                     answer: '2',
                     name: document.getElementById('name').value.trim(),
-                    phone: document.getElementById('phone').value.trim(),
+                    phone,
                     feedback
                 });
                 renderComplaintRecovery(data);
