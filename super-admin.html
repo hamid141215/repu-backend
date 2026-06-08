@@ -196,6 +196,7 @@
                         const complaintAction = ['contact', 'discount', 'contact_discount'].includes(c.complaint_action) ? c.complaint_action : 'contact';
                         const discountCode = c.discount_code || '';
                         const complaintMessage = c.complaint_message || 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.';
+                        const whatsappContact = c.whatsapp_contact || '';
 
                         return `
                         <tr class="bg-white hover:bg-gray-50 transition-colors">
@@ -235,6 +236,7 @@
                                             <option value="contact_discount" ${complaintAction === 'contact_discount' ? 'selected' : ''}>تواصل + كود خصم</option>
                                         </select>
                                         <input id="discount_code_${c.id}" value="${escapeHtml(discountCode)}" placeholder="كود الخصم" class="h-9 w-full rounded-lg border border-gray-300 px-3 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
+                                        <input id="whatsapp_contact_${c.id}" value="${escapeHtml(whatsappContact)}" placeholder="رقم واتساب التواصل" inputmode="tel" class="h-9 w-full rounded-lg border border-gray-300 px-3 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
                                         <textarea id="complaint_message_${c.id}" rows="2" placeholder="رسالة الشكوى" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">${escapeHtml(complaintMessage)}</textarea>
                                         <button onclick="saveComplaintSettings('${c.id}')" class="inline-flex h-8 items-center rounded-lg bg-[#465fff] px-3 text-xs font-medium text-white transition hover:bg-[#3641f5]">حفظ إعدادات الشكوى</button>
                                     </div>
@@ -266,6 +268,7 @@
                 adminPassword: pass,
                 complaint_action: document.getElementById(`complaint_action_${id}`).value,
                 discount_code: document.getElementById(`discount_code_${id}`).value.trim(),
+                whatsapp_contact: document.getElementById(`whatsapp_contact_${id}`).value.trim(),
                 complaint_message: document.getElementById(`complaint_message_${id}`).value.trim()
             };
 

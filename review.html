@@ -63,6 +63,9 @@
                     <p class="mb-2 text-xs font-semibold text-emerald-700">كود الخصم</p>
                     <div id="discountCode" class="font-mono text-2xl font-bold tracking-wide text-emerald-700" dir="ltr"></div>
                 </div>
+                <a id="whatsappContactBtn" href="#" target="_blank" rel="noopener noreferrer" class="mt-4 hidden h-12 w-full items-center justify-center rounded-xl bg-[#25d366] px-4 text-base font-semibold text-white shadow-sm transition hover:bg-[#1ebe5d]">
+                    تواصل معنا عبر واتساب
+                </a>
             </div>
 
             <div id="errorState" class="mt-4 hidden rounded-xl bg-red-50 p-4 text-center text-sm text-red-700"></div>
@@ -79,6 +82,7 @@
         const thankYouMessage = document.getElementById('thankYouMessage');
         const discountBox = document.getElementById('discountBox');
         const discountCode = document.getElementById('discountCode');
+        const whatsappContactBtn = document.getElementById('whatsappContactBtn');
         const errorState = document.getElementById('errorState');
         const excellentBtn = document.getElementById('excellentBtn');
         const complaintBtn = document.getElementById('complaintBtn');
@@ -87,6 +91,7 @@
         const phoneLabel = document.getElementById('phoneLabel');
         const phoneInput = document.getElementById('phone');
         let complaintAction = 'contact';
+        let whatsappContact = '';
 
         const requiresComplaintPhone = () => ['contact', 'contact_discount'].includes(complaintAction);
 
@@ -130,6 +135,16 @@
 
             discountBox.classList.add('hidden');
             discountCode.textContent = '';
+            whatsappContactBtn.classList.add('hidden');
+            whatsappContactBtn.classList.remove('flex');
+            whatsappContactBtn.href = '#';
+
+            if (whatsappContact) {
+                const whatsappText = encodeURIComponent('مرحباً، لدي ملاحظة على تجربتي');
+                whatsappContactBtn.href = `https://wa.me/${whatsappContact}?text=${whatsappText}`;
+                whatsappContactBtn.classList.remove('hidden');
+                whatsappContactBtn.classList.add('flex');
+            }
 
             if (action === 'discount' && code) {
                 thankYouMessage.textContent = 'نعتذر لك عن التجربة. يسعدنا تعويضك بكود خصم:';
@@ -162,6 +177,7 @@
                 if (!res.ok) throw new Error(data.error || 'تعذر تحميل بيانات المنشأة');
 
                 complaintAction = data.complaint_action || data.complaintAction || 'contact';
+                whatsappContact = data.whatsapp_contact || data.whatsappContact || '';
                 updatePhoneRequirement();
                 businessName.textContent = data.name || 'المنشأة';
                 loadingState.classList.add('hidden');

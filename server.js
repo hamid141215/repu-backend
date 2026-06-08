@@ -22,6 +22,8 @@ const normalizeComplaintAction = (action) => {
     return ['contact', 'discount', 'contact_discount'].includes(value) ? value : 'contact';
 };
 
+const normalizeWhatsappContact = (contact) => String(contact || '').trim().replace(/\D/g, '');
+
 // ─── Meta WhatsApp Cloud API ───────────────────────────────────────────────
 const isMockMode = () =>
     process.env.META_WHATSAPP_TOKEN === 'dummy' ||
@@ -86,6 +88,7 @@ const initDB = async (retries = 10) => {
         await pool.query("ALTER TABLE clients ADD COLUMN IF NOT EXISTS complaint_action TEXT DEFAULT 'contact'");
         await pool.query('ALTER TABLE clients ADD COLUMN IF NOT EXISTS discount_code TEXT');
         await pool.query("ALTER TABLE clients ADD COLUMN IF NOT EXISTS complaint_message TEXT DEFAULT 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.'");
+        await pool.query('ALTER TABLE clients ADD COLUMN IF NOT EXISTS whatsapp_contact TEXT');
         await pool.query("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'dashboard'");
         await pool.query('ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS feedback TEXT');
 
@@ -316,6 +319,7 @@ app.patch('/api/clients/:id/complaint-settings', superAdminAuth, async (req, res
     const complaintAction = String(req.body.complaint_action || '').trim();
     const discountCode = String(req.body.discount_code || '').trim();
     const complaintMessage = String(req.body.complaint_message || '').trim() || 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.';
+    const whatsappContact = normalizeWhatsappContact(req.body.whatsapp_contact);
 
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid client ID' });
     if (!['contact', 'discount', 'contact_discount'].includes(complaintAction)) {
@@ -325,9 +329,9 @@ app.patch('/api/clients/:id/complaint-settings', superAdminAuth, async (req, res
     try {
         const { rowCount } = await pool.query(
             `UPDATE clients
-             SET complaint_action = $1, discount_code = $2, complaint_message = $3
-             WHERE id = $4`,
-            [complaintAction, discountCode || null, complaintMessage, id]
+             SET complaint_action = $1, discount_code = $2, complaint_message = $3, whatsapp_contact = $4
+             WHERE id = $5`,
+            [complaintAction, discountCode || null, complaintMessage, whatsappContact || null, id]
         );
         if (rowCount === 0) return res.status(404).json({ error: 'Client not found' });
         res.json({ success: true });
@@ -343,7 +347,7 @@ app.get('/api/public/client/:nfcId', async (req, res) => {
 
     try {
         const { rows } = await pool.query(
-            `SELECT name, google_link, complaint_action, discount_code, complaint_message
+            `SELECT name, google_link, complaint_action, discount_code, complaint_message, whatsapp_contact
              FROM clients
              WHERE nfc_id = $1`,
             [nfcId]
@@ -356,7 +360,8 @@ app.get('/api/public/client/:nfcId', async (req, res) => {
             googleLink: client.google_link,
             complaint_action: normalizeComplaintAction(client.complaint_action),
             discount_code: client.discount_code,
-            complaint_message: client.complaint_message
+            complaint_message: client.complaint_message,
+            whatsapp_contact: client.whatsapp_contact
         });
     } catch (e) {
         res.status(500).json({ error: 'Database Error' });
