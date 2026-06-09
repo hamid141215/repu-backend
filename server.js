@@ -8,6 +8,7 @@ const QRCode    = require('qrcode');
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Phone normalization ───────────────────────────────────────────────────
 const normalizePhone = (phone) => {
