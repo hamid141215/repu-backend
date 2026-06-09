@@ -444,14 +444,35 @@ app.get('/api/qr/:nfcId', async (req, res) => {
 // ─── Client APIs ───────────────────────────────────────────────────────────
 app.get('/api/client-info', authenticate, async (req, res) => {
     const { rows } = await pool.query(
-        'SELECT COUNT(*)::int AS count FROM evaluations WHERE client_id = $1',
+        `SELECT
+            COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE status = 'replied' AND answer = '1')::int AS positive_count,
+            COUNT(*) FILTER (WHERE status = 'complaint' OR answer = '2')::int AS complaint_count
+         FROM evaluations
+         WHERE client_id = $1`,
         [req.clientData.id]
     );
+    const stats = rows[0];
+    const satisfactionBase = stats.positive_count + stats.complaint_count;
+    const satisfactionRate = satisfactionBase === 0
+        ? 0
+        : Math.round((stats.positive_count / satisfactionBase) * 100);
+
     res.json({
         name: req.clientData.name,
-        total: rows[0].count,
+        total: stats.total,
+        total_evaluations: stats.total,
+        positive_count: stats.positive_count,
+        complaint_count: stats.complaint_count,
+        satisfaction_rate: satisfactionRate,
         nfc_id: req.clientData.nfc_id,
-        nfcId: req.clientData.nfc_id
+        nfcId: req.clientData.nfc_id,
+        google_link: req.clientData.google_link,
+        complaint_action: normalizeComplaintAction(req.clientData.complaint_action),
+        discount_code: req.clientData.discount_code,
+        complaint_message: req.clientData.complaint_message,
+        whatsapp_number: req.clientData.whatsapp_contact || req.clientData.admin_phone || null,
+        whatsapp_contact: req.clientData.whatsapp_contact
     });
 });
 

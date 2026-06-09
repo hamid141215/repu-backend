@@ -18,13 +18,12 @@
         #send_section input, #send_section select { height: 2.75rem !important; padding: 0 1rem !important; border-radius: 0.5rem !important; border-color: #d1d5db !important; background-color: transparent !important; font-size: 0.875rem; font-weight: 400; }
         #send_section input:focus, #send_section select:focus { border-color: #465fff !important; box-shadow: 0 0 0 2px #dbeafe !important; outline: none !important; }
         #send_section + .grid { display: none !important; }
-        #main_app aside .tailadmin-sidebar nav a, #main_app aside .tailadmin-sidebar nav > div > div > span.flex { align-items: center !important; border-radius: 0.625rem !important; gap: 0.75rem !important; min-height: 44px !important; height: 44px !important; padding: 0 0.75rem !important; font-size: 0.875rem !important; font-weight: 500 !important; box-shadow: none !important; }
+        #main_app aside .tailadmin-sidebar nav a { align-items: center !important; border-radius: 0.625rem !important; gap: 0.75rem !important; min-height: 44px !important; height: 44px !important; padding: 0 0.75rem !important; font-size: 0.875rem !important; font-weight: 500 !important; box-shadow: none !important; }
         #main_app aside .tailadmin-sidebar ~ div { display: none !important; }
         #main_app aside .tailadmin-sidebar .nav-icon { width: 20px; height: 20px; flex-shrink: 0; color: currentColor; }
         #main_app aside nav a[href="#main_app"] { background-color: #EEF4FF !important; color: #465FFF !important; }
         #main_app aside nav a:not([href="#main_app"]) { color: #344054 !important; background-color: transparent !important; }
         #main_app aside nav a:not([href="#main_app"]):hover { background-color: #f9fafb !important; color: #111827 !important; }
-        #main_app aside .tailadmin-sidebar nav > div > div > span.flex { color: #9ca3af !important; background-color: transparent !important; }
         #main_app aside .nav-child { align-items: center !important; min-height: 36px !important; height: 36px !important; padding: 0 0.75rem !important; border-radius: 0.5rem !important; background-color: #f8fbff !important; color: #465FFF !important; font-size: 0.8125rem !important; }
         #main_app aside > div:last-child { border: 0 !important; background-color: transparent !important; border-radius: 0 !important; padding: 0 !important; }
         #main_app aside > div:last-child p { color: #6b7280 !important; }
@@ -37,12 +36,50 @@
     </style>
 </head>
 <body class="p-0">
-    <div id="login_screen" style="display: none;" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-6">
-        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md text-center shadow-2xl border border-slate-700">
-            <h2 class="text-3xl font-black text-blue-600 mb-2 italic tracking-tighter uppercase">MAWJAT REPU</h2>
-            <p class="text-slate-500 text-sm mb-6 font-bold">بوابة إدارة تقييمات العملاء</p>
-            <input id="key_input" type="password" placeholder="أدخل مفتاح الـ API" class="w-full p-4 bg-slate-100 rounded-2xl mb-4 text-center font-bold outline-none text-black">
-            <button id="login_btn" onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg hover:bg-blue-700 transition transform active:scale-95">دخول النظام</button>
+    <div id="login_screen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#0B1220] bg-gradient-to-br from-[#0B1220] via-[#101828] to-[#172554] p-4 md:p-6">
+        <div class="grid w-full max-w-5xl items-center gap-6 lg:grid-cols-[1fr_0.9fr]">
+            <div class="hidden lg:block">
+                <div class="mb-6">
+                    <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#465FFF] text-lg font-black text-white">R</div>
+                    <h1 class="text-3xl font-bold tracking-tight text-white">RepuSystem</h1>
+                    <p class="mt-2 text-sm font-medium text-slate-300">نظام إدارة التقييمات والسمعة</p>
+                </div>
+                <div class="grid gap-3">
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm font-semibold text-white backdrop-blur">
+                        متابعة التقييمات
+                    </div>
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm font-semibold text-white backdrop-blur">
+                        إدارة الشكاوى
+                    </div>
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm font-semibold text-white backdrop-blur">
+                        تقارير فورية
+                    </div>
+                </div>
+            </div>
+
+            <div class="mx-auto w-full max-w-md">
+                <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-xl shadow-black/10 md:p-8">
+                    <div class="mb-7 text-center">
+                        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#465FFF] text-lg font-black text-white">R</div>
+                        <h2 class="text-3xl font-bold tracking-tight text-gray-900">RepuSystem</h2>
+                        <p class="mt-2 text-sm font-medium text-gray-500">نظام إدارة التقييمات والسمعة</p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <input id="key_input" type="password" placeholder="أدخل مفتاح الدخول الخاص بالمنشأة" class="h-12 w-full rounded-lg border border-gray-300 bg-white px-4 text-center text-sm font-medium text-gray-800 outline-none placeholder:text-gray-400 focus:border-[#465fff] focus:ring-4 focus:ring-blue-500/10">
+                        <p class="text-center text-xs leading-5 text-gray-500">استخدم مفتاح الدخول المخصص لمنشأتك للوصول إلى لوحة التقييمات.</p>
+                        <button id="login_btn" onclick="login()" class="flex h-12 w-full items-center justify-center rounded-lg bg-[#465fff] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3641f5] active:scale-[0.99]">الدخول إلى لوحة التحكم</button>
+                    </div>
+
+                    <div class="mt-6 flex flex-wrap justify-center gap-2 lg:hidden">
+                        <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-[#465FFF]">متابعة التقييمات</span>
+                        <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-[#465FFF]">إدارة الشكاوى</span>
+                        <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-[#465FFF]">تقارير فورية</span>
+                    </div>
+
+                    <p class="mt-6 text-center text-xs font-medium text-gray-400">بواسطة موجة الصمت لتقنية المعلومات</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -62,12 +99,12 @@
                         <div>
                             <h3 class="mb-2 text-xs font-medium uppercase leading-4 tracking-wide text-gray-400">القائمة</h3>
                             <div class="space-y-1.5">
-                                <a href="#main_app" class="flex items-center gap-3 rounded-xl bg-[#EEF4FF] px-3 py-0 text-sm font-medium text-[#465FFF]">
+                                <a href="#main_app" onclick="showDashboardView(event)" class="flex items-center gap-3 rounded-xl bg-[#EEF4FF] px-3 py-0 text-sm font-medium text-[#465FFF]">
                                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5.5C4 4.67 4.67 4 5.5 4H10v7H4V5.5ZM14 4h4.5c.83 0 1.5.67 1.5 1.5V11h-6V4ZM4 14h6v6H5.5A1.5 1.5 0 0 1 4 18.5V14ZM14 14h6v4.5c0 .83-.67 1.5-1.5 1.5H14v-6Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
                                     <span>الرئيسية</span>
                                 </a>
-                                <a href="#main_app" class="nav-child mr-8 flex items-center text-sm font-medium">لوحة العميل</a>
-                                <a href="#send_section" class="flex items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                <a href="#main_app" onclick="showDashboardView(event)" class="nav-child mr-8 flex items-center text-sm font-medium">لوحة العميل</a>
+                                <a href="#send_section" onclick="showDashboardView()" class="flex items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
                                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 7.5h14M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2 7h6m-6 3h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                     <span>إرسال تقييم</span>
                                 </a>
@@ -81,10 +118,10 @@
                                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v14H5V5Zm4 4h6M9 12h6M9 15h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                     <span>التقارير</span>
                                 </a>
-                                <span class="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-400">
+                                <a href="#settings_section" onclick="showSettingsView(event)" class="flex items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
                                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Zm7.5 3.5a7.5 7.5 0 0 0-.12-1.35l2.02-1.55-2-3.46-2.4.96a7.3 7.3 0 0 0-2.34-1.36L14.3 2.7h-4.6l-.36 2.54A7.3 7.3 0 0 0 7 6.6l-2.4-.96-2 3.46 2.02 1.55a7.5 7.5 0 0 0 0 2.7L2.6 14.9l2 3.46 2.4-.96a7.3 7.3 0 0 0 2.34 1.36l.36 2.54h4.6l.36-2.54A7.3 7.3 0 0 0 17 17.4l2.4.96 2-3.46-2.02-1.55c.08-.44.12-.89.12-1.35Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
-                                    <span>الإعدادات قريباً</span>
-                                </span>
+                                    <span>الإعدادات</span>
+                                </a>
                             </div>
                         </div>
                     </nav>
@@ -110,10 +147,10 @@
 
                 <nav>
                     <h3 class="mb-4 text-xs font-medium uppercase leading-5 text-gray-400">القائمة</h3>
-                    <a href="#main_app" class="block rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black shadow-lg shadow-blue-950/30">الرئيسية</a>
-                    <a href="#send_section" class="block rounded-2xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white transition">إرسال تقييم</a>
+                    <a href="#main_app" onclick="showDashboardView(event)" class="block rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black shadow-lg shadow-blue-950/30">الرئيسية</a>
+                    <a href="#send_section" onclick="showDashboardView()" class="block rounded-2xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white transition">إرسال تقييم</a>
                     <a href="/reports" class="block rounded-2xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white transition">التقارير</a>
-                    <span class="block rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 cursor-not-allowed">الإعدادات قريباً</span>
+                    <a href="#settings_section" onclick="showSettingsView(event)" class="block rounded-2xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white transition">الإعدادات</a>
                 </nav>
             </div>
 
@@ -155,6 +192,7 @@
             <a href="/reports" class="bg-white text-red-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm">عرض التقارير</a>
         </div>
 
+        <div id="dashboard_view" class="space-y-4 md:space-y-6">
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
             <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-700">
@@ -172,7 +210,7 @@
                 </div>
                 <div class="mt-5">
                     <span class="text-sm text-gray-500">تقييمات ممتازة</span>
-                    <h4 class="mt-2 text-3xl font-bold text-gray-800">0</h4>
+                    <h4 id="positive_count" class="mt-2 text-3xl font-bold text-gray-800">0</h4>
                 </div>
             </div>
 
@@ -182,7 +220,7 @@
                 </div>
                 <div class="mt-5">
                     <span class="text-sm text-gray-500">شكاوى تحتاج متابعة</span>
-                    <h4 class="mt-2 text-3xl font-bold text-gray-800">0</h4>
+                    <h4 id="complaint_count" class="mt-2 text-3xl font-bold text-gray-800">0</h4>
                 </div>
             </div>
 
@@ -192,7 +230,7 @@
                 </div>
                 <div class="mt-5">
                     <span class="text-sm text-gray-500">معدل الرضا</span>
-                    <h4 class="mt-2 text-3xl font-bold text-gray-800">0%</h4>
+                    <h4 id="satisfaction_rate" class="mt-2 text-3xl font-bold text-gray-800">0%</h4>
                 </div>
             </div>
         </div>
@@ -334,17 +372,78 @@
             </a>
         </div>
         </div>
+
+        <section id="settings_section" class="hidden space-y-4 md:space-y-6">
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+                <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">الإعدادات</h3>
+                        <p class="mt-1 text-sm text-gray-500">بيانات المنشأة وإعدادات تجربة التقييم للعرض فقط.</p>
+                    </div>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <button type="button" onclick="copySettingsReviewLink()" class="inline-flex h-10 items-center justify-center rounded-lg bg-[#465fff] px-4 text-sm font-medium text-white shadow-sm transition hover:bg-[#3641f5]">
+                            نسخ رابط التقييم
+                        </button>
+                        <a id="settings_open_review" href="#" target="_blank" rel="noopener" class="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
+                            فتح صفحة التقييم
+                        </a>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <p class="text-xs font-medium text-gray-500">اسم المنشأة</p>
+                        <p id="settings_name" class="mt-2 break-words text-sm font-semibold text-gray-800">-</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <p class="text-xs font-medium text-gray-500">رابط التقييم الخاص</p>
+                        <p id="settings_review_link" class="mt-2 break-all text-left font-mono text-sm font-semibold text-gray-800" dir="ltr">-</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <p class="text-xs font-medium text-gray-500">NFC ID</p>
+                        <p id="settings_nfc_id" class="mt-2 break-words text-sm font-semibold text-gray-800">-</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <p class="text-xs font-medium text-gray-500">Google Maps review link</p>
+                        <p id="settings_google_link" class="mt-2 break-all text-left font-mono text-sm font-semibold text-gray-800" dir="ltr">-</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <p class="text-xs font-medium text-gray-500">سياسة التعامل مع الشكوى</p>
+                        <p id="settings_complaint_action" class="mt-2 text-sm font-semibold text-gray-800">-</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <p class="text-xs font-medium text-gray-500">كود الخصم</p>
+                        <p id="settings_discount_code" class="mt-2 break-words text-sm font-semibold text-gray-800">-</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 md:col-span-2">
+                        <p class="text-xs font-medium text-gray-500">رسالة الشكوى</p>
+                        <p id="settings_complaint_message" class="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-gray-800">-</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 md:col-span-2">
+                        <p class="text-xs font-medium text-gray-500">رقم واتساب المنشأة</p>
+                        <p id="settings_whatsapp_number" class="mt-2 break-words text-sm font-semibold text-gray-800">-</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        </div>
         </main>
     </div>
 
     <script>
+        let currentClientInfo = null;
+
+        function buildReviewLink(nfcId) {
+            return nfcId ? `${window.location.origin}/r/${encodeURIComponent(nfcId)}` : '';
+        }
+
         function updateReviewLink(nfcId) {
             const ready = document.getElementById('review_link_ready');
             const missing = document.getElementById('review_link_missing');
             const input = document.getElementById('review_link_input');
 
             if (nfcId) {
-                input.value = `${window.location.origin}/r/${encodeURIComponent(nfcId)}`;
+                input.value = buildReviewLink(nfcId);
                 ready.classList.remove('hidden');
                 missing.classList.add('hidden');
             } else {
@@ -358,6 +457,68 @@
             const input = document.getElementById('review_link_input');
             if (!input.value) return;
             navigator.clipboard.writeText(input.value);
+            alert('تم نسخ رابط التقييم');
+        }
+
+        function setText(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.innerText = value || '-';
+        }
+
+        function complaintActionLabel(action) {
+            if (action === 'discount') return 'كود خصم فقط';
+            if (action === 'contact_discount') return 'تواصل + كود خصم';
+            return 'تواصل فقط';
+        }
+
+        function renderStats(data) {
+            document.getElementById('total').innerText = data.total_evaluations ?? data.total ?? 0;
+            document.getElementById('positive_count').innerText = data.positive_count ?? 0;
+            document.getElementById('complaint_count').innerText = data.complaint_count ?? 0;
+            document.getElementById('satisfaction_rate').innerText = `${data.satisfaction_rate ?? 0}%`;
+        }
+
+        function renderSettings(data) {
+            const nfcId = data.nfc_id || data.nfcId || '';
+            const reviewLink = buildReviewLink(nfcId);
+            const openReview = document.getElementById('settings_open_review');
+
+            setText('settings_name', data.name);
+            setText('settings_review_link', reviewLink);
+            setText('settings_nfc_id', nfcId);
+            setText('settings_google_link', data.google_link);
+            setText('settings_complaint_action', complaintActionLabel(data.complaint_action));
+            setText('settings_discount_code', data.discount_code);
+            setText('settings_complaint_message', data.complaint_message);
+            setText('settings_whatsapp_number', data.whatsapp_number || data.whatsapp_contact);
+
+            if (reviewLink) {
+                openReview.href = reviewLink;
+                openReview.classList.remove('pointer-events-none', 'opacity-50');
+            } else {
+                openReview.href = '#';
+                openReview.classList.add('pointer-events-none', 'opacity-50');
+            }
+        }
+
+        function showDashboardView(event) {
+            if (event) event.preventDefault();
+            document.getElementById('dashboard_view').classList.remove('hidden');
+            document.getElementById('settings_section').classList.add('hidden');
+            window.location.hash = 'main_app';
+        }
+
+        function showSettingsView(event) {
+            if (event) event.preventDefault();
+            document.getElementById('dashboard_view').classList.add('hidden');
+            document.getElementById('settings_section').classList.remove('hidden');
+            window.location.hash = 'settings_section';
+        }
+
+        function copySettingsReviewLink() {
+            const link = document.getElementById('settings_review_link').innerText;
+            if (!link || link === '-') return;
+            navigator.clipboard.writeText(link);
             alert('تم نسخ رابط التقييم');
         }
 
@@ -449,12 +610,16 @@
                 
                 if(res.ok) {
                     const data = await res.json();
+                    currentClientInfo = data;
                     localStorage.setItem('repu_key', key);
                     document.getElementById('restaurant_name').innerText = data.name;
-                    document.getElementById('total').innerText = data.total;
+                    renderStats(data);
+                    renderSettings(data);
                     updateReviewLink(data.nfc_id || data.nfcId);
                     document.getElementById('login_screen').style.display = 'none';
                     document.getElementById('main_app').classList.remove('hidden');
+                    if (window.location.hash === '#settings_section') showSettingsView();
+                    else showDashboardView();
                     loadLatestActivity(key);
                     checkComplaints(key);
                 } else {
