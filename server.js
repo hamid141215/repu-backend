@@ -476,6 +476,114 @@ app.get('/api/client-info', authenticate, async (req, res) => {
     });
 });
 
+app.get('/api/dashboard-summary', authenticate, async (req, res) => {
+    const clientId = req.clientData.id;
+
+    try {
+        const { rows: statsRows } = await pool.query(
+            `SELECT
+                COUNT(*)::int AS total_evaluations,
+                COUNT(*) FILTER (WHERE status = 'replied' AND answer = '1')::int AS positive_count,
+                COUNT(*) FILTER (WHERE status = 'complaint' OR answer = '2')::int AS complaint_count
+             FROM evaluations
+             WHERE client_id = $1`,
+            [clientId]
+        );
+        const stats = statsRows[0];
+        const satisfactionBase = stats.positive_count + stats.complaint_count;
+        const satisfactionRate = satisfactionBase === 0
+            ? 0
+            : Math.round((stats.positive_count / satisfactionBase) * 100);
+
+        const { rows: monthlyRows } = await pool.query(
+            `WITH months AS (
+                SELECT generate_series(
+                    date_trunc('month', NOW()) - INTERVAL '5 months',
+                    date_trunc('month', NOW()),
+                    INTERVAL '1 month'
+                ) AS month_start
+             )
+             SELECT
+                to_char(months.month_start, 'YYYY-MM') AS month,
+                COUNT(e.id)::int AS total
+             FROM months
+             LEFT JOIN evaluations e
+                ON e.client_id = $1
+               AND e.sent_at >= months.month_start
+               AND e.sent_at < months.month_start + INTERVAL '1 month'
+             GROUP BY months.month_start
+             ORDER BY months.month_start`,
+            [clientId]
+        );
+
+        const { rows: dailyRows } = await pool.query(
+            `WITH days AS (
+                SELECT generate_series(
+                    (CURRENT_DATE - INTERVAL '29 days')::date,
+                    CURRENT_DATE,
+                    INTERVAL '1 day'
+                )::date AS day
+             )
+             SELECT
+                days.day::text AS date,
+                COUNT(e.id)::int AS total,
+                COUNT(e.id) FILTER (WHERE e.status = 'replied' AND e.answer = '1')::int AS positive_count,
+                COUNT(e.id) FILTER (WHERE e.status = 'complaint' OR e.answer = '2')::int AS complaint_count
+             FROM days
+             LEFT JOIN evaluations e
+                ON e.client_id = $1
+               AND e.sent_at >= days.day
+               AND e.sent_at < days.day + INTERVAL '1 day'
+             GROUP BY days.day
+             ORDER BY days.day`,
+            [clientId]
+        );
+
+        const { rows: sourceRows } = await pool.query(
+            `SELECT COALESCE(source, 'unknown') AS source, COUNT(*)::int AS total
+             FROM evaluations
+             WHERE client_id = $1
+             GROUP BY COALESCE(source, 'unknown')
+             ORDER BY total DESC`,
+            [clientId]
+        );
+
+        const { rows: recentRows } = await pool.query(
+            `SELECT id, name, phone, branch, status, answer, source, feedback, sent_at
+             FROM evaluations
+             WHERE client_id = $1
+             ORDER BY sent_at DESC
+             LIMIT 8`,
+            [clientId]
+        );
+
+        const { rows: complaintRows } = await pool.query(
+            `SELECT id, name, phone, branch, status, answer, source, feedback, sent_at
+             FROM evaluations
+             WHERE client_id = $1
+               AND (status = 'complaint' OR answer = '2')
+             ORDER BY sent_at DESC
+             LIMIT 5`,
+            [clientId]
+        );
+
+        res.json({
+            total_evaluations: stats.total_evaluations,
+            positive_count: stats.positive_count,
+            complaint_count: stats.complaint_count,
+            satisfaction_rate: satisfactionRate,
+            monthly_counts: monthlyRows,
+            daily_counts_last_30_days: dailyRows,
+            source_breakdown: sourceRows,
+            recent_activity: recentRows,
+            urgent_complaints: complaintRows
+        });
+    } catch (e) {
+        console.error('Dashboard summary error:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
 app.get('/api/client-recent', async (req, res) => {
     const apiKey = String(req.query.apiKey || '').trim();
     if (!apiKey) return res.status(401).json({ error: 'Missing API Key' });
