@@ -23,6 +23,11 @@ const normalizeComplaintAction = (action) => {
     return ['contact', 'discount', 'contact_discount'].includes(value) ? value : 'contact';
 };
 
+const normalizeComplaintStatus = (status) => {
+    const value = String(status || '').trim();
+    return ['new', 'in_progress', 'contacted', 'resolved', 'closed'].includes(value) ? value : 'new';
+};
+
 const normalizeWhatsappContact = (contact) => String(contact || '').trim().replace(/\D/g, '');
 
 const resolvePublicNfc = async (nfcId) => {
@@ -164,6 +169,16 @@ const initDB = async (retries = 10) => {
         await pool.query("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'dashboard'");
         await pool.query('ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS feedback TEXT');
         await pool.query('ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS rating INT');
+        await pool.query("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS complaint_status TEXT DEFAULT 'new'");
+        await pool.query('ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS complaint_updated_at TIMESTAMP');
+        await pool.query('ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS complaint_resolved_at TIMESTAMP');
+        await pool.query('ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS complaint_note TEXT');
+        await pool.query(`
+            UPDATE evaluations
+            SET complaint_status = 'new'
+            WHERE (status = 'complaint' OR answer = '2')
+              AND complaint_status IS NULL
+        `);
 
         await pool.query('CREATE INDEX IF NOT EXISTS idx_clients_api_key       ON clients (api_key)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_clients_nfc_id        ON clients (nfc_id)');
@@ -594,11 +609,20 @@ app.post('/api/public/review', async (req, res) => {
 
         const status = answer === '1' ? 'replied' : 'complaint';
         const branch = resolved.branchName || String(req.body.branch || '').trim() || null;
-        await pool.query(
-            `INSERT INTO evaluations (client_id, phone, name, branch, status, answer, source, feedback, rating)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-            [resolved.clientId, phone, name, branch, status, answer, 'nfc', feedback, rating]
-        );
+        if (answer === '2') {
+            await pool.query(
+                `INSERT INTO evaluations
+                    (client_id, phone, name, branch, status, answer, source, feedback, rating, complaint_status, complaint_updated_at, complaint_resolved_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NULL)`,
+                [resolved.clientId, phone, name, branch, status, answer, 'nfc', feedback, rating, 'new']
+            );
+        } else {
+            await pool.query(
+                `INSERT INTO evaluations (client_id, phone, name, branch, status, answer, source, feedback, rating)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                [resolved.clientId, phone, name, branch, status, answer, 'nfc', feedback, rating]
+            );
+        }
 
         const response = {
             success: true,
@@ -836,8 +860,43 @@ app.get('/api/dashboard-summary', authenticate, async (req, res) => {
             [clientId]
         );
 
+        const { rows: workflowRows } = await pool.query(
+            `SELECT
+                COUNT(*) FILTER (WHERE complaint_status = 'new')::int AS new_count,
+                COUNT(*) FILTER (WHERE complaint_status = 'in_progress')::int AS in_progress_count,
+                COUNT(*) FILTER (WHERE complaint_status = 'contacted')::int AS contacted_count,
+                COUNT(*) FILTER (WHERE complaint_status = 'resolved')::int AS resolved_count,
+                COUNT(*) FILTER (WHERE complaint_status = 'closed')::int AS closed_count,
+                COUNT(*) FILTER (
+                    WHERE complaint_status NOT IN ('resolved', 'closed')
+                      AND sent_at < NOW() - INTERVAL '24 hours'
+                )::int AS overdue_count
+             FROM evaluations
+             WHERE client_id = $1
+               AND (status = 'complaint' OR answer = '2')`,
+            [clientId]
+        );
+        const workflow = workflowRows[0] || {};
+
         const { rows: complaintRows } = await pool.query(
-            `SELECT id, name, phone, branch, status, answer, source, feedback, sent_at
+            `SELECT
+                id,
+                name,
+                phone,
+                branch,
+                status,
+                answer,
+                source,
+                feedback,
+                sent_at,
+                complaint_status,
+                complaint_updated_at,
+                complaint_resolved_at,
+                complaint_note,
+                (
+                    complaint_status NOT IN ('resolved', 'closed')
+                    AND sent_at < NOW() - INTERVAL '24 hours'
+                ) AS is_overdue
              FROM evaluations
              WHERE client_id = $1
                AND (status = 'complaint' OR answer = '2')
@@ -862,11 +921,71 @@ app.get('/api/dashboard-summary', authenticate, async (req, res) => {
             branch_performance: visibleBranchPerformance,
             best_branches: bestBranches,
             weak_branches: weakBranches,
+            complaint_workflow_summary: {
+                new_count: Number(workflow.new_count || 0),
+                in_progress_count: Number(workflow.in_progress_count || 0),
+                contacted_count: Number(workflow.contacted_count || 0),
+                resolved_count: Number(workflow.resolved_count || 0),
+                closed_count: Number(workflow.closed_count || 0),
+                overdue_count: Number(workflow.overdue_count || 0)
+            },
             recent_activity: recentRows,
             urgent_complaints: complaintRows
         });
     } catch (e) {
         console.error('Dashboard summary error:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.patch('/api/client/complaints/:id/status', authenticate, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const complaintStatus = normalizeComplaintStatus(req.body.complaint_status);
+    const complaintNote = String(req.body.complaint_note || '').trim() || null;
+
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid complaint ID' });
+    if (!['new', 'in_progress', 'contacted', 'resolved', 'closed'].includes(String(req.body.complaint_status || '').trim())) {
+        return res.status(400).json({ error: 'Invalid complaint status' });
+    }
+
+    try {
+        const { rows } = await pool.query(
+            `UPDATE evaluations
+             SET complaint_status = $1,
+                 complaint_note = $2,
+                 complaint_updated_at = NOW(),
+                 complaint_resolved_at = CASE
+                    WHEN $1 IN ('resolved', 'closed') THEN NOW()
+                    ELSE NULL
+                 END
+             WHERE id = $3
+               AND client_id = $4
+               AND (status = 'complaint' OR answer = '2')
+             RETURNING
+                id,
+                client_id,
+                name,
+                phone,
+                branch,
+                status,
+                answer,
+                source,
+                feedback,
+                sent_at,
+                complaint_status,
+                complaint_updated_at,
+                complaint_resolved_at,
+                complaint_note,
+                (
+                    complaint_status NOT IN ('resolved', 'closed')
+                    AND sent_at < NOW() - INTERVAL '24 hours'
+                ) AS is_overdue`,
+            [complaintStatus, complaintNote, id, req.clientData.id]
+        );
+
+        if (!rows[0]) return res.status(404).json({ error: 'Complaint not found' });
+        res.json({ success: true, complaint: rows[0] });
+    } catch (e) {
         res.status(500).json({ error: 'Database Error' });
     }
 });

@@ -193,6 +193,23 @@
             return 'غير محدد';
         }
 
+        function complaintWorkflowMeta(status) {
+            const map = {
+                new: { label: 'جديدة', className: 'bg-slate-100 text-slate-700' },
+                in_progress: { label: 'قيد المعالجة', className: 'bg-amber-100 text-amber-700' },
+                contacted: { label: 'تم التواصل', className: 'bg-blue-100 text-blue-700' },
+                resolved: { label: 'تم الحل', className: 'bg-emerald-100 text-emerald-700' },
+                closed: { label: 'مغلقة', className: 'bg-gray-100 text-gray-600' }
+            };
+            return map[status] || map.new;
+        }
+
+        function isComplaintOverdue(ev) {
+            const status = ev.complaint_status || 'new';
+            if (status === 'resolved' || status === 'closed' || !ev.sent_at) return false;
+            return Date.now() - new Date(ev.sent_at).getTime() > 24 * 60 * 60 * 1000;
+        }
+
         function renderBranchPerformance(items) {
             const container = document.getElementById('branch_performance_table');
             const branches = new Map();
@@ -273,9 +290,12 @@
                     if(ev.answer === '2') {
                         neg++;
                         const feedback = ev.feedback ? escapeHtml(ev.feedback) : '';
+                        const workflow = complaintWorkflowMeta(ev.complaint_status);
+                        const overdueBadge = isComplaintOverdue(ev) ? '<span class="status-badge bg-rose-100 text-rose-700">متأخرة</span>' : '';
                         grid.innerHTML += `<div class="complaint-card flex items-center justify-between gap-3 rounded-xl p-3">
                             <div class="min-w-0">
                                 <p class="text-sm font-medium text-gray-800">${escapeHtml(ev.name || 'عميل')}<br><span class="text-xs font-normal text-gray-500">${escapeHtml(ev.phone || '')}</span></p>
+                                <div class="mt-2 flex flex-wrap gap-2"><span class="status-badge ${workflow.className}">${workflow.label}</span>${overdueBadge}</div>
                                 ${feedback ? `<p class="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-700">${feedback}</p>` : ''}
                             </div>
                             <a href="https://wa.me/${ev.phone}" class="inline-flex h-9 items-center justify-center rounded-lg bg-rose-600 px-3 text-xs font-medium text-white hover:bg-rose-700">تواصل</a>
@@ -288,6 +308,8 @@
                         if(rating <= 3) lowRatingCount++;
                     }
                     const feedback = ev.feedback ? escapeHtml(ev.feedback) : '';
+                    const workflow = complaintWorkflowMeta(ev.complaint_status);
+                    const overdueBadge = ev.answer === '2' && isComplaintOverdue(ev) ? '<span class="status-badge bg-rose-100 text-rose-700">متأخرة</span>' : '';
                     return `<tr>
                         <td class="px-5 py-3 text-sm font-medium text-gray-800">
                             ${escapeHtml(ev.name || 'عميل')}
@@ -297,7 +319,7 @@
                         <td class="px-5 py-3 text-center">
                             ${ev.status === 'scheduled' ? '<span class="status-badge bg-amber-100 text-amber-700">⏳ مجدولة</span>' : 
                               ev.answer === '1' ? '<span class="status-badge bg-blue-100 text-blue-700">✅ ممتاز</span>' : 
-                              ev.answer === '2' ? '<span class="status-badge bg-rose-100 text-rose-700">⚠️ شكوى</span>' : 
+                              ev.answer === '2' ? `<span class="status-badge bg-rose-100 text-rose-700">⚠️ شكوى</span><div class="mt-2 flex justify-center gap-2"><span class="status-badge ${workflow.className}">${workflow.label}</span>${overdueBadge}</div>` : 
                               '<span class="status-badge bg-slate-100 text-slate-400">بانتظار الرد</span>'}
                         </td>
                         <td class="px-5 py-3 text-center">
