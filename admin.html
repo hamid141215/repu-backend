@@ -38,7 +38,8 @@
         #main_app header button[onclick="logout()"]:hover { background-color: #f9fafb !important; }
         .dashboard-chart { position: relative; height: 280px; min-height: 260px; }
         .dashboard-chart canvas { width: 100% !important; max-height: 290px; }
-        .dashboard-chart--compact { height: 220px; min-height: 210px; }
+        .dashboard-chart--compact { height: 240px; min-height: 230px; }
+        .dashboard-chart--compact canvas { max-height: 230px; }
         .kpi-card { overflow: hidden; position: relative; }
         .kpi-card::after { content: ""; position: absolute; inset-inline-start: -36px; top: -48px; width: 96px; height: 96px; border-radius: 9999px; background: rgba(70, 95, 255, 0.08); }
     </style>
@@ -200,7 +201,7 @@
         <div id="executive_summary_strip" class="grid grid-cols-2 gap-2 md:grid-cols-4">
             <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
                 <p class="text-xs font-medium text-gray-500">متوسط التقييم</p>
-                <p id="summary_average_rating" class="mt-1 text-base font-semibold text-gray-900">0 / 5</p>
+                <p id="summary_average_rating" class="mt-1 text-base font-semibold text-gray-900">0.0 / 5</p>
             </div>
             <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
                 <p class="text-xs font-medium text-gray-500">تقييمات النجوم</p>
@@ -211,7 +212,7 @@
                 <p id="summary_complaint_count" class="mt-1 text-base font-semibold text-gray-900">0</p>
             </div>
             <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-                <p class="text-xs font-medium text-gray-500">فروع نشطة/مقاسة</p>
+                <p class="text-xs font-medium text-gray-500">فروع مقاسة</p>
                 <p id="summary_branch_count" class="mt-1 text-base font-semibold text-gray-900">0</p>
             </div>
         </div>
@@ -539,6 +540,16 @@
             return 'bg-rose-50 text-rose-700';
         }
 
+        function branchStatusBadge(branch) {
+            const ratingCount = Number(branch.rating_count || 0);
+            const averageRating = Number(branch.average_rating || 0);
+            if (ratingCount === 0) return { label: 'لا توجد بيانات', className: 'bg-slate-100 text-slate-500' };
+            if (averageRating >= 4.5) return { label: 'ممتاز', className: 'bg-emerald-50 text-emerald-700' };
+            if (averageRating >= 4) return { label: 'جيد', className: 'bg-blue-50 text-blue-700' };
+            if (averageRating >= 3) return { label: 'يحتاج متابعة', className: 'bg-amber-50 text-amber-700' };
+            return { label: 'حرج', className: 'bg-rose-50 text-rose-700' };
+        }
+
         function renderBranchPerformance(summary) {
             const container = document.getElementById('branch_performance');
             const branches = Array.isArray(summary.branch_performance) ? summary.branch_performance : [];
@@ -581,11 +592,13 @@
                             <th class="px-4 py-3 text-center">التقييمات</th>
                             <th class="px-4 py-3 text-center">الشكاوى</th>
                             <th class="px-4 py-3 text-center">تحتاج متابعة</th>
+                            <th class="px-4 py-3 text-center">الحالة</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         ${branches.map(branch => {
                             const averageRating = Number(branch.average_rating || 0);
+                            const statusBadge = branchStatusBadge(branch);
                             return `<tr>
                                 <td class="px-4 py-3 text-sm font-medium text-gray-800">${escapeHtml(branch.branch || 'غير محدد')}</td>
                                 <td class="px-4 py-3 text-center">
@@ -594,6 +607,9 @@
                                 <td class="px-4 py-3 text-center text-sm font-medium text-gray-700">${branch.rating_count ?? branch.total_evaluations ?? 0}</td>
                                 <td class="px-4 py-3 text-center text-sm font-medium text-gray-700">${branch.complaint_count ?? 0}</td>
                                 <td class="px-4 py-3 text-center text-sm font-medium text-gray-700">${branch.low_rating_rate ?? 0}%</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadge.className}">${statusBadge.label}</span>
+                                </td>
                             </tr>`;
                         }).join('')}
                     </tbody>
@@ -891,11 +907,16 @@
             container.innerHTML = complaints.map(ev => {
                 const customer = ev.name || ev.phone || 'عميل غير محدد';
                 const feedback = ev.feedback ? `<p class="mt-1 line-clamp-2 text-xs leading-5 text-gray-500">${escapeHtml(ev.feedback)}</p>` : '';
+                const phone = String(ev.phone || '').replace(/\D/g, '');
+                const contactButton = phone
+                    ? `<a href="https://wa.me/${phone}" target="_blank" rel="noopener noreferrer" class="mt-2 inline-flex h-8 items-center rounded-lg bg-[#25d366] px-3 text-xs font-medium text-white hover:bg-[#1ebe5d]">تواصل</a>`
+                    : '';
                 return `<div class="px-4 py-3 text-right">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <p class="text-sm font-semibold text-gray-800">${escapeHtml(customer)}</p>
                             ${feedback}
+                            ${contactButton}
                         </div>
                         <span class="shrink-0 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700">شكوى</span>
                     </div>
