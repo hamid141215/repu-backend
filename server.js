@@ -25,6 +25,63 @@ const normalizeComplaintAction = (action) => {
 
 const normalizeWhatsappContact = (contact) => String(contact || '').trim().replace(/\D/g, '');
 
+const resolvePublicNfc = async (nfcId) => {
+    const { rows: branchRows } = await pool.query(
+        `SELECT
+            c.id AS client_id,
+            c.name AS client_name,
+            c.google_link AS client_google_link,
+            c.complaint_action,
+            c.discount_code,
+            c.complaint_message,
+            c.whatsapp_contact,
+            b.id AS branch_id,
+            b.name AS branch_name,
+            b.google_link AS branch_google_link
+         FROM branches b
+         JOIN clients c ON c.id = b.client_id
+         WHERE b.nfc_id = $1
+           AND b.is_active = true
+         LIMIT 1`,
+        [nfcId]
+    );
+    if (branchRows[0]) {
+        const row = branchRows[0];
+        return {
+            clientId: row.client_id,
+            name: row.client_name,
+            branchName: row.branch_name,
+            googleLink: row.branch_google_link || row.client_google_link,
+            complaintAction: row.complaint_action,
+            discountCode: row.discount_code,
+            complaintMessage: row.complaint_message,
+            whatsappContact: row.whatsapp_contact,
+            isBranch: true
+        };
+    }
+
+    const { rows: clientRows } = await pool.query(
+        `SELECT id, name, google_link, complaint_action, discount_code, complaint_message, whatsapp_contact
+         FROM clients
+         WHERE nfc_id = $1
+         LIMIT 1`,
+        [nfcId]
+    );
+    const client = clientRows[0];
+    if (!client) return null;
+    return {
+        clientId: client.id,
+        name: client.name,
+        branchName: null,
+        googleLink: client.google_link,
+        complaintAction: client.complaint_action,
+        discountCode: client.discount_code,
+        complaintMessage: client.complaint_message,
+        whatsappContact: client.whatsapp_contact,
+        isBranch: false
+    };
+};
+
 // ─── Meta WhatsApp Cloud API ───────────────────────────────────────────────
 const isMockMode = () =>
     process.env.META_WHATSAPP_TOKEN === 'dummy' ||
@@ -86,6 +143,20 @@ const initDB = async (retries = 10) => {
             )
         `);
 
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS branches (
+                id          SERIAL PRIMARY KEY,
+                client_id   INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+                name        TEXT NOT NULL,
+                city        TEXT,
+                area        TEXT,
+                nfc_id      TEXT UNIQUE,
+                google_link TEXT,
+                is_active   BOOLEAN DEFAULT true,
+                created_at  TIMESTAMP DEFAULT NOW()
+            )
+        `);
+
         await pool.query("ALTER TABLE clients ADD COLUMN IF NOT EXISTS complaint_action TEXT DEFAULT 'contact'");
         await pool.query('ALTER TABLE clients ADD COLUMN IF NOT EXISTS discount_code TEXT');
         await pool.query("ALTER TABLE clients ADD COLUMN IF NOT EXISTS complaint_message TEXT DEFAULT 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.'");
@@ -96,6 +167,8 @@ const initDB = async (retries = 10) => {
 
         await pool.query('CREATE INDEX IF NOT EXISTS idx_clients_api_key       ON clients (api_key)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_clients_nfc_id        ON clients (nfc_id)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_branches_client_id    ON branches (client_id)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_branches_nfc_id       ON branches (nfc_id)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_evaluations_phone     ON evaluations (phone)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_evaluations_client_id ON evaluations (client_id)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_evaluations_sent_at   ON evaluations (sent_at DESC)');
@@ -283,7 +356,29 @@ app.get('/r/:nfcId',        (req, res) => res.sendFile(path.join(__dirname, 'rev
 
 // ─── Super admin APIs ──────────────────────────────────────────────────────
 app.get('/api/super-admin/clients', superAdminAuth, async (req, res) => {
-    const { rows } = await pool.query('SELECT * FROM clients ORDER BY created_at DESC');
+    const { rows } = await pool.query(`
+        SELECT
+            c.*,
+            COALESCE(
+                json_agg(
+                    json_build_object(
+                        'id', b.id,
+                        'name', b.name,
+                        'city', b.city,
+                        'area', b.area,
+                        'nfc_id', b.nfc_id,
+                        'google_link', b.google_link,
+                        'is_active', b.is_active
+                    )
+                    ORDER BY b.created_at DESC
+                ) FILTER (WHERE b.id IS NOT NULL),
+                '[]'
+            ) AS branches
+        FROM clients c
+        LEFT JOIN branches b ON b.client_id = c.id
+        GROUP BY c.id
+        ORDER BY c.created_at DESC
+    `);
     res.json(rows);
 });
 
@@ -342,28 +437,132 @@ app.patch('/api/clients/:id/complaint-settings', superAdminAuth, async (req, res
     }
 });
 
+app.get('/api/admin/branches', superAdminAuth, async (req, res) => {
+    const clientId = parseInt(req.query.client_id, 10);
+    if (!Number.isInteger(clientId)) return res.status(400).json({ error: 'Invalid client ID' });
+
+    try {
+        const { rows } = await pool.query(
+            `SELECT id, client_id, name, city, area, nfc_id, google_link, is_active, created_at
+             FROM branches
+             WHERE client_id = $1
+             ORDER BY created_at DESC`,
+            [clientId]
+        );
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.post('/api/admin/branches', superAdminAuth, async (req, res) => {
+    const clientId = parseInt(req.body.client_id, 10);
+    const name = String(req.body.name || '').trim();
+    const city = String(req.body.city || '').trim() || null;
+    const area = String(req.body.area || '').trim() || null;
+    const nfcId = String(req.body.nfc_id || '').trim();
+    const googleLink = String(req.body.google_link || '').trim() || null;
+
+    if (!Number.isInteger(clientId)) return res.status(400).json({ error: 'Invalid client ID' });
+    if (!name) return res.status(400).json({ error: 'Branch name is required' });
+    if (!nfcId) return res.status(400).json({ error: 'Branch NFC ID is required' });
+
+    try {
+        const { rows: clients } = await pool.query('SELECT id FROM clients WHERE id = $1', [clientId]);
+        if (!clients[0]) return res.status(404).json({ error: 'Client not found' });
+        const { rows: clientNfcRows } = await pool.query('SELECT id FROM clients WHERE nfc_id = $1', [nfcId]);
+        if (clientNfcRows[0]) return res.status(400).json({ error: 'NFC ID already exists' });
+
+        const { rows } = await pool.query(
+            `INSERT INTO branches (client_id, name, city, area, nfc_id, google_link)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id, client_id, name, city, area, nfc_id, google_link, is_active, created_at`,
+            [clientId, name, city, area, nfcId, googleLink]
+        );
+        res.json({ success: true, branch: rows[0] });
+    } catch (e) {
+        if (e.code === '23505') return res.status(400).json({ error: 'NFC ID already exists' });
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.patch('/api/admin/branches/:id', superAdminAuth, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid branch ID' });
+
+    try {
+        const { rows: existingRows } = await pool.query('SELECT * FROM branches WHERE id = $1', [id]);
+        const existing = existingRows[0];
+        if (!existing) return res.status(404).json({ error: 'Branch not found' });
+
+        const name = req.body.name === undefined ? existing.name : String(req.body.name || '').trim();
+        const city = req.body.city === undefined ? existing.city : String(req.body.city || '').trim() || null;
+        const area = req.body.area === undefined ? existing.area : String(req.body.area || '').trim() || null;
+        const nfcId = req.body.nfc_id === undefined ? existing.nfc_id : String(req.body.nfc_id || '').trim();
+        const googleLink = req.body.google_link === undefined ? existing.google_link : String(req.body.google_link || '').trim() || null;
+        const isActive = req.body.is_active === undefined
+            ? existing.is_active
+            : req.body.is_active === true || req.body.is_active === 'true';
+
+        if (!name) return res.status(400).json({ error: 'Branch name is required' });
+        if (!nfcId) return res.status(400).json({ error: 'Branch NFC ID is required' });
+        const { rows: clientNfcRows } = await pool.query('SELECT id FROM clients WHERE nfc_id = $1', [nfcId]);
+        if (clientNfcRows[0]) return res.status(400).json({ error: 'NFC ID already exists' });
+
+        const { rows } = await pool.query(
+            `UPDATE branches
+             SET name = $1, city = $2, area = $3, nfc_id = $4, google_link = $5, is_active = $6
+             WHERE id = $7
+             RETURNING id, client_id, name, city, area, nfc_id, google_link, is_active, created_at`,
+            [name, city, area, nfcId, googleLink, isActive, id]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'Branch not found' });
+        res.json({ success: true, branch: rows[0] });
+    } catch (e) {
+        if (e.code === '23505') return res.status(400).json({ error: 'NFC ID already exists' });
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.delete('/api/admin/branches/:id', superAdminAuth, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid branch ID' });
+
+    try {
+        const { rowCount } = await pool.query(
+            'UPDATE branches SET is_active = false WHERE id = $1',
+            [id]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'Branch not found' });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
 // Public NFC/QR review APIs
 app.get('/api/public/client/:nfcId', async (req, res) => {
     const nfcId = String(req.params.nfcId || '').trim();
     if (!nfcId) return res.status(400).json({ error: 'Missing NFC ID' });
 
     try {
-        const { rows } = await pool.query(
-            `SELECT name, google_link, complaint_action, discount_code, complaint_message, whatsapp_contact
-             FROM clients
-             WHERE nfc_id = $1`,
-            [nfcId]
-        );
-        const client = rows[0];
-        if (!client) return res.status(404).json({ error: 'Client not found' });
+        const resolved = await resolvePublicNfc(nfcId);
+        if (!resolved) return res.status(404).json({ error: 'Client not found' });
 
         res.json({
-            name: client.name,
-            googleLink: client.google_link,
-            complaint_action: normalizeComplaintAction(client.complaint_action),
-            discount_code: client.discount_code,
-            complaint_message: client.complaint_message,
-            whatsapp_contact: client.whatsapp_contact
+            name: resolved.name,
+            branchName: resolved.branchName,
+            googleLink: resolved.googleLink,
+            nfcId,
+            complaintAction: normalizeComplaintAction(resolved.complaintAction),
+            complaint_action: normalizeComplaintAction(resolved.complaintAction),
+            discountCode: resolved.discountCode,
+            discount_code: resolved.discountCode,
+            complaintMessage: resolved.complaintMessage,
+            complaint_message: resolved.complaintMessage,
+            whatsappNumber: resolved.whatsappContact,
+            whatsapp_contact: resolved.whatsappContact
         });
     } catch (e) {
         res.status(500).json({ error: 'Database Error' });
@@ -390,32 +589,27 @@ app.post('/api/public/review', async (req, res) => {
     if (answer === '2' && !feedback) return res.status(400).json({ error: 'Feedback is required' });
 
     try {
-        const { rows } = await pool.query(
-            `SELECT id, google_link, complaint_action, discount_code, complaint_message
-             FROM clients
-             WHERE nfc_id = $1`,
-            [nfcId]
-        );
-        const client = rows[0];
-        if (!client) return res.status(404).json({ error: 'Client not found' });
+        const resolved = await resolvePublicNfc(nfcId);
+        if (!resolved) return res.status(404).json({ error: 'Client not found' });
 
         const status = answer === '1' ? 'replied' : 'complaint';
+        const branch = resolved.branchName || String(req.body.branch || '').trim() || null;
         await pool.query(
-            `INSERT INTO evaluations (client_id, phone, name, status, answer, source, feedback, rating)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [client.id, phone, name, status, answer, 'nfc', feedback, rating]
+            `INSERT INTO evaluations (client_id, phone, name, branch, status, answer, source, feedback, rating)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [resolved.clientId, phone, name, branch, status, answer, 'nfc', feedback, rating]
         );
 
         const response = {
             success: true,
             status,
-            googleLink: answer === '1' ? client.google_link : undefined
+            googleLink: answer === '1' ? resolved.googleLink : undefined
         };
 
         if (answer === '2') {
-            response.complaintAction = normalizeComplaintAction(client.complaint_action);
-            response.discountCode = client.discount_code || null;
-            response.complaintMessage = client.complaint_message || 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.';
+            response.complaintAction = normalizeComplaintAction(resolved.complaintAction);
+            response.discountCode = resolved.discountCode || null;
+            response.complaintMessage = resolved.complaintMessage || 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.';
         }
 
         res.json(response);
@@ -431,11 +625,8 @@ app.get('/api/qr/:nfcId', async (req, res) => {
     }
 
     try {
-        const { rows } = await pool.query(
-            'SELECT id FROM clients WHERE nfc_id = $1',
-            [nfcId]
-        );
-        if (!rows[0]) return res.status(404).json({ error: 'Client not found' });
+        const resolved = await resolvePublicNfc(nfcId);
+        if (!resolved) return res.status(404).json({ error: 'Client not found' });
 
         const baseUrl = (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
         const reviewUrl = `${baseUrl}/r/${encodeURIComponent(nfcId)}`;

@@ -15,6 +15,7 @@
                 </div>
                 <p class="mb-2 text-sm font-medium text-slate-500">قيّم تجربتك</p>
                 <h1 id="businessName" class="text-2xl font-bold text-slate-900">جاري التحميل...</h1>
+                <p id="branchName" class="mt-2 hidden text-sm font-medium text-slate-500"></p>
             </div>
 
             <div id="loadingState" class="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">
@@ -80,6 +81,7 @@
     <script>
         const nfcId = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).pop() || '').trim();
         const businessName = document.getElementById('businessName');
+        const branchName = document.getElementById('branchName');
         const loadingState = document.getElementById('loadingState');
         const ratingState = document.getElementById('ratingState');
         const complaintForm = document.getElementById('complaintForm');
@@ -195,6 +197,13 @@
                 whatsappContact = data.whatsapp_contact || data.whatsappContact || '';
                 updatePhoneRequirement();
                 businessName.textContent = data.name || 'المنشأة';
+                if (data.branchName) {
+                    branchName.textContent = `فرع: ${data.branchName}`;
+                    branchName.classList.remove('hidden');
+                } else {
+                    branchName.textContent = '';
+                    branchName.classList.add('hidden');
+                }
                 loadingState.classList.add('hidden');
                 ratingState.classList.remove('hidden');
             } catch (error) {
