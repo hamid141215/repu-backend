@@ -135,6 +135,16 @@
             <div id="complaints_grid" class="grid grid-cols-1 gap-3 md:grid-cols-2"></div>
         </div>
 
+        <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
+            <div class="mb-4">
+                <h4 class="text-sm font-semibold text-gray-800">أداء الفروع</h4>
+                <p class="mt-1 text-sm text-gray-500">متوسط التقييمات والشكاوى حسب كل فرع.</p>
+            </div>
+            <div id="branch_performance_table" class="overflow-hidden rounded-xl border border-gray-100">
+                <div class="px-4 py-6 text-center text-sm text-gray-500">لا توجد بيانات كافية حسب الفرع حالياً</div>
+            </div>
+        </div>
+
         <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
             <table class="w-full text-right">
                 <thead class="bg-gray-50 text-xs font-medium text-gray-500">
@@ -181,6 +191,72 @@
             if (source === 'dashboard') return 'لوحة العميل';
             if (source === 'whatsapp') return 'واتساب';
             return 'غير محدد';
+        }
+
+        function renderBranchPerformance(items) {
+            const container = document.getElementById('branch_performance_table');
+            const branches = new Map();
+
+            items.forEach(ev => {
+                const branchName = String(ev.branch || '').trim() || 'غير محدد';
+                if (!branches.has(branchName)) {
+                    branches.set(branchName, {
+                        branch: branchName,
+                        total: 0,
+                        ratingTotal: 0,
+                        ratingCount: 0,
+                        complaints: 0,
+                        lowRatings: 0
+                    });
+                }
+                const branch = branches.get(branchName);
+                branch.total++;
+                if (ev.status === 'complaint' || ev.answer === '2') branch.complaints++;
+
+                const rating = Number(ev.rating);
+                if (Number.isInteger(rating) && rating >= 1 && rating <= 5) {
+                    branch.ratingTotal += rating;
+                    branch.ratingCount++;
+                    if (rating <= 3) branch.lowRatings++;
+                }
+            });
+
+            const rows = Array.from(branches.values())
+                .map(branch => ({
+                    ...branch,
+                    averageRating: branch.ratingCount === 0 ? 0 : branch.ratingTotal / branch.ratingCount,
+                    lowRatingRate: branch.ratingCount === 0 ? 0 : Math.round((branch.lowRatings / branch.ratingCount) * 100)
+                }))
+                .sort((a, b) => b.lowRatingRate - a.lowRatingRate || b.complaints - a.complaints || b.total - a.total)
+                .slice(0, 10);
+
+            if (rows.length === 0) {
+                container.innerHTML = '<div class="px-4 py-6 text-center text-sm text-gray-500">لا توجد بيانات كافية حسب الفرع حالياً</div>';
+                return;
+            }
+
+            container.innerHTML = `<div class="overflow-x-auto">
+                <table class="w-full min-w-[620px] text-right">
+                    <thead class="bg-gray-50 text-xs font-medium text-gray-500">
+                        <tr>
+                            <th class="px-4 py-3">الفرع</th>
+                            <th class="px-4 py-3 text-center">متوسط التقييم</th>
+                            <th class="px-4 py-3 text-center">التقييمات</th>
+                            <th class="px-4 py-3 text-center">الشكاوى</th>
+                            <th class="px-4 py-3 text-center">تحتاج متابعة</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        ${rows.map(branch => `<tr>
+                            <td class="px-4 py-3 text-sm font-medium text-gray-800">${escapeHtml(branch.branch)}</td>
+                            <td class="px-4 py-3 text-center text-sm font-medium text-gray-700">${branch.averageRating.toFixed(1)} / 5</td>
+                            <td class="px-4 py-3 text-center text-sm font-medium text-gray-700">${branch.ratingCount || branch.total}</td>
+                            <td class="px-4 py-3 text-center text-sm font-medium text-gray-700">${branch.complaints}</td>
+                            <td class="px-4 py-3 text-center text-sm font-medium text-gray-700">${branch.lowRatingRate}%</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`;
         }
 
         async function load() {
@@ -241,6 +317,7 @@
                 document.getElementById('stat_avg_rating').innerText = ratingCount === 0 ? '0' : (ratingTotal / ratingCount).toFixed(1);
                 document.getElementById('stat_rating_count').innerText = ratingCount;
                 document.getElementById('stat_low_rating').innerText = lowRatingCount;
+                renderBranchPerformance(data);
             } catch(e) {}
         }
         function exportEx() { window.location.href = `/api/export-excel?apiKey=${key}`; } // دالة التصدير

@@ -587,6 +587,55 @@ app.get('/api/dashboard-summary', authenticate, async (req, res) => {
             count: ratingCounts.get(rating) || 0
         }));
 
+        const { rows: branchRows } = await pool.query(
+            `WITH branch_stats AS (
+                SELECT
+                    COALESCE(NULLIF(TRIM(branch), ''), 'غير محدد') AS branch,
+                    COUNT(*)::int AS total_evaluations,
+                    COUNT(rating)::int AS rating_count,
+                    COALESCE(ROUND(AVG(rating)::numeric, 1), 0)::float AS average_rating,
+                    COUNT(*) FILTER (WHERE status = 'complaint' OR answer = '2')::int AS complaint_count,
+                    COUNT(*) FILTER (WHERE status = 'replied' AND answer = '1')::int AS positive_count,
+                    COUNT(*) FILTER (WHERE rating BETWEEN 1 AND 3)::int AS low_rating_count
+                FROM evaluations
+                WHERE client_id = $1
+                GROUP BY COALESCE(NULLIF(TRIM(branch), ''), 'غير محدد')
+            )
+             SELECT
+                branch,
+                total_evaluations,
+                rating_count,
+                average_rating,
+                complaint_count,
+                positive_count,
+                low_rating_count,
+                CASE
+                    WHEN rating_count = 0 THEN 0
+                    ELSE ROUND((low_rating_count::numeric / rating_count) * 100)::int
+                END AS low_rating_rate
+             FROM branch_stats
+             ORDER BY low_rating_rate DESC, complaint_count DESC, total_evaluations DESC`,
+            [clientId]
+        );
+        const branchPerformance = branchRows.map(row => ({
+            branch: row.branch,
+            total_evaluations: Number(row.total_evaluations || 0),
+            rating_count: Number(row.rating_count || 0),
+            average_rating: Number(row.average_rating || 0),
+            complaint_count: Number(row.complaint_count || 0),
+            positive_count: Number(row.positive_count || 0),
+            low_rating_count: Number(row.low_rating_count || 0),
+            low_rating_rate: Number(row.low_rating_rate || 0)
+        }));
+        const bestBranches = [...branchPerformance]
+            .filter(row => row.rating_count >= 1)
+            .sort((a, b) => b.average_rating - a.average_rating || b.rating_count - a.rating_count || b.total_evaluations - a.total_evaluations)
+            .slice(0, 5);
+        const weakBranches = [...branchPerformance]
+            .sort((a, b) => b.low_rating_rate - a.low_rating_rate || b.complaint_count - a.complaint_count || b.rating_count - a.rating_count)
+            .slice(0, 5);
+        const visibleBranchPerformance = branchPerformance.slice(0, 10);
+
         const { rows: recentRows } = await pool.query(
             `SELECT id, name, phone, branch, status, answer, source, feedback, sent_at
              FROM evaluations
@@ -619,6 +668,9 @@ app.get('/api/dashboard-summary', authenticate, async (req, res) => {
             rating_breakdown: ratingBreakdown,
             low_rating_count: lowRatingCount,
             low_rating_rate: lowRatingRate,
+            branch_performance: visibleBranchPerformance,
+            best_branches: bestBranches,
+            weak_branches: weakBranches,
             recent_activity: recentRows,
             urgent_complaints: complaintRows
         });
