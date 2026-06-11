@@ -9,14 +9,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
+        html, body { overflow-x: hidden; }
         body { font-family: 'Cairo', sans-serif; background-color: #F9FAFB; color: #111827; }
         input, select, textarea { color: #111827 !important; font-weight: 400; }
         input::placeholder, textarea::placeholder { color: #9ca3af; }
+        main, .app-shell, .content-wrap, .app-card, .client-card, .client-card * { min-width: 0; }
         .app-card { border: 1px solid #e5e7eb; background: #fff; border-radius: 1rem; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+        .soft-code { overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
         .nav-icon { width: 20px; height: 20px; flex-shrink: 0; color: currentColor; }
         .metric-icon { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: 0.75rem; }
-        .table-scroll { overflow-x: auto; }
-        .table-scroll table { min-width: 980px; }
         .status-badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
         .api-key-box { font-family: monospace; background: #f8fafc; padding: 4px 8px; border-radius: 8px; color: #475467; font-size: 10px; border: 1px solid #e5e7eb; }
         .nfc-link-box { font-size: 10px; color: #475467; word-break: break-all; background: #f8fafc; padding: 8px; border-radius: 12px; border: 1px solid #e5e7eb; }
@@ -26,7 +27,7 @@
     </style>
 </head>
 <body>
-    <div class="min-h-screen bg-[#F9FAFB] text-gray-900">
+    <div class="app-shell min-h-screen bg-[#F9FAFB] text-gray-900">
         <aside class="hidden lg:fixed lg:inset-y-0 lg:right-0 lg:z-40 lg:flex lg:w-[290px] lg:flex-col border-l border-gray-200 bg-white p-5">
             <div class="mb-5 text-center">
                 <img src="/assets/logo-icon-tight.svg" alt="RepuSystem" class="mx-auto h-16 w-16 object-contain">
@@ -68,7 +69,7 @@
             </div>
         </aside>
 
-        <div class="min-h-screen lg:mr-[290px]">
+        <div class="min-h-screen min-w-0 lg:mr-[290px]">
             <header class="sticky top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur">
                 <div class="flex flex-col gap-4 px-4 py-4 md:px-6 xl:flex-row xl:items-center xl:justify-between">
                     <div>
@@ -90,7 +91,7 @@
                 </div>
             </header>
 
-            <main class="p-4 md:p-6">
+            <main class="min-w-0 max-w-full p-4 md:p-6">
                 <div class="mb-4 mobile-shell-card p-4 lg:hidden">
                     <div class="flex items-center gap-3">
                         <img src="/assets/logo-icon-tight.svg" alt="RepuSystem" class="h-12 w-12 object-contain">
@@ -104,7 +105,7 @@
                         <a href="#add-client-section" class="rounded-lg border border-gray-200 px-3 py-2 text-center font-medium text-gray-700">إضافة عميل</a>
                     </div>
                 </div>
-                <div class="mx-auto w-full max-w-[1500px]">
+                <div class="content-wrap mx-auto w-full max-w-[1500px] min-w-0">
 
         <div id="dash" class="hidden space-y-5 md:space-y-6">
             <div class="grid gap-3 md:grid-cols-3 md:gap-4">
@@ -131,7 +132,7 @@
                 </div>
             </div>
 
-            <div class="grid gap-5 xl:grid-cols-5">
+            <div class="grid min-w-0 gap-5 xl:grid-cols-5">
                 <div id="add-client-section" class="app-card p-5 md:p-6 xl:col-span-2">
                     <div class="mb-5">
                         <h3 class="text-lg font-semibold text-gray-900">إضافة عميل جديد</h3>
@@ -178,24 +179,12 @@
                     <button onclick="add()" class="mt-5 h-11 w-full rounded-lg bg-[#465fff] text-sm font-medium text-white transition hover:bg-[#3641f5]">تفعيل الحساب</button>
                 </div>
 
-                <div class="app-card overflow-hidden xl:col-span-3">
+                <div class="app-card min-w-0 overflow-hidden xl:col-span-3">
                     <div class="flex flex-col gap-1 border-b border-gray-200 px-5 py-4 md:px-6">
                         <h4 class="text-lg font-semibold text-gray-900">العملاء</h4>
                         <p class="text-sm text-gray-500">قائمة المنشآت وروابط التقييم</p>
                     </div>
-                    <div class="table-scroll">
-                        <table class="w-full text-right text-sm">
-                            <thead class="bg-gray-50 text-xs font-medium text-gray-500">
-                                <tr>
-                                    <th class="px-5 py-3 md:px-6">المنشأة والبيانات</th>
-                                    <th class="px-5 py-3 md:px-6">رابط التقييم / NFC</th>
-                                    <th class="px-5 py-3 text-center md:px-6">الباقة</th>
-                                    <th class="px-5 py-3 text-center md:px-6">تحكم</th>
-                                </tr>
-                            </thead>
-                            <tbody id="list" class="divide-y divide-gray-100"></tbody>
-                        </table>
-                    </div>
+                    <div id="list" class="space-y-4 p-4 md:p-5"></div>
                 </div>
             </div>
         </div>
@@ -236,17 +225,17 @@
                 const reviewUrl = branchReviewUrl(branch.nfc_id);
                 const statusClass = branch.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500';
                 const statusText = branch.is_active ? 'نشط' : 'معطل';
-                return `<div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                return `<div class="min-w-0 rounded-lg border border-gray-100 bg-gray-50 p-3">
+                    <div class="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
                                 <p class="text-xs font-semibold text-gray-800">${escapeHtml(branch.name)}</p>
                                 <span class="rounded-full px-2 py-0.5 text-[10px] font-medium ${statusClass}">${statusText}</span>
                             </div>
                             <p class="mt-1 text-[11px] text-gray-500">${escapeHtml([branch.city, branch.area].filter(Boolean).join(' - ') || 'بدون موقع')}</p>
-                            <p class="mt-1 break-all font-mono text-[11px] text-[#465fff]" dir="ltr">${escapeHtml(reviewUrl || '-')}</p>
+                            <p class="soft-code mt-1 font-mono text-[11px] text-[#465fff]" dir="ltr">${escapeHtml(reviewUrl || '-')}</p>
                         </div>
-                        <div class="flex flex-wrap gap-2">
+                        <div class="flex shrink-0 flex-wrap gap-2">
                             ${reviewUrl ? `<button onclick="copyBranchReviewLink('${encodeURIComponent(branch.nfc_id)}')" class="inline-flex h-7 items-center rounded-lg bg-[#465fff] px-2.5 text-[11px] font-medium text-white">نسخ رابط الفرع</button>` : ''}
                             ${branch.nfc_id ? `<a href="/api/qr/${encodeURIComponent(branch.nfc_id)}" class="inline-flex h-7 items-center rounded-lg border border-gray-200 bg-white px-2.5 text-[11px] font-medium text-gray-700">تحميل QR للفرع</a>` : ''}
                             <button onclick="toggleBranch('${branch.id}', ${branch.is_active ? 'false' : 'true'}, '${client.id}')" class="inline-flex h-7 items-center rounded-lg border border-gray-200 bg-white px-2.5 text-[11px] font-medium text-gray-700">${branch.is_active ? 'تعطيل' : 'تفعيل'}</button>
@@ -255,7 +244,7 @@
                 </div>`;
             }).join('') : '<div class="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-500">لا توجد فروع مضافة</div>';
 
-            return `<div class="mt-4 max-w-sm rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+            return `<div class="mt-4 max-w-full rounded-xl border border-blue-100 bg-blue-50/40 p-3">
                 <div class="mb-3">
                     <div class="text-xs font-semibold text-gray-800">فروع العميل</div>
                     <p class="mt-1 text-[11px] text-gray-500">كل فرع يمكنه امتلاك NFC ID ورابط Google خاص.</p>
@@ -263,7 +252,7 @@
                 <div class="space-y-2">${branchRows}</div>
                 <div class="mt-3 grid grid-cols-1 gap-2">
                     <input id="branch_name_${client.id}" placeholder="اسم الفرع" class="h-9 w-full rounded-lg border border-gray-300 px-3 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <input id="branch_city_${client.id}" placeholder="المدينة" class="h-9 w-full rounded-lg border border-gray-300 px-3 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
                         <input id="branch_area_${client.id}" placeholder="الحي / المنطقة" class="h-9 w-full rounded-lg border border-gray-300 px-3 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
                     </div>
@@ -300,35 +289,53 @@
                         const whatsappContact = c.whatsapp_contact || '';
 
                         return `
-                        <tr class="bg-white hover:bg-gray-50 transition-colors">
-                            <td class="px-5 py-4 md:px-6">
-                                <div class="mb-2 font-semibold text-gray-900">${c.name}</div>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-[#465fff]">ID: ${c.nfc_id || '---'}</span>
-                                    <span class="font-mono text-xs text-gray-500">${c.api_key}</span>
-                                </div>
-                            </td>
-                            <td class="w-2/5 px-5 py-4 md:px-6">
-                                ${reviewUrl ? `
-                                    <div class="mb-2 text-xs font-semibold text-gray-700">رابط التقييم / NFC</div>
-                                    <div class="mb-2 max-w-sm truncate rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 font-mono text-xs text-[#465fff]">${reviewUrl}</div>
-                                    <div class="mb-3 flex flex-wrap gap-2">
-                                        <button onclick="copyLink('${reviewUrl}')" class="inline-flex h-8 items-center rounded-lg bg-[#465fff] px-3 text-xs font-medium text-white transition hover:bg-[#3641f5]">نسخ رابط التقييم</button>
-                                        <a href="/api/qr/${encodeURIComponent(c.nfc_id)}" class="inline-flex h-8 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50">تحميل QR</a>
+                        <article class="client-card min-w-0 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:border-gray-200 md:p-5">
+                            <div class="flex min-w-0 flex-col gap-3 border-b border-gray-100 pb-4 lg:flex-row lg:items-start lg:justify-between">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h5 class="soft-code text-base font-semibold text-gray-900">${escapeHtml(c.name)}</h5>
+                                        <span class="status-badge bg-gray-100 text-gray-700">${escapeHtml(c.plan || 'غير محدد')}</span>
                                     </div>
-                                ` : `
-                                    <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">لا يوجد NFC ID</div>
-                                `}
-                                <div class="mb-2 max-w-sm truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">WhatsApp: "${friendlyText}"</div>
-                                <button onclick="copyLink('${nfcLink}')" class="inline-flex h-8 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50">نسخ رابط واتساب القديم</button>
-                                <div class="mt-4 max-w-sm rounded-xl border border-gray-200 bg-white p-3">
+                                    <div class="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+                                        <span class="status-badge bg-blue-50 text-[#465fff]">ID: ${escapeHtml(c.nfc_id || '---')}</span>
+                                        <span class="soft-code rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 font-mono text-xs text-gray-500">${escapeHtml(c.api_key || 'بدون API Key')}</span>
+                                    </div>
+                                </div>
+                                <button onclick="deleteClient('${c.id}')" class="inline-flex h-8 w-fit shrink-0 items-center rounded-lg bg-rose-50 px-3 text-xs font-medium text-rose-600 transition hover:bg-rose-100">حذف</button>
+                            </div>
+
+                            <div class="mt-4 grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
+                                <div class="min-w-0 space-y-4">
+                                    <div class="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <div class="mb-2 text-xs font-semibold text-gray-700">رابط التقييم / NFC</div>
+                                        ${reviewUrl ? `
+                                            <div class="soft-code mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 font-mono text-xs leading-5 text-[#465fff]" dir="ltr">${escapeHtml(reviewUrl)}</div>
+                                            <div class="flex flex-wrap gap-2">
+                                                <button onclick="copyLink('${reviewUrl}')" class="inline-flex h-8 items-center rounded-lg bg-[#465fff] px-3 text-xs font-medium text-white transition hover:bg-[#3641f5]">نسخ رابط التقييم</button>
+                                                <a href="/api/qr/${encodeURIComponent(c.nfc_id)}" class="inline-flex h-8 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50">تحميل QR</a>
+                                            </div>
+                                        ` : `
+                                            <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">لا يوجد NFC ID</div>
+                                        `}
+                                    </div>
+
+                                    <div class="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <div class="mb-2 text-xs font-semibold text-gray-700">رابط واتساب القديم</div>
+                                        <div class="soft-code mb-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs leading-5 text-gray-500">WhatsApp: "${escapeHtml(friendlyText)}"</div>
+                                        <button onclick="copyLink('${nfcLink}')" class="inline-flex h-8 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50">نسخ رابط واتساب القديم</button>
+                                    </div>
+
+                                    ${renderBranches(c)}
+                                </div>
+
+                                <div class="min-w-0 rounded-xl border border-gray-200 bg-white p-3">
                                     <div class="mb-3">
                                         <div class="text-xs font-semibold text-gray-700">إعدادات الشكوى</div>
                                         <div class="mt-1 flex flex-wrap gap-2 text-[11px] text-gray-500">
                                             <span class="rounded-full bg-gray-100 px-2 py-1">${complaintActionLabel(complaintAction)}</span>
-                                            <span class="rounded-full bg-gray-100 px-2 py-1">الكود: ${escapeHtml(discountCode || 'غير محدد')}</span>
+                                            <span class="soft-code rounded-full bg-gray-100 px-2 py-1">الكود: ${escapeHtml(discountCode || 'غير محدد')}</span>
                                         </div>
-                                        <p class="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">${escapeHtml(complaintMessage)}</p>
+                                        <p class="soft-code mt-2 text-xs leading-5 text-gray-500">${escapeHtml(complaintMessage)}</p>
                                     </div>
                                     <div class="space-y-2">
                                         <select id="complaint_action_${c.id}" class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
@@ -342,16 +349,9 @@
                                         <button onclick="saveComplaintSettings('${c.id}')" class="inline-flex h-8 items-center rounded-lg bg-[#465fff] px-3 text-xs font-medium text-white transition hover:bg-[#3641f5]">حفظ إعدادات الشكوى</button>
                                     </div>
                                 </div>
-                                ${renderBranches(c)}
-                            </td>
-                            <td class="px-5 py-4 text-center md:px-6">
-                                <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">${c.plan}</span>
-                            </td>
-                            <td class="px-5 py-4 text-center md:px-6">
-                                <button onclick="deleteClient('${c.id}')" class="inline-flex h-8 items-center rounded-lg bg-rose-50 px-3 text-xs font-medium text-rose-600 transition hover:bg-rose-100">حذف</button>
-                            </td>
-                        </tr>
-                    `}).join('') : '<tr><td colspan="4" class="px-5 py-10 text-center text-sm text-gray-500">لا يوجد عملاء بعد</td></tr>';
+                            </div>
+                        </article>
+                    `}).join('') : '<div class="rounded-xl border border-dashed border-gray-200 px-5 py-10 text-center text-sm text-gray-500">لا يوجد عملاء بعد</div>';
                 } else {
                     localStorage.removeItem('ap');
                     alert('خطأ في كلمة المرور');
