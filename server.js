@@ -92,6 +92,7 @@ const initDB = async (retries = 10) => {
         await pool.query('ALTER TABLE clients ADD COLUMN IF NOT EXISTS whatsapp_contact TEXT');
         await pool.query("ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'dashboard'");
         await pool.query('ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS feedback TEXT');
+        await pool.query('ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS rating INT');
 
         await pool.query('CREATE INDEX IF NOT EXISTS idx_clients_api_key       ON clients (api_key)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_clients_nfc_id        ON clients (nfc_id)');
@@ -376,9 +377,16 @@ app.post('/api/public/review', async (req, res) => {
     const phoneInput = String(req.body.phone || '').trim();
     const phone = phoneInput ? normalizePhone(phoneInput) : '';
     const feedback = String(req.body.feedback || '').trim() || null;
+    const rawRating = req.body.rating;
+    const rating = rawRating === undefined || rawRating === null || rawRating === ''
+        ? null
+        : Number(rawRating);
 
     if (!nfcId) return res.status(400).json({ error: 'Missing NFC ID' });
     if (!['1', '2'].includes(answer)) return res.status(400).json({ error: 'Invalid answer' });
+    if (rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
+        return res.status(400).json({ error: 'Invalid rating' });
+    }
     if (answer === '2' && !feedback) return res.status(400).json({ error: 'Feedback is required' });
 
     try {
@@ -393,9 +401,9 @@ app.post('/api/public/review', async (req, res) => {
 
         const status = answer === '1' ? 'replied' : 'complaint';
         await pool.query(
-            `INSERT INTO evaluations (client_id, phone, name, status, answer, source, feedback)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [client.id, phone, name, status, answer, 'nfc', feedback]
+            `INSERT INTO evaluations (client_id, phone, name, status, answer, source, feedback, rating)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [client.id, phone, name, status, answer, 'nfc', feedback, rating]
         );
 
         const response = {

@@ -21,19 +21,24 @@
                 يتم تحميل بيانات المنشأة.
             </div>
 
-            <div id="choiceState" class="hidden space-y-3">
-                <p class="mb-4 text-center text-sm leading-6 text-slate-600">
+            <div id="ratingState" class="hidden space-y-5">
+                <p class="text-center text-sm leading-6 text-slate-600">
                     كيف كانت تجربتك معنا اليوم؟
                 </p>
-                <button id="excellentBtn" type="button" class="flex h-14 w-full items-center justify-center rounded-xl bg-[#465fff] px-4 text-base font-semibold text-white shadow-sm transition hover:bg-[#3449d6] disabled:cursor-not-allowed disabled:opacity-60">
-                    ممتازة
-                </button>
-                <button id="complaintBtn" type="button" class="flex h-14 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-base font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
-                    تحتاج تحسين
-                </button>
+                <div id="starRating" class="flex items-center justify-center gap-1.5" role="radiogroup" aria-label="تقييم التجربة من 1 إلى 5">
+                    <button type="button" class="star-btn text-4xl leading-none text-slate-300 transition hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:opacity-60" data-rating="1" role="radio" aria-checked="false" aria-label="1 من 5">★</button>
+                    <button type="button" class="star-btn text-4xl leading-none text-slate-300 transition hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:opacity-60" data-rating="2" role="radio" aria-checked="false" aria-label="2 من 5">★</button>
+                    <button type="button" class="star-btn text-4xl leading-none text-slate-300 transition hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:opacity-60" data-rating="3" role="radio" aria-checked="false" aria-label="3 من 5">★</button>
+                    <button type="button" class="star-btn text-4xl leading-none text-slate-300 transition hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:opacity-60" data-rating="4" role="radio" aria-checked="false" aria-label="4 من 5">★</button>
+                    <button type="button" class="star-btn text-4xl leading-none text-slate-300 transition hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:opacity-60" data-rating="5" role="radio" aria-checked="false" aria-label="5 من 5">★</button>
+                </div>
             </div>
 
             <form id="complaintForm" class="hidden space-y-4">
+                <div class="rounded-xl bg-emerald-50 p-4 text-center text-sm leading-6 text-emerald-700">
+                    <p class="font-semibold">نعتذر أن تجربتك لم تكن بالمستوى المطلوب.</p>
+                    <p>ملاحظتك تهمنا وسيتم التعامل معها لتحسين الخدمة.</p>
+                </div>
                 <div>
                     <label for="name" class="mb-1.5 block text-sm font-medium text-slate-700">الاسم اختياري</label>
                     <input id="name" name="name" type="text" autocomplete="name" class="h-12 w-full rounded-xl border border-slate-300 px-4 text-sm outline-none transition focus:border-[#465fff] focus:ring-4 focus:ring-blue-50">
@@ -76,7 +81,7 @@
         const nfcId = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).pop() || '').trim();
         const businessName = document.getElementById('businessName');
         const loadingState = document.getElementById('loadingState');
-        const choiceState = document.getElementById('choiceState');
+        const ratingState = document.getElementById('ratingState');
         const complaintForm = document.getElementById('complaintForm');
         const thankYouState = document.getElementById('thankYouState');
         const thankYouMessage = document.getElementById('thankYouMessage');
@@ -84,14 +89,14 @@
         const discountCode = document.getElementById('discountCode');
         const whatsappContactBtn = document.getElementById('whatsappContactBtn');
         const errorState = document.getElementById('errorState');
-        const excellentBtn = document.getElementById('excellentBtn');
-        const complaintBtn = document.getElementById('complaintBtn');
+        const starButtons = Array.from(document.querySelectorAll('.star-btn'));
         const submitComplaintBtn = document.getElementById('submitComplaintBtn');
         const backBtn = document.getElementById('backBtn');
         const phoneLabel = document.getElementById('phoneLabel');
         const phoneInput = document.getElementById('phone');
         let complaintAction = 'contact';
         let whatsappContact = '';
+        let selectedRating = 0;
 
         const requiresComplaintPhone = () => ['contact', 'contact_discount'].includes(complaintAction);
 
@@ -111,9 +116,19 @@
         };
 
         const setBusy = (busy) => {
-            excellentBtn.disabled = busy;
-            complaintBtn.disabled = busy;
+            starButtons.forEach(button => {
+                button.disabled = busy;
+            });
             submitComplaintBtn.disabled = busy;
+        };
+
+        const paintStars = (rating) => {
+            starButtons.forEach(button => {
+                const starRating = Number(button.dataset.rating);
+                button.classList.toggle('text-amber-400', starRating <= rating);
+                button.classList.toggle('text-slate-300', starRating > rating);
+                button.setAttribute('aria-checked', selectedRating === starRating ? 'true' : 'false');
+            });
         };
 
         const postReview = async (payload) => {
@@ -181,7 +196,7 @@
                 updatePhoneRequirement();
                 businessName.textContent = data.name || 'المنشأة';
                 loadingState.classList.add('hidden');
-                choiceState.classList.remove('hidden');
+                ratingState.classList.remove('hidden');
             } catch (error) {
                 loadingState.classList.add('hidden');
                 businessName.textContent = 'تعذر التحميل';
@@ -189,34 +204,46 @@
             }
         };
 
-        excellentBtn.addEventListener('click', async () => {
+        const handleRating = async (rating) => {
             clearError();
+            selectedRating = rating;
+            paintStars(rating);
+
+            if (rating <= 3) {
+                ratingState.classList.add('hidden');
+                complaintForm.classList.remove('hidden');
+                return;
+            }
+
             setBusy(true);
             try {
-                const data = await postReview({ nfcId, answer: '1' });
+                const data = await postReview({ nfcId, answer: '1', rating });
                 if (data.googleLink) {
                     window.location.href = data.googleLink;
                     return;
                 }
-                choiceState.classList.add('hidden');
+                ratingState.classList.add('hidden');
                 thankYouState.classList.remove('hidden');
             } catch (error) {
                 showError(error.message);
             } finally {
                 setBusy(false);
             }
+        };
+
+        starButtons.forEach(button => {
+            const rating = Number(button.dataset.rating);
+            button.addEventListener('mouseenter', () => paintStars(rating));
+            button.addEventListener('focus', () => paintStars(rating));
+            button.addEventListener('click', () => handleRating(rating));
         });
 
-        complaintBtn.addEventListener('click', () => {
-            clearError();
-            choiceState.classList.add('hidden');
-            complaintForm.classList.remove('hidden');
-        });
+        document.getElementById('starRating').addEventListener('mouseleave', () => paintStars(selectedRating));
 
         backBtn.addEventListener('click', () => {
             clearError();
             complaintForm.classList.add('hidden');
-            choiceState.classList.remove('hidden');
+            ratingState.classList.remove('hidden');
         });
 
         complaintForm.addEventListener('submit', async (event) => {
@@ -239,6 +266,7 @@
                 const data = await postReview({
                     nfcId,
                     answer: '2',
+                    rating: selectedRating,
                     name: document.getElementById('name').value.trim(),
                     phone,
                     feedback
