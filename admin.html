@@ -197,6 +197,25 @@
         </div>
 
         <div id="dashboard_view" class="space-y-4 md:space-y-5">
+        <div id="executive_summary_strip" class="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                <p class="text-xs font-medium text-gray-500">متوسط التقييم</p>
+                <p id="summary_average_rating" class="mt-1 text-base font-semibold text-gray-900">0 / 5</p>
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                <p class="text-xs font-medium text-gray-500">تقييمات النجوم</p>
+                <p id="summary_rating_count" class="mt-1 text-base font-semibold text-gray-900">0</p>
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                <p class="text-xs font-medium text-gray-500">شكاوى مفتوحة</p>
+                <p id="summary_complaint_count" class="mt-1 text-base font-semibold text-gray-900">0</p>
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                <p class="text-xs font-medium text-gray-500">فروع نشطة/مقاسة</p>
+                <p id="summary_branch_count" class="mt-1 text-base font-semibold text-gray-900">0</p>
+            </div>
+        </div>
+
         <div class="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm md:p-4">
             <div class="mb-2 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div>
@@ -240,6 +259,7 @@
                 <div class="mb-4">
                     <h3 class="text-lg font-semibold text-gray-800">معدل الرضا</h3>
                     <p class="mt-1 text-sm text-gray-500">نسبة التقييمات الممتازة من الردود المصنفة.</p>
+                    <p class="mt-1 text-xs text-gray-400">يعتمد على التقييمات المصنفة خلال الفترة الحالية.</p>
                 </div>
                 <div class="dashboard-chart dashboard-chart--compact flex items-center justify-center">
                     <canvas id="satisfaction_chart"></canvas>
@@ -258,8 +278,8 @@
 
             <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-4">
                 <div class="mb-4">
-                    <h3 class="text-lg font-semibold text-gray-800">تحليل النجوم</h3>
-                    <p class="mt-1 text-sm text-gray-500">توزيع تقييمات العملاء من 1 إلى 5 نجوم.</p>
+                    <h3 class="text-lg font-semibold text-gray-800">توزيع تقييمات النجوم</h3>
+                    <p class="mt-1 text-sm text-gray-500">يوضح مستوى رضا العملاء من 1 إلى 5 نجوم.</p>
                 </div>
                 <div class="mb-4 grid grid-cols-3 gap-2 text-center">
                     <div class="rounded-xl bg-slate-50 px-2 py-3">
@@ -503,6 +523,15 @@
             setText('low_rating_rate', `${summary.low_rating_rate ?? 0}%`);
         }
 
+        function renderExecutiveSummary(summary) {
+            const averageRating = Number(summary.average_rating || 0).toFixed(1);
+            const branchCount = Array.isArray(summary.branch_performance) ? summary.branch_performance.length : 0;
+            setText('summary_average_rating', `${averageRating} / 5`);
+            setText('summary_rating_count', String(summary.rating_count ?? 0));
+            setText('summary_complaint_count', String(summary.complaint_count ?? 0));
+            setText('summary_branch_count', String(branchCount));
+        }
+
         function ratingBadgeClass(rating) {
             const value = Number(rating || 0);
             if (value >= 4) return 'bg-emerald-50 text-emerald-700';
@@ -523,7 +552,8 @@
                     bestBadge.textContent = `أفضل أداء: ${bestBranch.branch}`;
                     bestBadge.classList.remove('hidden');
                 } else {
-                    bestBadge.classList.add('hidden');
+                    bestBadge.textContent = 'لا توجد بيانات كافية بعد.';
+                    bestBadge.classList.remove('hidden');
                 }
             }
 
@@ -828,10 +858,12 @@
                 const source = activitySourceLabel(ev.source);
                 const time = formatActivityTime(ev.sent_at);
                 const feedback = ev.feedback ? `<p class="mt-1 truncate text-xs leading-5 text-gray-500">${escapeHtml(ev.feedback)}</p>` : '<p class="mt-1 text-xs text-gray-400">لا توجد ملاحظات نصية</p>';
+                const branch = ev.branch ? `<p class="mt-1 text-xs font-medium text-slate-500">فرع: ${escapeHtml(ev.branch)}</p>` : '';
 
                 return `<div class="grid gap-3 border-b border-gray-100 px-4 py-3 text-right last:border-b-0 md:grid-cols-[1fr_auto] md:items-center">
                     <div class="min-w-0">
                         <p class="text-sm font-medium text-gray-800">${escapeHtml(activityTitle(ev))}</p>
+                        ${branch}
                         ${feedback}
                     </div>
                     <div class="flex flex-wrap items-center gap-2 md:justify-end">
@@ -880,6 +912,7 @@
                 if (!res.ok) throw new Error(summary.error || `HTTP ${res.status}`);
 
                 renderStats(summary);
+                renderExecutiveSummary(summary);
                 renderDashboardCharts(summary);
                 renderBranchPerformance(summary);
                 renderLatestActivity(summary.recent_activity || []);
