@@ -76,7 +76,7 @@
 
         <div class="mx-auto max-w-screen-2xl space-y-6">
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-3">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-6">
             <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-700">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v14H5V5Zm4 4h6M9 12h6M9 15h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -102,6 +102,27 @@
                 <div class="mt-5">
                     <p class="text-sm text-gray-500">شكاوى</p>
                     <h3 id="stat_negative" class="mt-2 text-3xl font-bold text-gray-900">0</h3>
+                </div>
+            </div>
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600">★</div>
+                <div class="mt-5">
+                    <p class="text-sm text-gray-500">متوسط التقييم</p>
+                    <h3 id="stat_avg_rating" class="mt-2 text-3xl font-bold text-gray-900">0</h3>
+                </div>
+            </div>
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">★</div>
+                <div class="mt-5">
+                    <p class="text-sm text-gray-500">عدد تقييمات النجوم</p>
+                    <h3 id="stat_rating_count" class="mt-2 text-3xl font-bold text-gray-900">0</h3>
+                </div>
+            </div>
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 text-rose-600">!</div>
+                <div class="mt-5">
+                    <p class="text-sm text-gray-500">تقييمات 1–3 نجوم</p>
+                    <h3 id="stat_low_rating" class="mt-2 text-3xl font-bold text-gray-900">0</h3>
                 </div>
             </div>
         </div>
@@ -168,7 +189,7 @@
                 const data = await res.json();
                 document.getElementById('content').classList.remove('hidden');
                 
-                let pos = 0, neg = 0;
+                let pos = 0, neg = 0, ratingTotal = 0, ratingCount = 0, lowRatingCount = 0;
                 const grid = document.getElementById('complaints_grid'); grid.innerHTML = '';
                 
                 document.getElementById('rows').innerHTML = data.map(ev => {
@@ -183,6 +204,12 @@
                             </div>
                             <a href="https://wa.me/${ev.phone}" class="inline-flex h-9 items-center justify-center rounded-lg bg-rose-600 px-3 text-xs font-medium text-white hover:bg-rose-700">تواصل</a>
                         </div>`;
+                    }
+                    const rating = Number(ev.rating);
+                    if(Number.isInteger(rating) && rating >= 1 && rating <= 5) {
+                        ratingTotal += rating;
+                        ratingCount++;
+                        if(rating <= 3) lowRatingCount++;
                     }
                     const feedback = ev.feedback ? escapeHtml(ev.feedback) : '';
                     return `<tr>
@@ -211,6 +238,9 @@
                 document.getElementById('stat_total').innerText = data.length;
                 document.getElementById('stat_positive').innerText = pos;
                 document.getElementById('stat_negative').innerText = neg;
+                document.getElementById('stat_avg_rating').innerText = ratingCount === 0 ? '0' : (ratingTotal / ratingCount).toFixed(1);
+                document.getElementById('stat_rating_count').innerText = ratingCount;
+                document.getElementById('stat_low_rating').innerText = lowRatingCount;
             } catch(e) {}
         }
         function exportEx() { window.location.href = `/api/export-excel?apiKey=${key}`; } // دالة التصدير

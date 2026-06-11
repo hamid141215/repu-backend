@@ -258,11 +258,25 @@
 
             <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-4">
                 <div class="mb-4">
-                    <h3 class="text-lg font-semibold text-gray-800">توزيع المصادر</h3>
-                    <p class="mt-1 text-sm text-gray-500">مصادر الطلبات والتقييمات حسب القناة.</p>
+                    <h3 class="text-lg font-semibold text-gray-800">تحليل النجوم</h3>
+                    <p class="mt-1 text-sm text-gray-500">توزيع تقييمات العملاء من 1 إلى 5 نجوم.</p>
                 </div>
-                <div class="dashboard-chart dashboard-chart--compact flex items-center justify-center">
-                    <canvas id="source_chart"></canvas>
+                <div class="mb-4 grid grid-cols-3 gap-2 text-center">
+                    <div class="rounded-xl bg-slate-50 px-2 py-3">
+                        <p class="text-[11px] font-medium text-gray-500">متوسط التقييم</p>
+                        <p id="average_rating" class="mt-1 text-lg font-bold text-gray-900">0 / 5</p>
+                    </div>
+                    <div class="rounded-xl bg-slate-50 px-2 py-3">
+                        <p class="text-[11px] font-medium text-gray-500">تقييمات مسجلة</p>
+                        <p id="rating_count" class="mt-1 text-lg font-bold text-gray-900">0</p>
+                    </div>
+                    <div class="rounded-xl bg-rose-50 px-2 py-3">
+                        <p class="text-[11px] font-medium text-rose-600">تحتاج متابعة</p>
+                        <p id="low_rating_rate" class="mt-1 text-lg font-bold text-rose-700">0%</p>
+                    </div>
+                </div>
+                <div class="dashboard-chart dashboard-chart--compact">
+                    <canvas id="rating_breakdown_chart"></canvas>
                 </div>
             </div>
         </div>
@@ -466,6 +480,13 @@
             if (satisfaction) satisfaction.innerText = `${data.satisfaction_rate ?? 0}%`;
         }
 
+        function renderRatingInsights(summary) {
+            const averageRating = Number(summary.average_rating || 0).toFixed(1);
+            setText('average_rating', `${averageRating} / 5`);
+            setText('rating_count', String(summary.rating_count ?? 0));
+            setText('low_rating_rate', `${summary.low_rating_rate ?? 0}%`);
+        }
+
         function destroyChart(id) {
             if (dashboardCharts[id]) {
                 dashboardCharts[id].destroy();
@@ -588,20 +609,29 @@
                 })
             });
 
-            const sources = summary.source_breakdown || [];
-            destroyChart('source_chart');
-            dashboardCharts.source_chart = new Chart(document.getElementById('source_chart'), {
-                type: 'doughnut',
+            renderRatingInsights(summary);
+            const ratingBreakdown = Array.isArray(summary.rating_breakdown)
+                ? summary.rating_breakdown
+                : [5, 4, 3, 2, 1].map(rating => ({ rating, count: 0 }));
+            destroyChart('rating_breakdown_chart');
+            dashboardCharts.rating_breakdown_chart = new Chart(document.getElementById('rating_breakdown_chart'), {
+                type: 'bar',
                 data: {
-                    labels: sources.map(item => activitySourceLabel(item.source)),
+                    labels: ratingBreakdown.map(item => item.rating === 1 ? '1 نجمة' : `${item.rating} نجوم`),
                     datasets: [{
-                        data: sources.map(item => item.total),
-                        backgroundColor: ['#465FFF', '#12B76A', '#F79009', '#667085'],
-                        borderWidth: 0,
-                        cutout: '62%'
+                        label: 'عدد التقييمات',
+                        data: ratingBreakdown.map(item => item.count),
+                        backgroundColor: ['#12B76A', '#34D399', '#F79009', '#FB7185', '#F04438'],
+                        borderRadius: 8,
+                        maxBarThickness: 36
                     }]
                 },
-                options: chartOptions({ scales: {} })
+                options: chartOptions({
+                    plugins: {
+                        ...chartOptions().plugins,
+                        legend: { display: false }
+                    }
+                })
             });
         }
 

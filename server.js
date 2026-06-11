@@ -557,6 +557,36 @@ app.get('/api/dashboard-summary', authenticate, async (req, res) => {
             [clientId]
         );
 
+        const { rows: ratingStatsRows } = await pool.query(
+            `SELECT
+                COUNT(*) FILTER (WHERE rating IS NOT NULL)::int AS rating_count,
+                COALESCE(ROUND(AVG(rating)::numeric, 1), 0)::float AS average_rating,
+                COUNT(*) FILTER (WHERE rating BETWEEN 1 AND 3)::int AS low_rating_count
+             FROM evaluations
+             WHERE client_id = $1`,
+            [clientId]
+        );
+        const ratingStats = ratingStatsRows[0] || { rating_count: 0, average_rating: 0, low_rating_count: 0 };
+        const ratingCount = Number(ratingStats.rating_count || 0);
+        const lowRatingCount = Number(ratingStats.low_rating_count || 0);
+        const lowRatingRate = ratingCount === 0
+            ? 0
+            : Math.round((lowRatingCount / ratingCount) * 100);
+
+        const { rows: ratingRows } = await pool.query(
+            `SELECT rating, COUNT(*)::int AS count
+             FROM evaluations
+             WHERE client_id = $1
+               AND rating IS NOT NULL
+             GROUP BY rating`,
+            [clientId]
+        );
+        const ratingCounts = new Map(ratingRows.map(row => [Number(row.rating), Number(row.count)]));
+        const ratingBreakdown = [5, 4, 3, 2, 1].map(rating => ({
+            rating,
+            count: ratingCounts.get(rating) || 0
+        }));
+
         const { rows: recentRows } = await pool.query(
             `SELECT id, name, phone, branch, status, answer, source, feedback, sent_at
              FROM evaluations
@@ -584,6 +614,11 @@ app.get('/api/dashboard-summary', authenticate, async (req, res) => {
             monthly_counts: monthlyRows,
             daily_counts_last_30_days: dailyRows,
             source_breakdown: sourceRows,
+            average_rating: ratingCount === 0 ? 0 : Number(ratingStats.average_rating || 0),
+            rating_count: ratingCount,
+            rating_breakdown: ratingBreakdown,
+            low_rating_count: lowRatingCount,
+            low_rating_rate: lowRatingRate,
             recent_activity: recentRows,
             urgent_complaints: complaintRows
         });
