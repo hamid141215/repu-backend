@@ -20,6 +20,9 @@
         }
         .app-card { border: 1px solid #e5e7eb; background: #fff; border-radius: 1rem; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
         .soft-code { overflow-wrap: anywhere; word-break: break-word; max-width: 100%; white-space: normal; }
+        .url-code { direction: ltr; text-align: left; overflow-wrap: anywhere; word-break: normal; max-width: 100%; white-space: normal; }
+        .client-card-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; min-width: 0; max-width: 100%; }
+        .branch-section { grid-column: 1 / -1; min-width: 0; max-width: 100%; }
         .nav-icon { width: 20px; height: 20px; flex-shrink: 0; color: currentColor; }
         .metric-icon { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: 0.75rem; }
         .status-badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
@@ -229,17 +232,20 @@
                 const reviewUrl = branchReviewUrl(branch.nfc_id);
                 const statusClass = branch.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500';
                 const statusText = branch.is_active ? 'نشط' : 'معطل';
-                return `<div class="min-w-0 rounded-lg border border-gray-100 bg-gray-50 p-3">
-                    <div class="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                return `<div class="min-w-0 rounded-xl border border-gray-100 bg-white p-3">
+                    <div class="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
                                 <p class="text-xs font-semibold text-gray-800">${escapeHtml(branch.name)}</p>
                                 <span class="rounded-full px-2 py-0.5 text-[10px] font-medium ${statusClass}">${statusText}</span>
                             </div>
-                            <p class="mt-1 text-[11px] text-gray-500">${escapeHtml([branch.city, branch.area].filter(Boolean).join(' - ') || 'بدون موقع')}</p>
-                            <p class="soft-code mt-1 font-mono text-[11px] text-[#465fff]" dir="ltr">${escapeHtml(reviewUrl || '-')}</p>
+                            <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                                <span>${escapeHtml([branch.city, branch.area].filter(Boolean).join(' - ') || 'بدون موقع')}</span>
+                                <span class="rounded-full bg-blue-50 px-2 py-0.5 font-mono text-[#465fff]">NFC: ${escapeHtml(branch.nfc_id || '-')}</span>
+                            </div>
+                            <div class="url-code mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 font-mono text-[11px] leading-5 text-[#465fff]">${escapeHtml(reviewUrl || '-')}</div>
                         </div>
-                        <div class="flex shrink-0 flex-wrap gap-2">
+                        <div class="flex shrink-0 flex-wrap gap-2 lg:justify-end">
                             ${reviewUrl ? `<button onclick="copyBranchReviewLink('${encodeURIComponent(branch.nfc_id)}')" class="inline-flex h-7 items-center rounded-lg bg-[#465fff] px-2.5 text-[11px] font-medium text-white">نسخ رابط الفرع</button>` : ''}
                             ${branch.nfc_id ? `<a href="/api/qr/${encodeURIComponent(branch.nfc_id)}" class="inline-flex h-7 items-center rounded-lg border border-gray-200 bg-white px-2.5 text-[11px] font-medium text-gray-700">تحميل QR للفرع</a>` : ''}
                             <button onclick="toggleBranch('${branch.id}', ${branch.is_active ? 'false' : 'true'}, '${client.id}')" class="inline-flex h-7 items-center rounded-lg border border-gray-200 bg-white px-2.5 text-[11px] font-medium text-gray-700">${branch.is_active ? 'تعطيل' : 'تفعيل'}</button>
@@ -248,13 +254,13 @@
                 </div>`;
             }).join('') : '<div class="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-500">لا توجد فروع مضافة</div>';
 
-            return `<div class="mt-4 max-w-full rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+            return `<div class="branch-section rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <div class="mb-3">
-                    <div class="text-xs font-semibold text-gray-800">فروع العميل</div>
+                    <div class="text-sm font-semibold text-gray-900">فروع العميل</div>
                     <p class="mt-1 text-[11px] text-gray-500">كل فرع يمكنه امتلاك NFC ID ورابط Google خاص.</p>
                 </div>
                 <div class="space-y-2">${branchRows}</div>
-                <div class="mt-3 grid grid-cols-1 gap-2">
+                <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                     <input id="branch_name_${client.id}" placeholder="اسم الفرع" class="h-9 w-full rounded-lg border border-gray-300 px-3 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
                     <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <input id="branch_city_${client.id}" placeholder="المدينة" class="h-9 w-full rounded-lg border border-gray-300 px-3 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
@@ -262,7 +268,7 @@
                     </div>
                     <input id="branch_nfc_${client.id}" placeholder="NFC ID" class="h-9 w-full rounded-lg border border-gray-300 px-3 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
                     <input id="branch_google_${client.id}" placeholder="رابط Google Review" class="h-9 w-full rounded-lg border border-gray-300 px-3 text-xs !font-normal outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
-                    <button onclick="addBranch('${client.id}')" class="inline-flex h-8 items-center justify-center rounded-lg bg-[#465fff] px-3 text-xs font-medium text-white transition hover:bg-[#3641f5]">إضافة فرع</button>
+                    <button onclick="addBranch('${client.id}')" class="inline-flex h-9 items-center justify-center rounded-lg bg-[#465fff] px-3 text-xs font-medium text-white transition hover:bg-[#3641f5] md:col-span-2">إضافة فرع</button>
                 </div>
             </div>`;
         }
@@ -308,12 +314,12 @@
                                 <button onclick="deleteClient('${c.id}')" class="inline-flex h-8 w-fit shrink-0 items-center rounded-lg bg-rose-50 px-3 text-xs font-medium text-rose-600 transition hover:bg-rose-100">حذف</button>
                             </div>
 
-                            <div class="mt-4 grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
+                            <div class="client-card-sections mt-4">
                                 <div class="min-w-0 space-y-4">
                                     <div class="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3">
                                         <div class="mb-2 text-xs font-semibold text-gray-700">رابط التقييم / NFC</div>
                                         ${reviewUrl ? `
-                                            <div class="soft-code mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 font-mono text-xs leading-5 text-[#465fff]" dir="ltr">${escapeHtml(reviewUrl)}</div>
+                                            <div class="url-code mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 font-mono text-xs leading-5 text-[#465fff]">${escapeHtml(reviewUrl)}</div>
                                             <div class="flex flex-wrap gap-2">
                                                 <button onclick="copyLink('${reviewUrl}')" class="inline-flex h-8 items-center rounded-lg bg-[#465fff] px-3 text-xs font-medium text-white transition hover:bg-[#3641f5]">نسخ رابط التقييم</button>
                                                 <a href="/api/qr/${encodeURIComponent(c.nfc_id)}" class="inline-flex h-8 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50">تحميل QR</a>
@@ -328,8 +334,6 @@
                                         <div class="soft-code mb-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs leading-5 text-gray-500">WhatsApp: "${escapeHtml(friendlyText)}"</div>
                                         <button onclick="copyLink('${nfcLink}')" class="inline-flex h-8 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50">نسخ رابط واتساب القديم</button>
                                     </div>
-
-                                    ${renderBranches(c)}
                                 </div>
 
                                 <div class="min-w-0 rounded-xl border border-gray-200 bg-white p-3">
@@ -353,6 +357,7 @@
                                         <button onclick="saveComplaintSettings('${c.id}')" class="inline-flex h-8 items-center rounded-lg bg-[#465fff] px-3 text-xs font-medium text-white transition hover:bg-[#3641f5]">حفظ إعدادات الشكوى</button>
                                     </div>
                                 </div>
+                                ${renderBranches(c)}
                             </div>
                         </article>
                     `}).join('') : '<div class="rounded-xl border border-dashed border-gray-200 px-5 py-10 text-center text-sm text-gray-500">لا يوجد عملاء بعد</div>';
