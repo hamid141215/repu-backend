@@ -25,7 +25,9 @@
         100% { background-position: 0 50%; }
       }
     </style>
-  <link rel="icon" href="/tailadmin/favicon.ico"><link href="/tailadmin/style.css" rel="stylesheet"></head>
+  <link rel="icon" type="image/svg+xml" href="/assets/logo-icon-tight.svg">
+  <link rel="alternate icon" type="image/png" href="/assets/favicon.png">
+  <link href="/tailadmin/style.css" rel="stylesheet"></head>
   <body
     x-data="{ page: 'repu-dashboard', 'loaded': true, 'darkMode': false, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
     :class="{'dark bg-gray-900': darkMode === true}"
@@ -44,7 +46,7 @@
     <div id="login_screen" class="fixed inset-0 z-999999 hidden items-center justify-center bg-gray-50 p-4">
       <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-lg">
         <div class="mb-6 text-center">
-          <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-500 text-lg font-semibold text-white">R</div>
+          <img src="/assets/logo-full.svg" alt="RepuSystem" class="mx-auto mb-4 h-auto max-h-[70px] w-60 max-w-full object-contain">
           <h1 class="text-xl font-semibold text-gray-800">RepuSystem</h1>
           <p class="mt-1 text-theme-sm text-gray-500">أدخل مفتاح المنشأة للمتابعة</p>
         </div>
@@ -60,7 +62,7 @@
       >
         <div class="flex items-center justify-between gap-2 pb-5 pt-6">
           <a href="/repu-admin-v2.html" class="flex items-center gap-3">
-            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-lg font-semibold text-white">R</span>
+            <img src="/assets/logo-icon-tight.svg" alt="RepuSystem" class="h-10 w-10 shrink-0 object-contain">
             <span>
               <span class="block text-lg font-semibold text-gray-900 dark:text-white">RepuSystem</span>
               <span class="block text-xs text-gray-500 dark:text-gray-400">لوحة إدارة السمعة</span>
@@ -184,7 +186,7 @@
               </button>
 
               <a href="/repu-admin-v2.html" class="lg:hidden">
-                <span class="text-lg font-semibold text-gray-900 dark:text-white">RepuSystem</span>
+                <img src="/assets/logo-icon-tight.svg" alt="RepuSystem" class="h-8 w-8 object-contain">
               </a>
 
               <button
@@ -863,9 +865,9 @@
           target.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-theme-sm text-gray-500">لا توجد بيانات فروع.</td></tr>';
           return;
         }
-        const sorted = [...items].sort((a, b) => safeNumber(b.average_rating) - safeNumber(a.average_rating));
+        const sorted = [...items].sort((a, b) => branchAvgRating(b) - branchAvgRating(a));
         target.innerHTML = sorted.map((branch) => {
-          const rating = safeNumber(branch.average_rating);
+          const rating = branchAvgRating(branch);
           const status = branchStatusMeta(rating);
           return `
             <tr>
@@ -877,6 +879,12 @@
             </tr>
           `;
         }).join('');
+      }
+
+      function branchAvgRating(branch) {
+        const raw = safeNumber(branch.average_rating);
+        const count = safeNumber(branch.rating_count ?? branch.total_evaluations);
+        return raw > 5 && count > 0 ? raw / count : raw;
       }
 
       function branchStatusMeta(rating) {
@@ -901,14 +909,14 @@
           target.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-theme-sm text-gray-500">لا توجد بيانات فروع.</td></tr>';
           return;
         }
-        const sorted = [...items].sort((a, b) => safeNumber(b.average_rating) - safeNumber(a.average_rating));
-        const average = sorted.reduce((sum, branch) => sum + safeNumber(branch.average_rating), 0) / sorted.length;
+        const sorted = [...items].sort((a, b) => branchAvgRating(b) - branchAvgRating(a));
+        const average = sorted.reduce((sum, branch) => sum + branchAvgRating(branch), 0) / sorted.length;
         setText('branch_count_badge', String(sorted.length));
         setText('best_branch_badge', branchName(sorted[0]));
         setText('weak_branch_badge', branchName(sorted[sorted.length - 1]));
         setText('branches_average_rating', `${average.toFixed(1)} / 5`);
         target.innerHTML = sorted.map((branch) => {
-          const rating = safeNumber(branch.average_rating);
+          const rating = branchAvgRating(branch);
           const status = branchStatusMeta(rating);
           return `<tr>
             <td class="px-3 py-3"><p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">${escapeHtml(branchName(branch))}</p></td>
@@ -927,12 +935,12 @@
 
       function renderBranchCard(prefix, branch) {
         setText(`${prefix}_name`, branchName(branch));
-        setText(`${prefix}_rating`, branch ? `${safeNumber(branch.average_rating).toFixed(1)} / 5` : '-');
+        setText(`${prefix}_rating`, branch ? `${branchAvgRating(branch).toFixed(1)} / 5` : '-');
         setText(`${prefix}_complaints`, `${safeNumber(branch?.complaint_count)} شكاوى`);
       }
 
       function renderExecutiveSnapshot(branches, complaints) {
-        const sorted = Array.isArray(branches) ? [...branches].sort((a, b) => safeNumber(b.average_rating) - safeNumber(a.average_rating)) : [];
+        const sorted = Array.isArray(branches) ? [...branches].sort((a, b) => branchAvgRating(b) - branchAvgRating(a)) : [];
         renderBranchCard('home_best_branch', sorted[0]);
         renderBranchCard('home_weak_branch', sorted.length ? sorted[sorted.length - 1] : null);
 
@@ -1259,7 +1267,7 @@
           const data = await res.json();
           currentClientInfo = data;
           renderSettings(data);
-          updateReviewLink(data.nfc_id || data.nfcId);
+          if (data.nfc_id || data.nfcId) updateReviewLink(data.nfc_id || data.nfcId);
           setText('header_client_name', data.name || 'RepuSystem');
           setText('header_client_name_dropdown', data.name || 'RepuSystem');
           setText('sidebar_client_name', data.name || 'RepuSystem');
@@ -1290,4 +1298,5 @@
     </script>
   <script defer src="/tailadmin/bundle.js"></script></body>
 </html>
+
 
