@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
@@ -61,7 +61,7 @@
         class="fixed right-0 top-0 z-9999 flex h-screen w-[290px] flex-col overflow-y-hidden border-l border-gray-200 bg-white px-5 dark:border-gray-800 dark:bg-black lg:static lg:translate-x-0"
       >
         <div class="flex items-center justify-between gap-2 pb-5 pt-6">
-          <a href="/repu-admin-v2.html" class="flex items-center gap-3">
+          <a href="/admin.html" class="flex items-center gap-3">
             <img src="/assets/logo-icon-tight.svg" alt="RepuSystem" class="h-10 w-10 shrink-0 object-contain">
             <span>
               <span class="block text-lg font-semibold text-gray-900 dark:text-white">RepuSystem</span>
@@ -185,7 +185,7 @@
                 <svg class="fill-current" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.25 6C3.25 5.58579 3.58579 5.25 4 5.25H20C20.4142 5.25 20.75 5.58579 20.75 6C20.75 6.41421 20.4142 6.75 20 6.75H4C3.58579 6.75 3.25 6.41421 3.25 6ZM3.25 12C3.25 11.5858 3.58579 11.25 4 11.25H15C15.4142 11.25 15.75 11.5858 15.75 12C15.75 12.4142 15.4142 12.75 15 12.75H4C3.58579 12.75 3.25 12.4142 3.25 12ZM4 17.25C3.58579 17.25 3.25 17.5858 3.25 18C3.25 18.4142 3.58579 18.75 4 18.75H20C20.4142 18.75 20.75 18.4142 20.75 18C20.75 17.5858 20.4142 17.25 20 17.25H4Z" fill="currentColor"/></svg>
               </button>
 
-              <a href="/repu-admin-v2.html" class="lg:hidden">
+              <a href="/admin.html" class="lg:hidden">
                 <img src="/assets/logo-icon-tight.svg" alt="RepuSystem" class="h-8 w-8 object-contain">
               </a>
 
@@ -225,8 +225,28 @@
                       <button @click="dropdownOpen = false" class="text-gray-500">✕</button>
                     </div>
                     <ul class="custom-scrollbar flex h-auto flex-col overflow-y-auto">
-                      <li class="rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-white/5"><p class="text-theme-sm text-gray-700 dark:text-gray-300">تنبيه: شكاوى نشطة تحتاج متابعة.</p><p class="mt-1 text-theme-xs text-gray-500">تنبيه تشغيلي</p></li>
-                      <li class="rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-white/5"><p class="text-theme-sm text-gray-700 dark:text-gray-300">تم تحديث مؤشرات الرضا.</p><p class="mt-1 text-theme-xs text-gray-500">تحديث الأداء</p></li>
+                      <li>
+                        <button
+                          type="button"
+                          class="w-full rounded-lg p-3 text-right hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-white/5"
+                          aria-label="عرض الشكاوى النشطة"
+                          @click="dropdownOpen = false; navigateToView('complaints_view')"
+                        >
+                          <p class="text-theme-sm text-gray-700 dark:text-gray-300">تنبيه: شكاوى نشطة تحتاج متابعة.</p>
+                          <p class="mt-1 text-theme-xs text-gray-500">تنبيه تشغيلي</p>
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          type="button"
+                          class="w-full rounded-lg p-3 text-right hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-white/5"
+                          aria-label="عرض تحليلات الأداء"
+                          @click="dropdownOpen = false; navigateToView('analytics_view')"
+                        >
+                          <p class="text-theme-sm text-gray-700 dark:text-gray-300">تم تحديث مؤشرات الرضا.</p>
+                          <p class="mt-1 text-theme-xs text-gray-500">تحديث الأداء</p>
+                        </button>
+                      </li>
                     </ul>
                   </div>
                 </div>
@@ -234,7 +254,7 @@
                 <div class="relative" x-data="{ dropdownOpen: false }" @click.outside="dropdownOpen = false">
                   <button @click.prevent="dropdownOpen = !dropdownOpen" class="flex items-center text-gray-700 dark:text-gray-400">
                     <span class="mr-3 h-11 w-11 overflow-hidden rounded-full bg-brand-50">
-                      <span class="flex h-full w-full items-center justify-center text-sm font-semibold text-brand-500">R</span>
+                      <span id="header_client_avatar" class="flex h-full w-full items-center justify-center text-sm font-semibold text-brand-500">R</span>
                     </span>
                     <span id="header_client_name" class="ml-1 hidden text-theme-sm font-medium lg:block">RepuSystem</span>
                     <svg class="ml-0.5 hidden stroke-gray-500 lg:block" width="18" height="20" viewBox="0 0 18 20" fill="none"><path d="M4.3125 8.65625L9 13.3437L13.6875 8.65625" stroke="" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -261,28 +281,48 @@
 
             <section id="home_view" class="client-view grid scroll-mt-24 grid-cols-12 gap-4 md:gap-5">
               <div class="col-span-12 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 md:gap-4">
-                <div class="min-h-[88px] rounded-2xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div
+                  class="min-h-[88px] rounded-2xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-brand-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض التحليلات - معدل الرضا"
+                  onclick="navigateToView('analytics_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('analytics_view')}"
+                >
                   <span class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">معدل الرضا</span>
                   <div class="mt-2 flex items-end justify-between gap-3">
                     <h4 id="satisfaction_rate" class="text-[28px] font-bold leading-none text-gray-800 dark:text-white/90"><span class="repu-skeleton repu-skeleton-lg"></span></h4>
                     <span class="rounded-full bg-success-50 px-2.5 py-0.5 text-theme-xs font-medium text-success-600">رضا</span>
                   </div>
                 </div>
-                <div class="min-h-[88px] rounded-2xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div
+                  class="min-h-[88px] rounded-2xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-brand-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض التحليلات - متوسط التقييم"
+                  onclick="navigateToView('analytics_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('analytics_view')}"
+                >
                   <span class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">متوسط التقييم</span>
                   <div class="mt-2 flex items-end justify-between gap-3">
                     <h4 id="average_rating" class="text-[28px] font-bold leading-none text-gray-800 dark:text-white/90" dir="ltr"><span class="repu-skeleton repu-skeleton-lg"></span></h4>
                     <span class="rounded-full bg-brand-50 px-2.5 py-0.5 text-theme-xs font-medium text-brand-500">نجوم</span>
                   </div>
                 </div>
-                <div class="min-h-[88px] rounded-2xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div
+                  class="min-h-[88px] rounded-2xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-error-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-error-400 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض الشكاوى النشطة"
+                  onclick="navigateToView('complaints_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('complaints_view')}"
+                >
                   <span class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">الشكاوى النشطة</span>
                   <div class="mt-2 flex items-end justify-between gap-3">
                     <h4 id="active_complaints" class="text-[28px] font-bold leading-none text-gray-800 dark:text-white/90"><span class="repu-skeleton repu-skeleton-lg"></span></h4>
                     <span class="rounded-full bg-error-50 px-2.5 py-0.5 text-theme-xs font-medium text-error-600">نشطة</span>
                   </div>
                 </div>
-                <div class="min-h-[88px] rounded-2xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div
+                  class="min-h-[88px] rounded-2xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-warning-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-warning-400 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض الشكاوى المتأخرة"
+                  onclick="navigateToView('complaints_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('complaints_view')}"
+                >
                   <span class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">متأخرة +24 ساعة</span>
                   <div class="mt-2 flex items-end justify-between gap-3">
                     <h4 id="overdue_complaints" class="text-[28px] font-bold leading-none text-gray-800 dark:text-white/90"><span class="repu-skeleton repu-skeleton-lg"></span></h4>
@@ -332,7 +372,12 @@
               </div>
 
               <div class="col-span-12 grid grid-cols-1 gap-4 xl:col-span-7 xl:grid-cols-3">
-                <div class="self-start rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div
+                  class="self-start rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-success-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-success-400 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض الفروع - أفضل فرع"
+                  onclick="navigateToView('branches_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('branches_view')}"
+                >
                   <p class="text-theme-xs font-semibold text-success-600">أفضل فرع</p>
                   <h4 id="home_best_branch_name" class="mt-2 text-base font-semibold text-gray-800 dark:text-white/90">لا توجد بيانات</h4>
                   <div class="mt-3 flex items-center justify-between gap-3 text-theme-sm">
@@ -340,7 +385,12 @@
                     <span id="home_best_branch_complaints" class="rounded-full bg-success-50 px-2.5 py-1 text-theme-xs font-medium text-success-600">0 شكاوى</span>
                   </div>
                 </div>
-                <div class="self-start rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div
+                  class="self-start rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-error-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-error-400 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض الفروع - يحتاج متابعة"
+                  onclick="navigateToView('branches_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('branches_view')}"
+                >
                   <p class="text-theme-xs font-semibold text-error-600">يحتاج متابعة</p>
                   <h4 id="home_weak_branch_name" class="mt-2 text-base font-semibold text-gray-800 dark:text-white/90">لا توجد بيانات</h4>
                   <div class="mt-3 flex items-center justify-between gap-3 text-theme-sm">
@@ -348,7 +398,13 @@
                     <span id="home_weak_branch_complaints" class="rounded-full bg-error-50 px-2.5 py-1 text-theme-xs font-medium text-error-600">0 شكاوى</span>
                   </div>
                 </div>
-                <div id="critical_complaint_card" class="self-start rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div
+                  id="critical_complaint_card"
+                  class="self-start rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-warning-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-warning-400 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض الشكاوى - آخر شكوى حرجة"
+                  onclick="navigateToView('complaints_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('complaints_view')}"
+                >
                   <div class="flex items-start justify-between gap-3">
                     <p class="text-theme-xs font-semibold text-warning-700">آخر شكوى حرجة</p>
                     <span id="critical_complaint_status" class="rounded-full bg-gray-100 px-2.5 py-1 text-theme-xs font-medium text-gray-600">لا توجد</span>
@@ -356,7 +412,10 @@
                   <h4 id="critical_complaint_customer" class="mt-2 text-theme-sm font-semibold text-gray-800 dark:text-white/90">لا توجد شكاوى نشطة</h4>
                   <p id="critical_complaint_branch" class="mt-1 text-theme-xs text-gray-500">-</p>
                   <p id="critical_complaint_summary" class="mt-2 line-clamp-1 text-theme-xs leading-5 text-gray-500">كل شيء تحت السيطرة حالياً.</p>
-                  <a id="critical_complaint_whatsapp" href="#" target="_blank" rel="noopener noreferrer" class="mt-2 hidden h-8 w-fit items-center rounded-lg bg-success-500 px-3 text-theme-xs font-medium text-white">واتساب</a>
+                  <a id="critical_complaint_whatsapp" href="#" target="_blank" rel="noopener noreferrer"
+                     class="mt-2 hidden h-8 w-fit items-center rounded-lg bg-success-500 px-3 text-theme-xs font-medium text-white"
+                     onclick="event.stopPropagation()"
+                  >واتساب</a>
                 </div>
               </div>
 
@@ -371,8 +430,15 @@
                   </div>
                   <div class="mt-4 max-w-full overflow-x-auto custom-scrollbar">
                     <div class="min-w-[650px] xl:min-w-full">
-                      <div class="h-[280px]">
+                      <div class="h-[280px] relative">
                         <canvas id="daily_chart"></canvas>
+                        <div id="daily_chart_placeholder" class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white dark:bg-white/[0.03] rounded-lg">
+                          <svg id="daily_chart_spinner" class="animate-spin h-6 w-6 text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                          </svg>
+                          <p id="daily_chart_msg" class="text-sm text-gray-400 dark:text-gray-500">جاري تحميل بيانات الرسم…</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -398,7 +464,11 @@
                       <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">الشكاوى الأخيرة</h3>
                       <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">أحدث البلاغات التي تحتاج متابعة</p>
                     </div>
-                    <a href="/reports.html" class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50">عرض الكل</a>
+                    <button
+                      type="button"
+                      onclick="navigateToView('complaints_view')"
+                      class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50"
+                    >عرض الكل</button>
                   </div>
                   <div id="complaints_list" class="divide-y divide-gray-100 dark:divide-gray-800">
                     <div class="space-y-4 py-4">
@@ -599,6 +669,7 @@
       const charts = {};
       let currentClientInfo = null;
       let lastDashboardSummary = null;
+      let dailyChartHasRealData = false;
       const fallbackDailyTrend = [
         { date: '2026-06-01', average_rating: 3.8, complaints: 2 },
         { date: '2026-06-02', average_rating: 4.1, complaints: 1 },
@@ -636,6 +707,23 @@
       function safeNumber(value, fallback = 0) {
         const number = Number(value);
         return Number.isFinite(number) ? number : fallback;
+      }
+
+      function getClientInitial(name) {
+        if (!name || typeof name !== 'string') return 'R';
+        const trimmed = name.trim();
+        // Strip Arabic definite article "ال" if word is longer than 2 chars
+        const stripped = trimmed.startsWith('ال') && trimmed.length > 2
+          ? trimmed.slice(2)
+          : trimmed;
+        // Return first non-space visible character
+        const first = stripped.replace(/^\s+/, '').charAt(0);
+        return first || 'R';
+      }
+
+      function setClientAvatar(name) {
+        const el = document.getElementById('header_client_avatar');
+        if (el) el.textContent = getClientInitial(name);
       }
 
       function formatDate(value) {
@@ -767,18 +855,45 @@
         setText('settings_review_link', reviewLink || '-');
       }
 
+      /* ── Toast system ── */
+      function showToast(message, type) {
+        const existing = document.getElementById('repu_toast');
+        if (existing) existing.remove();
+        const colors = {
+          success: 'bg-success-500',
+          error:   'bg-error-600',
+          info:    'bg-brand-500',
+        };
+        const bg = colors[type] || colors.info;
+        const toast = document.createElement('div');
+        toast.id = 'repu_toast';
+        toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
+        toast.className = `fixed bottom-6 left-1/2 z-[9999] -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-medium text-white shadow-lg transition-opacity duration-300 ${bg}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 320); }, 2800);
+      }
+
+      /* ── navigateToView: single reusable helper ── */
+      function navigateToView(viewId) {
+        showClientView(viewId);
+      }
+
       function copyReviewLink() {
         const input = document.getElementById('review_link_input');
         if (!input || !input.value) return;
-        navigator.clipboard.writeText(input.value);
-        alert('تم نسخ رابط التقييم');
+        navigator.clipboard.writeText(input.value)
+          .then(() => showToast('تم نسخ رابط التقييم', 'success'))
+          .catch(() => showToast('تعذر نسخ الرابط', 'error'));
       }
 
       function copySettingsReviewLink() {
         const link = document.getElementById('settings_review_link')?.innerText;
         if (!link || link === '-') return;
-        navigator.clipboard.writeText(link);
-        alert('تم نسخ رابط التقييم');
+        navigator.clipboard.writeText(link)
+          .then(() => showToast('تم نسخ رابط التقييم', 'success'))
+          .catch(() => showToast('تعذر نسخ الرابط', 'error'));
       }
 
       function renderSummary(summary) {
@@ -829,6 +944,8 @@
         renderExecutiveSnapshot(branches, summary.urgent_complaints || []);
         renderUrgentComplaints(summary.urgent_complaints || []);
         renderLatestActivity(summary.recent_activity || []);
+        const dailySource = summary.daily_counts_last_30_days || summary.daily_counts_last_7_days || summary.daily_trend;
+        summary._chartDataMissing = !Array.isArray(dailySource) || dailySource.length === 0;
         renderCharts(summary);
       }
 
@@ -1035,41 +1152,74 @@
         }).join('');
       }
 
+      function showDailyChartPlaceholder(msg, showSpinner) {
+        const placeholder = document.getElementById('daily_chart_placeholder');
+        const spinner = document.getElementById('daily_chart_spinner');
+        const msgEl = document.getElementById('daily_chart_msg');
+        if (!placeholder) return;
+        if (msgEl) msgEl.textContent = msg;
+        if (spinner) spinner.style.display = showSpinner ? '' : 'none';
+        placeholder.style.display = 'flex';
+      }
+
+      function hideDailyChartPlaceholder() {
+        const placeholder = document.getElementById('daily_chart_placeholder');
+        if (placeholder) placeholder.style.display = 'none';
+      }
+
       function renderCharts(summary) {
         if (typeof Chart === 'undefined') return;
         const dailySource = summary.daily_counts_last_30_days || summary.daily_counts_last_7_days || summary.daily_trend;
-        const daily = Array.isArray(dailySource) && dailySource.length ? dailySource : fallbackDailyTrend;
-        const monthly = Array.isArray(summary.monthly_counts) && summary.monthly_counts.length ? summary.monthly_counts : fallbackMonthlyCounts;
-        const breakdown = Array.isArray(summary.rating_breakdown) && summary.rating_breakdown.length ? summary.rating_breakdown : fallbackRatingBreakdown;
+        const hasDaily = Array.isArray(dailySource) && dailySource.length > 0;
+        const monthly = Array.isArray(summary.monthly_counts) && summary.monthly_counts.length ? summary.monthly_counts : [];
+        const breakdown = Array.isArray(summary.rating_breakdown) && summary.rating_breakdown.length ? summary.rating_breakdown : [];
         const satisfaction = safeNumber(summary.satisfaction_rate);
 
-        destroyChart('daily_chart');
-        charts.daily_chart = new Chart(document.getElementById('daily_chart'), {
-          type: 'line',
-          data: {
-            labels: daily.map((item) => String(item.date).slice(5, 10)),
-            datasets: [
-              { label: 'تقييمات ممتازة', data: daily.map((item) => safeNumber(item.positive_count ?? item.average_rating)), borderColor: '#465fff', backgroundColor: 'rgba(70,95,255,.12)', tension: .35, fill: true },
-              { label: 'الشكاوى', data: daily.map((item) => safeNumber(item.complaint_count ?? item.complaints)), borderColor: '#f04438', tension: .35 },
-            ],
-          },
-          options: { responsive: true, maintainAspectRatio: false },
-        });
+        // ── daily_chart: only render with real data ──
+        if (hasDaily) {
+          dailyChartHasRealData = true;
+          hideDailyChartPlaceholder();
+          destroyChart('daily_chart');
+          charts.daily_chart = new Chart(document.getElementById('daily_chart'), {
+            type: 'line',
+            data: {
+              labels: dailySource.map((item) => String(item.date).slice(5, 10)),
+              datasets: [
+                { label: 'تقييمات ممتازة', data: dailySource.map((item) => safeNumber(item.positive_count ?? item.average_rating)), borderColor: '#465fff', backgroundColor: 'rgba(70,95,255,.12)', tension: .35, fill: true },
+                { label: 'الشكاوى', data: dailySource.map((item) => safeNumber(item.complaint_count ?? item.complaints)), borderColor: '#f04438', tension: .35 },
+              ],
+            },
+            options: { responsive: true, maintainAspectRatio: false },
+          });
+        } else if (!dailyChartHasRealData) {
+          // No real data yet — keep/show placeholder. Do NOT draw fallback.
+          showDailyChartPlaceholder(
+            summary._chartDataMissing ? 'لا توجد بيانات كافية لعرض الرسم' : 'جاري تحميل بيانات الرسم…',
+            !summary._chartDataMissing
+          );
+        }
 
+        // ── monthly_chart ──
         destroyChart('monthly_chart');
-        charts.monthly_chart = new Chart(document.getElementById('monthly_chart'), {
-          type: 'bar',
-          data: { labels: monthly.map((item) => item.month), datasets: [{ label: 'التقييمات', data: monthly.map((item) => safeNumber(item.total ?? item.rating_count)), backgroundColor: '#465fff' }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
-        });
+        if (monthly.length) {
+          charts.monthly_chart = new Chart(document.getElementById('monthly_chart'), {
+            type: 'bar',
+            data: { labels: monthly.map((item) => item.month), datasets: [{ label: 'التقييمات', data: monthly.map((item) => safeNumber(item.total ?? item.rating_count)), backgroundColor: '#465fff' }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+          });
+        }
 
+        // ── rating_breakdown_chart ──
         destroyChart('rating_breakdown_chart');
-        charts.rating_breakdown_chart = new Chart(document.getElementById('rating_breakdown_chart'), {
-          type: 'bar',
-          data: { labels: breakdown.map((item) => item.rating === 1 ? '1 نجمة' : `${item.rating} نجوم`), datasets: [{ data: breakdown.map((item) => safeNumber(item.count)), backgroundColor: '#465fff' }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
-        });
+        if (breakdown.length) {
+          charts.rating_breakdown_chart = new Chart(document.getElementById('rating_breakdown_chart'), {
+            type: 'bar',
+            data: { labels: breakdown.map((item) => item.rating === 1 ? '1 نجمة' : `${item.rating} نجوم`), datasets: [{ data: breakdown.map((item) => safeNumber(item.count)), backgroundColor: '#465fff' }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+          });
+        }
 
+        // ── satisfaction_chart ──
         destroyChart('satisfaction_chart');
         charts.satisfaction_chart = new Chart(document.getElementById('satisfaction_chart'), {
           type: 'doughnut',
@@ -1079,7 +1229,8 @@
       }
 
       async function loadDashboard() {
-        renderCharts({ daily_trend: fallbackDailyTrend });
+        dailyChartHasRealData = false;
+        showDailyChartPlaceholder('جاري تحميل بيانات الرسم…', true);
         const apiKey = localStorage.getItem('repu_key');
         if (!apiKey) {
           document.getElementById('auth_notice')?.classList.remove('hidden');
@@ -1093,6 +1244,7 @@
             setText('header_client_name', client.name || 'RepuSystem');
             setText('header_client_name_dropdown', client.name || 'RepuSystem');
             setText('sidebar_client_name', client.name || 'RepuSystem');
+            setClientAvatar(client.name);
             renderSettings(client);
             updateReviewLink(client.nfc_id || client.nfcId);
           }
@@ -1107,6 +1259,9 @@
         } catch (error) {
           console.error('تعذر تحميل لوحة RepuSystem:', error);
           document.getElementById('auth_notice')?.classList.remove('hidden');
+          if (!dailyChartHasRealData) {
+            showDailyChartPlaceholder('لا توجد بيانات كافية لعرض الرسم', false);
+          }
         }
       }
 
@@ -1207,9 +1362,10 @@
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data.error || 'تعذر تحديث حالة الشكوى');
+          showToast('تم تحديث حالة الشكوى', 'success');
           await loadDashboard();
         } catch (error) {
-          alert(error.message);
+          showToast(error.message || 'تعذر تحديث حالة الشكوى', 'error');
           await loadDashboard();
         }
       }
@@ -1219,8 +1375,8 @@
         const name = document.getElementById('cust_name').value.trim();
         const phone = document.getElementById('cust_phone').value.trim();
         const key = localStorage.getItem('repu_key');
-        if (!name || !phone) return alert('يرجى إدخال اسم العميل ورقم الجوال');
-        if (!/^05\d{8}$/.test(phone)) return alert('يرجى إدخال رقم جوال صحيح (05xxxxxxxx)');
+        if (!name || !phone) { showToast('يرجى إدخال اسم العميل ورقم الجوال', 'error'); return; }
+        if (!/^05\d{8}$/.test(phone)) { showToast('يرجى إدخال رقم جوال صحيح (05xxxxxxxx)', 'error'); return; }
         btn.disabled = true;
         btn.textContent = 'جاري المعالجة...';
         try {
@@ -1236,12 +1392,12 @@
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data.error || 'فشل الإرسال');
-          alert('تمت عملية الإرسال بنجاح');
+          showToast('تمت عملية الإرسال بنجاح', 'success');
           document.getElementById('cust_name').value = '';
           document.getElementById('cust_phone').value = '';
           await loadDashboard();
         } catch (error) {
-          alert(error.message || 'حدث خطأ أثناء الاتصال بالخادم');
+          showToast(error.message || 'حدث خطأ أثناء الاتصال بالخادم', 'error');
         } finally {
           btn.disabled = false;
           btn.textContent = 'إرسال عبر واتساب';
@@ -1271,12 +1427,13 @@
           setText('header_client_name', data.name || 'RepuSystem');
           setText('header_client_name_dropdown', data.name || 'RepuSystem');
           setText('sidebar_client_name', data.name || 'RepuSystem');
+          setClientAvatar(data.name);
           const hashView = { '#send_view': 'send', '#complaints_view': 'complaints', '#branches_view': 'branches_view', '#analytics_view': 'analytics', '#settings_view': 'settings', '#settings_section': 'settings' }[window.location.hash] || 'home';
           showClientView(hashView);
           await loadDashboard();
         } catch (error) {
           console.error('تعذر تسجيل الدخول:', error);
-          alert('خطأ في الاتصال بالخادم');
+          showToast('خطأ في الاتصال بالخادم', 'error');
         }
       }
 
@@ -1298,5 +1455,4 @@
     </script>
   <script defer src="/tailadmin/bundle.js"></script></body>
 </html>
-
 
