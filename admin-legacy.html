@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RepuSystem | لوحة التحكم</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/logo-icon-tight.svg">
+    <link rel="alternate icon" type="image/png" href="/assets/favicon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        html, body { overflow-x: hidden; }
+        *, *::before, *::after { box-sizing: border-box; }
+        body { font-family: 'Cairo', sans-serif; background-color: #F9FAFB; color: #111827; }
+        .app-shell, .app-main, .content-grid, .app-card, .metric-card, .section-card, .data-table, .table-scroll { min-width: 0; max-width: 100%; }
+        .app-sidebar { width: 290px; border-left: 1px solid #e5e7eb; background: #fff; padding: 1.25rem; }
+        .app-topbar { border-bottom: 1px solid #e5e7eb; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); }
+        .page-title { color: #111827; font-size: 1.25rem; font-weight: 600; line-height: 1.75rem; }
+        .page-subtitle { margin-top: 0.25rem; color: #6b7280; font-size: 0.875rem; line-height: 1.25rem; }
+        .app-card, .metric-card, .section-card { border: 1px solid #e5e7eb; background: #fff; border-radius: 1.25rem; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+        .metric-card { min-height: 132px; overflow: hidden; position: relative; }
+        .app-button { display: inline-flex; min-height: 2.5rem; align-items: center; justify-content: center; border-radius: 0.5rem; padding: 0 1rem; font-size: 0.875rem; font-weight: 500; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+        .app-button-primary { border: 1px solid #465fff; background: #465fff; color: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+        .app-button-primary:hover { background: #3641f5; border-color: #3641f5; }
+        .app-button-secondary { border: 1px solid #e5e7eb; background: #fff; color: #374151; }
+        .app-button-secondary:hover { background: #f9fafb; }
+        .app-button-danger { border: 1px solid #fee2e2; background: #fff1f2; color: #e11d48; }
+        .app-button-success { border: 1px solid #dcfce7; background: #f0fdf4; color: #15803d; }
+        .app-badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; padding: 0.25rem 0.625rem; font-size: 0.75rem; font-weight: 500; }
+        .app-input { min-height: 2.75rem; width: 100%; border-radius: 0.5rem; border: 1px solid #d1d5db; background: #fff; padding: 0 1rem; font-size: 0.875rem; outline: none; }
+        .app-input:focus { border-color: #465fff; box-shadow: 0 0 0 4px rgba(70,95,255,.10); }
+        .soft-code, .url-code { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+        .url-code { direction: ltr; text-align: left; word-break: normal; }
+        .data-table { width: 100%; border-collapse: collapse; text-align: right; }
+        .data-table thead { background: #f9fafb; color: #6b7280; font-size: .75rem; font-weight: 500; }
+        .data-table tr:hover { background: #f9fafb; }
+        /* تحسين مظهر الحقول لتكون واضحة */
+        input, select, textarea { border: 1px solid #e5e7eb !important; }
+        input:focus, select:focus, textarea:focus { border-color: #465fff !important; box-shadow: 0 0 0 4px rgba(70,95,255,.10) !important; outline: none !important; }
+        #complaint_alert p { font-size: 0.75rem; font-weight: 700; }
+        #complaint_alert span { font-size: 1.125rem; }
+        #complaint_alert a { background-color: #ffffff; color: #b42318; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-weight: 600; box-shadow: none; }
+        #send_section h3 { margin-bottom: 0.25rem; text-align: right; font-size: 1.125rem; }
+        #send_section input, #send_section select { height: 2.75rem !important; padding: 0 1rem !important; border-radius: 0.5rem !important; border-color: #d1d5db !important; background-color: transparent !important; font-size: 0.875rem; font-weight: 400; }
+        #send_section input:focus, #send_section select:focus { border-color: #465fff !important; box-shadow: 0 0 0 2px #dbeafe !important; outline: none !important; }
+        #send_section + .grid { display: none !important; }
+        #main_app aside .tailadmin-sidebar nav a { align-items: center !important; border-radius: 0.625rem !important; gap: 0.75rem !important; min-height: 44px !important; height: 44px !important; padding: 0 0.75rem !important; font-size: 0.875rem !important; font-weight: 500 !important; box-shadow: none !important; }
+        #main_app aside .tailadmin-sidebar ~ div { display: none !important; }
+        #main_app aside .tailadmin-sidebar .nav-icon { width: 20px; height: 20px; flex-shrink: 0; color: currentColor; }
+        #main_app aside nav a[href="#main_app"] { background-color: #EEF4FF !important; color: #465FFF !important; }
+        #main_app aside nav a:not([href="#main_app"]) { color: #344054 !important; background-color: transparent !important; }
+        #main_app aside nav a.client-nav.bg-\[\#EEF4FF\] { background-color: #EEF4FF !important; color: #465FFF !important; }
+        #main_app aside nav a:not([href="#main_app"]):hover { background-color: #f9fafb !important; color: #111827 !important; }
+        #main_app aside .nav-child { align-items: center !important; min-height: 36px !important; height: 36px !important; padding: 0 0.75rem !important; border-radius: 0.5rem !important; background-color: #f8fbff !important; color: #465FFF !important; font-size: 0.8125rem !important; }
+        #main_app aside > div:last-child { border: 0 !important; background-color: transparent !important; border-radius: 0 !important; padding: 0 !important; }
+        #main_app aside > div:last-child p { color: #6b7280 !important; }
+        #main_app aside > div:last-child span:first-child { color: #374151 !important; font-weight: 500 !important; }
+        #main_app aside > div:last-child span:last-child { background-color: #f0fdf4 !important; color: #15803d !important; border: 0 !important; font-size: 0.75rem !important; font-weight: 500 !important; }
+        #main_app aside > div:last-child button { margin-top: 0.5rem !important; color: #667085 !important; font-size: 0.8125rem !important; font-weight: 500 !important; }
+        #main_app header h1 { font-size: 0.875rem !important; font-weight: 600 !important; color: #1f2937 !important; }
+        #main_app header button[onclick="logout()"] { display: none !important; border: 1px solid #d1d5db !important; background-color: #ffffff !important; color: #374151 !important; border-radius: 0.5rem !important; padding: 0.5rem 0.75rem !important; font-size: 0.875rem !important; font-weight: 500 !important; }
+        #main_app header button[onclick="logout()"]:hover { background-color: #f9fafb !important; }
+        .dashboard-chart { position: relative; height: 280px; min-height: 260px; }
+        .dashboard-chart canvas { width: 100% !important; max-height: 290px; }
+        .dashboard-chart--compact { height: 240px; min-height: 230px; }
+        .dashboard-chart--compact canvas { max-height: 230px; }
+        .kpi-card { overflow: hidden; position: relative; }
+        .kpi-card::after { content: ""; position: absolute; inset-inline-start: -36px; top: -48px; width: 96px; height: 96px; border-radius: 9999px; background: rgba(70, 95, 255, 0.08); }
+        .health-card { position: relative; overflow: hidden; background: #ffffff; }
+        .health-card::before { display: none; }
+        .health-meter { height: 8px; overflow: hidden; border-radius: 9999px; background: #eaecf0; }
+        .health-meter span { display: block; height: 100%; width: var(--health-width, 0%); border-radius: inherit; background: #465fff; transition: width .25s ease; }
+        .dashboard-metric { min-height: 112px; }
+        .subtle-row { border: 1px solid #eaecf0; background: #ffffff; }
+        .subtle-row-accent { display: inline-block; width: 6px; height: 28px; border-radius: 9999px; background: #98a2b3; }
+        .timeline-dot { position: relative; }
+        .timeline-dot::before { content: ""; position: absolute; inset-inline-start: 7px; top: 30px; bottom: -18px; width: 1px; background: #e5e7eb; }
+        .timeline-dot:last-child::before { display: none; }
+        .topbar-inner { min-height: 76px; }
+        .account-pill { border: 1px solid #eaecf0; background: #fff; border-radius: 0.75rem; padding: 0.5rem 0.75rem; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03); }
+        .topbar-search { width: min(100%, 300px); }
+        .health-card { min-height: 100%; }
+        .health-score-block { padding: 0.875rem 1rem; border: 1px solid #eaecf0; border-radius: 1rem; background: #fcfcfd; }
+        .kpi-grid { align-content: stretch; }
+        .dashboard-metric { min-height: 112px; padding: 0.875rem 1rem !important; border-top: 0; }
+        .dashboard-metric--compact { min-height: 92px; }
+        .health-support-card { border: 1px solid #eaecf0; background: #fff; border-radius: 0.875rem; padding: 0.875rem; }
+        .quick-actions-compact .app-button { min-height: 2.25rem; padding-inline: 0.75rem; font-size: 0.8125rem; }
+        .dashboard-metric::before { content: ""; position: absolute; inset-inline-start: 0; top: 1rem; bottom: 1rem; width: 3px; border-radius: 9999px; background: #d0d5dd; }
+        .dashboard-metric.metric-blue::before { background: #465fff; }
+        .dashboard-metric.metric-green::before { background: #12b76a; }
+        .dashboard-metric.metric-red::before { background: #f04438; }
+        .dashboard-metric.metric-amber::before { background: #f79009; }
+        .is-search-hidden { display: none !important; }
+        .search-empty-state { border: 1px dashed #d0d5dd; border-radius: 0.75rem; padding: 1rem; text-align: center; color: #667085; font-size: 0.875rem; background: #fff; }
+    </style>
+</head>
+<body class="p-0">
+    <div id="login_screen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#0B1220] bg-gradient-to-br from-[#0B1220] via-[#101828] to-[#172554] p-4 md:p-6">
+        <div class="grid w-full max-w-5xl items-center gap-6 lg:grid-cols-[1fr_0.9fr]">
+            <div class="hidden lg:block">
+                <div class="mb-6">
+                    <img src="/assets/logo-full.svg" alt="RepuSystem" class="mb-4 h-auto max-h-[70px] w-60 max-w-full object-contain">
+                    <p class="mt-2 text-sm font-medium text-slate-300">نظام إدارة التقييمات والسمعة</p>
+                </div>
+                <div class="grid gap-3">
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm font-semibold text-white backdrop-blur">
+                        متابعة التقييمات
+                    </div>
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm font-semibold text-white backdrop-blur">
+                        إدارة الشكاوى
+                    </div>
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm font-semibold text-white backdrop-blur">
+                        تقارير فورية
+                    </div>
+                </div>
+            </div>
+
+            <div class="mx-auto w-full max-w-md">
+                <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-xl shadow-black/10 md:p-8">
+                    <div class="mb-7 text-center">
+                        <img src="/assets/logo-full.svg" alt="RepuSystem" class="mx-auto mb-4 h-auto max-h-[70px] w-60 max-w-full object-contain">
+                        <p class="mt-2 text-sm font-medium text-gray-500">نظام إدارة التقييمات والسمعة</p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <input id="key_input" type="password" placeholder="أدخل مفتاح الدخول الخاص بالمنشأة" class="h-12 w-full rounded-lg border border-gray-300 bg-white px-4 text-center text-sm font-medium text-gray-800 outline-none placeholder:text-gray-400 focus:border-[#465fff] focus:ring-4 focus:ring-blue-500/10">
+                        <p class="text-center text-xs leading-5 text-gray-500">استخدم مفتاح الدخول المخصص لمنشأتك للوصول إلى لوحة التقييمات.</p>
+                        <button id="login_btn" onclick="login()" class="flex h-12 w-full items-center justify-center rounded-lg bg-[#465fff] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3641f5] active:scale-[0.99]">الدخول إلى لوحة التحكم</button>
+                    </div>
+
+                    <div class="mt-6 flex flex-wrap justify-center gap-2 lg:hidden">
+                        <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-[#465FFF]">متابعة التقييمات</span>
+                        <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-[#465FFF]">إدارة الشكاوى</span>
+                        <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-[#465FFF]">تقارير فورية</span>
+                    </div>
+
+                    <p class="mt-6 text-center text-xs font-medium text-gray-400">بواسطة موجة الصمت لتقنية المعلومات</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="main_app" class="app-shell hidden min-h-screen bg-[#F9FAFB] text-gray-900">
+        <aside class="app-sidebar hidden lg:flex fixed right-0 top-0 z-40 h-screen w-[290px] flex-col justify-between overflow-y-auto border-l border-gray-200 bg-white p-5">
+            <div class="tailadmin-sidebar flex h-full flex-col justify-between">
+                <div>
+                    <div class="mb-4">
+                        <img src="/assets/logo-icon-tight.svg" alt="RepuSystem" class="mx-auto h-16 w-16 object-contain">
+                        <div class="mt-2 text-center text-xl font-extrabold text-slate-900">RepuSystem</div>
+                        <div class="mt-1 text-center text-xs font-medium text-slate-500">نظام إدارة السمعة</div>
+                    </div>
+
+                    <nav class="space-y-4">
+                        <div>
+                            <h3 class="mb-2 text-xs font-medium uppercase leading-4 tracking-wide text-gray-400">القائمة</h3>
+                            <div class="space-y-1.5">
+                                <a href="#home_view" onclick="showClientView('home', event)" data-nav-view="home" class="client-nav flex items-center gap-3 rounded-xl bg-[#EEF4FF] px-3 py-0 text-sm font-medium text-[#465FFF]">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5.5C4 4.67 4.67 4 5.5 4H10v7H4V5.5ZM14 4h4.5c.83 0 1.5.67 1.5 1.5V11h-6V4ZM4 14h6v6H5.5A1.5 1.5 0 0 1 4 18.5V14ZM14 14h6v4.5c0 .83-.67 1.5-1.5 1.5H14v-6Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+                                    <span>الرئيسية</span>
+                                </a>
+                                <a href="#send_view" onclick="showClientView('send', event)" data-nav-view="send" class="client-nav flex items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 7.5h14M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2 7h6m-6 3h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <span>إرسال تقييم</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="mb-2 text-xs font-medium uppercase leading-4 tracking-wide text-gray-400">أدوات</h3>
+                            <div class="space-y-1.5">
+                                <a href="#complaints_view" onclick="showClientView('complaints', event)" data-nav-view="complaints" class="client-nav flex items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v5m0 3h.01M10.3 4.5 3.4 16.4A2 2 0 0 0 5.1 19h13.8a2 2 0 0 0 1.7-2.6L13.7 4.5a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <span>الشكاوى</span>
+                                </a>
+                                <a href="#branches_view" onclick="showClientView('branches', event)" data-nav-view="branches" class="client-nav flex items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 18V8m5 10V5m5 13v-7m5 7V9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                                    <span>الفروع</span>
+                                </a>
+                                <a href="#analytics_view" onclick="showClientView('analytics', event)" data-nav-view="analytics" class="client-nav flex items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 19V5m0 14h14M9 15l3-4 3 2 4-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <span>التحليلات</span>
+                                </a>
+                                <a href="/reports.html" class="flex items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v14H5V5Zm4 4h6M9 12h6M9 15h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <span>التقارير</span>
+                                </a>
+                                <a href="#settings_section" onclick="showClientView('settings', event)" data-nav-view="settings" class="client-nav flex items-center gap-3 rounded-xl px-3 py-0 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Zm7.5 3.5a7.5 7.5 0 0 0-.12-1.35l2.02-1.55-2-3.46-2.4.96a7.3 7.3 0 0 0-2.34-1.36L14.3 2.7h-4.6l-.36 2.54A7.3 7.3 0 0 0 7 6.6l-2.4-.96-2 3.46 2.02 1.55a7.5 7.5 0 0 0 0 2.7L2.6 14.9l2 3.46 2.4-.96a7.3 7.3 0 0 0 2.34 1.36l.36 2.54h4.6l.36-2.54A7.3 7.3 0 0 0 17 17.4l2.4.96 2-3.46-2.02-1.55c.08-.44.12-.89.12-1.35Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+                                    <span>الإعدادات</span>
+                                </a>
+                            </div>
+                        </div>
+                    </nav>
+                </div>
+
+                <div class="pb-0">
+                    <div class="text-sm font-medium leading-5 text-gray-800">لوحة العميل</div>
+                    <div class="mt-0.5 flex items-center gap-2 text-xs leading-4 text-gray-500">
+                        <span class="h-2 w-2 rounded-full bg-green-500"></span>
+                        <span>متصل</span>
+                    </div>
+                    <button onclick="logout()" class="mt-1.5 text-xs font-medium text-gray-500 hover:text-gray-700">تسجيل الخروج</button>
+                </div>
+            </div>
+            <div>
+                <div class="mb-8 flex items-center gap-3">
+                    <img src="/assets/logo-icon-tight.svg" alt="RepuSystem" class="h-16 w-16 shrink-0 object-contain">
+                    <div class="text-right leading-tight">
+                    <h2 class="text-xl font-extrabold text-slate-900">RepuSystem</h2>
+                    <p class="mt-1 text-xs font-medium text-slate-500">نظام إدارة السمعة</p>
+                    </div>
+                </div>
+
+                <nav>
+                    <h3 class="mb-4 text-xs font-medium uppercase leading-5 text-gray-400">القائمة</h3>
+                    <a href="#home_view" onclick="showClientView('home', event)" data-nav-view="home" class="client-nav block rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black shadow-lg shadow-blue-950/30">الرئيسية</a>
+                    <a href="#send_view" onclick="showClientView('send', event)" data-nav-view="send" class="client-nav block rounded-2xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white transition">إرسال تقييم</a>
+                    <a href="#complaints_view" onclick="showClientView('complaints', event)" data-nav-view="complaints" class="client-nav block rounded-2xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white transition">الشكاوى</a>
+                    <a href="#branches_view" onclick="showClientView('branches', event)" data-nav-view="branches" class="client-nav block rounded-2xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white transition">الفروع</a>
+                    <a href="#analytics_view" onclick="showClientView('analytics', event)" data-nav-view="analytics" class="client-nav block rounded-2xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white transition">التحليلات</a>
+                    <a href="/reports.html" class="block rounded-2xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white transition">التقارير</a>
+                    <a href="#settings_section" onclick="showClientView('settings', event)" data-nav-view="settings" class="client-nav block rounded-2xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white transition">الإعدادات</a>
+                </nav>
+            </div>
+
+            <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div>
+                    <p class="text-xs text-slate-400 mb-2">حالة الحساب</p>
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-sm font-black">لوحة العميل</span>
+                        <span class="text-[10px] bg-green-500/10 text-green-300 border border-green-500/20 px-2 py-1 rounded-full font-bold">متصل</span>
+                    </div>
+                </div>
+                <button onclick="logout()" class="w-full text-right text-sm font-black text-red-300 hover:text-red-200 transition">خروج</button>
+            </div>
+        </aside>
+
+        <main class="app-main min-h-screen space-y-4 p-4 md:p-6 lg:mr-[290px] lg:space-y-6">
+        <header class="app-topbar sticky top-0 z-30 -mx-4 -mt-4 mb-4 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur md:-mx-6 md:-mt-6 md:mb-6 md:px-6">
+            <div class="topbar-inner flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="page-title text-xl font-semibold text-gray-900">لوحة إدارة السمعة</h2>
+                        <span class="rounded-full border border-blue-100 bg-white px-2.5 py-1 text-xs font-medium text-[#465fff]">آخر 30 يوم</span>
+                    </div>
+                    <p class="page-subtitle mt-1 text-sm text-gray-500">متابعة رضا العملاء، الشكاوى، وأداء الفروع من مكان واحد</p>
+                </div>
+                <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
+                    <div class="account-pill text-right">
+                        <div class="flex items-center justify-between gap-3">
+                            <h1 id="restaurant_name" class="max-w-[180px] truncate text-sm font-semibold text-slate-900">...</h1>
+                            <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">متصل</span>
+                        </div>
+                        <p class="mt-1 text-[11px] text-gray-400">آخر تحديث: اليوم</p>
+                    </div>
+                    <div class="topbar-search relative">
+                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
+                        <input id="topbar_search" type="search" placeholder="بحث في الشكاوى، الفروع، النشاط..." autocomplete="off" class="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pr-9 pl-4 text-sm text-gray-700 outline-none placeholder:text-gray-400 focus:border-[#465fff] focus:bg-white focus:ring-2 focus:ring-blue-500/10">
+                        <span id="topbar_search_count" class="pointer-events-none absolute left-3 top-1/2 hidden -translate-y-1/2 text-[11px] text-gray-400"></span>
+                    </div>
+                    <button onclick="logout()" class="h-10 rounded-lg border border-gray-200 bg-white px-4 text-xs font-medium text-gray-600 transition hover:bg-gray-50">خروج</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="content-grid mx-auto w-full max-w-[1500px] space-y-4 pt-2 md:space-y-5 md:pt-3">
+        <div id="complaint_alert" class="hidden rounded-xl border border-rose-200 bg-white px-3 py-2.5 text-rose-800 shadow-sm flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-xs text-rose-700">!</span>
+                <p class="text-sm font-semibold leading-tight">تنبيه: توجد شكاوى جديدة لم يتم الرد عليها!</p>
+            </div>
+            <a href="/reports" class="inline-flex h-8 items-center rounded-lg bg-white px-3 text-xs font-semibold text-rose-600 shadow-sm hover:bg-rose-100">عرض التقارير</a>
+        </div>
+
+        <div id="dashboard_view" class="space-y-5 md:space-y-6">
+        <section id="home_view" class="client-view space-y-5 md:space-y-6">
+        <div class="health-card section-card app-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+            <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-sm font-medium text-[#465fff]">الرئيسية</p>
+                    <h3 class="mt-1 text-xl font-semibold text-gray-900">مؤشر صحة تجربة العملاء</h3>
+                    <p class="mt-1 text-sm text-gray-500">قراءة تنفيذية تجمع الرضا، النجوم، والشكاوى النشطة.</p>
+                </div>
+                <span id="health_status_label" class="app-badge inline-flex w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">لا توجد بيانات</span>
+            </div>
+            <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.82fr)] xl:items-stretch">
+                <div class="health-score-block flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-baseline gap-2">
+                            <span id="health_score" class="text-6xl font-semibold tracking-tight text-[#101828]">0</span>
+                            <span class="text-xl font-medium text-gray-400">/ 100</span>
+                        </div>
+                        <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-500">يعطي تقديراً سريعاً لصحة تجربة العملاء بناءً على متوسط التقييم ومعدل الرضا الحالي.</p>
+                    </div>
+                    <div class="mt-5">
+                        <div id="health_meter" class="health-meter"><span></span></div>
+                        <div class="mt-2 flex justify-between text-[11px] font-medium text-gray-400">
+                            <span>خطر</span>
+                            <span>ممتاز</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="health-support-card">
+                        <p class="text-[11px] font-medium text-gray-500">متوسط التقييم</p>
+                        <p id="summary_average_rating" dir="ltr" class="mt-1 text-lg font-semibold text-gray-900">0.0 / 5</p>
+                    </div>
+                    <div class="health-support-card">
+                        <p class="text-[11px] font-medium text-gray-500">معدل الرضا</p>
+                        <p id="summary_satisfaction_rate" class="mt-1 text-lg font-semibold text-gray-900">0%</p>
+                    </div>
+                    <div class="health-support-card">
+                        <p class="text-[11px] font-medium text-gray-500">الشكاوى النشطة</p>
+                        <p id="summary_complaint_count" class="mt-1 text-lg font-semibold text-gray-900">0</p>
+                    </div>
+                    <div class="health-support-card">
+                        <p class="text-[11px] font-medium text-gray-500">متأخرة +24 ساعة</p>
+                        <p id="summary_overdue_count" class="mt-1 text-lg font-semibold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card rounded-2xl border border-gray-200 bg-white p-3 shadow-sm md:p-4">
+            <div class="kpi-grid grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="dashboard-metric dashboard-metric--compact metric-green metric-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p class="text-xs font-medium text-gray-500">معدل الرضا</p>
+                    <p id="kpi_satisfaction_rate" class="mt-1 text-2xl font-semibold text-gray-900">0%</p>
+                    <p class="mt-1 text-xs text-gray-400">نسبة التجارب الإيجابية</p>
+                </div>
+                <div class="dashboard-metric dashboard-metric--compact metric-blue metric-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p class="text-xs font-medium text-gray-500">متوسط التقييم</p>
+                    <p id="kpi_average_rating" dir="ltr" class="mt-1 text-2xl font-semibold text-gray-900">0.0 / 5</p>
+                    <p class="mt-1 text-xs text-gray-400">متوسط النجوم المسجلة</p>
+                </div>
+                <div class="dashboard-metric dashboard-metric--compact metric-red metric-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p class="text-xs font-medium text-gray-500">الشكاوى النشطة</p>
+                    <p id="kpi_complaint_count" class="mt-1 text-2xl font-semibold text-gray-900">0</p>
+                    <p class="mt-1 text-xs text-gray-400">جديدة أو قيد المتابعة</p>
+                </div>
+                <div class="dashboard-metric dashboard-metric--compact metric-amber metric-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p class="text-xs font-medium text-gray-500">متأخرة +24 ساعة</p>
+                    <p id="kpi_overdue_count" class="mt-1 text-2xl font-semibold text-gray-900">0</p>
+                    <p class="mt-1 text-xs text-gray-400">تحتاج إجراء سريع</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div class="section-card rounded-2xl border border-rose-100 bg-white p-5 shadow-sm">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">إجراءات عاجلة</h3>
+                        <p class="mt-1 text-sm text-gray-500">قائمة تشغيلية مختصرة للشكاوى النشطة.</p>
+                    </div>
+                    <button type="button" onclick="showClientView('complaints')" class="inline-flex h-9 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 hover:bg-gray-50">مركز الشكاوى</button>
+                </div>
+                <div id="home_urgent_preview" class="rounded-xl border border-gray-100 px-4 py-6 text-center">
+                    <p class="text-sm text-gray-500">كل شيء تحت السيطرة — لا توجد شكاوى عاجلة حالياً</p>
+                </div>
+            </div>
+
+            <div class="section-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">أداء الفروع</h3>
+                        <p class="mt-1 text-sm text-gray-500">أفضل فرع والفروع التي تحتاج متابعة.</p>
+                    </div>
+                    <p id="summary_branch_count" class="app-badge rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">0 فروع مقاسة</p>
+                </div>
+                <div id="home_branch_insights" class="grid gap-2">
+                    <div class="rounded-xl bg-slate-50 px-4 py-4 text-sm text-gray-500">لا توجد بيانات كافية بعد.</div>
+                </div>
+                <button type="button" onclick="showClientView('branches')" class="mt-4 inline-flex h-9 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 hover:bg-gray-50">عرض الفروع</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <div class="section-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-8">
+                <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">آخر النشاط</h3>
+                        <p class="mt-1 text-sm text-gray-500">آخر 3 أنشطة مرتبة حسب التوقيت.</p>
+                    </div>
+                    <a href="/reports.html" class="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">عرض كل التقارير</a>
+                </div>
+                <div id="latest_activity" class="rounded-xl border border-gray-100 px-4 py-6 text-center">
+                    <p class="text-sm text-gray-500">لا توجد بيانات حديثة</p>
+                </div>
+            </div>
+
+            <div class="section-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-4">
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">إجراءات سريعة</h3>
+                    <p class="mt-1 text-sm text-gray-500">روابط وأوامر يومية مختصرة.</p>
+                </div>
+                <div id="review_link_ready" class="hidden">
+                    <input id="review_link_input" type="text" readonly class="app-input url-code mb-3 h-10 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 text-left font-mono text-xs text-gray-600 outline-none" dir="ltr">
+                </div>
+                <div id="review_link_missing" class="hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
+                    لم يتم تعيين NFC ID لهذا الحساب
+                </div>
+                <div class="quick-actions-compact grid grid-cols-2 gap-2">
+                    <button type="button" onclick="copyReviewLink()" class="app-button app-button-primary col-span-2 inline-flex h-10 items-center justify-center rounded-lg bg-[#465fff] px-3 text-sm font-medium text-white shadow-sm transition hover:bg-[#3641f5]">نسخ رابط التقييم</button>
+                    <a id="quick_open_review" href="#" target="_blank" rel="noopener" class="app-button app-button-secondary inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50">فتح الصفحة</a>
+                    <button type="button" onclick="showClientView('send')" class="app-button app-button-secondary inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 hover:bg-gray-50">إرسال تقييم</button>
+                    <a id="quick_qr_link" href="#" class="app-button app-button-secondary inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 hover:bg-gray-50">QR</a>
+                    <a href="/reports.html" class="app-button app-button-secondary inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50">التقارير</a>
+                </div>
+            </div>
+        </div>
+        </section>
+
+        <section id="complaints_view" class="client-view hidden space-y-4">
+            <div>
+                <h3 class="text-xl font-semibold text-gray-900">مركز الشكاوى</h3>
+                <p class="mt-1 text-sm text-gray-500">إدارة الشكاوى، الحالات، والتواصل مع العملاء.</p>
+            </div>
+            <div class="section-card rounded-2xl border border-rose-100 bg-white p-5 shadow-sm md:p-6">
+            <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">إجراءات عاجلة</h3>
+                    <p class="mt-1 text-sm text-gray-500">الشكاوى النشطة التي تحتاج متابعة تشغيلية.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span id="urgent_complaints_count" class="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">0</span>
+                    <span id="workflow_overdue_count" class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">0 متأخرة</span>
+                </div>
+            </div>
+            <div id="complaint_workflow_summary" class="mb-4 grid grid-cols-2 gap-2 text-center md:grid-cols-4">
+                <div class="rounded-xl bg-slate-50 px-2 py-2">
+                    <p class="text-[11px] font-medium text-gray-500">جديدة</p>
+                    <p id="workflow_new_count" class="mt-1 text-sm font-semibold text-gray-900">0</p>
+                </div>
+                <div class="rounded-xl bg-amber-50 px-2 py-2">
+                    <p class="text-[11px] font-medium text-amber-700">قيد المعالجة</p>
+                    <p id="workflow_in_progress_count" class="mt-1 text-sm font-semibold text-amber-800">0</p>
+                </div>
+                <div class="rounded-xl bg-blue-50 px-2 py-2">
+                    <p class="text-[11px] font-medium text-blue-700">تم التواصل</p>
+                    <p id="workflow_contacted_count" class="mt-1 text-sm font-semibold text-blue-800">0</p>
+                </div>
+                <div class="rounded-xl bg-emerald-50 px-2 py-2">
+                    <p class="text-[11px] font-medium text-emerald-700">تم الحل / مغلقة</p>
+                    <p id="workflow_resolved_closed_count" class="mt-1 text-sm font-semibold text-emerald-800">0</p>
+                </div>
+            </div>
+            <div id="urgent_complaints" class="rounded-xl border border-gray-100 px-4 py-6 text-center">
+                <p class="text-sm text-gray-500">كل شيء تحت السيطرة — لا توجد شكاوى عاجلة حالياً</p>
+            </div>
+            </div>
+        </section>
+
+        <section id="analytics_view" class="client-view hidden space-y-5">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <p class="text-sm font-medium text-[#465fff]">التحليلات</p>
+                    <h3 class="mt-1 text-2xl font-semibold text-gray-900">تحليلات رضا العملاء</h3>
+                    <p class="mt-1 text-sm text-gray-500">مؤشرات الاتجاهات ومستوى الرضا عبر القنوات والفروع.</p>
+                </div>
+                <span class="app-badge w-fit bg-blue-50 text-[#465fff]">آخر 30 يوم</span>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="metric-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p class="text-xs font-medium text-gray-500">متوسط التقييم</p>
+                    <p id="average_rating" class="mt-1 text-2xl font-semibold text-gray-900">0 / 5</p>
+                    <p id="analytics_rating_count" class="mt-1 text-xs text-gray-400">0 تقييمات مسجلة</p>
+                    <span id="rating_count" class="hidden">0</span>
+                </div>
+                <div class="metric-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p class="text-xs font-medium text-gray-500">معدل الرضا</p>
+                    <p id="analytics_satisfaction_rate" class="mt-1 text-2xl font-semibold text-gray-900">0%</p>
+                    <p class="mt-1 text-xs text-gray-400">من الردود المصنفة</p>
+                </div>
+                <div class="metric-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p class="text-xs font-medium text-gray-500">تقييمات إيجابية</p>
+                    <p id="analytics_positive_count" class="mt-1 text-2xl font-semibold text-gray-900">0</p>
+                    <p class="mt-1 text-xs text-gray-400">حسب ملخص الفترة</p>
+                </div>
+                <div class="metric-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p class="text-xs font-medium text-gray-500">الشكاوى النشطة</p>
+                    <p id="analytics_active_complaints" class="mt-1 text-2xl font-semibold text-gray-900">0</p>
+                    <p id="low_rating_rate" class="mt-1 text-xs text-rose-600">0% تحتاج متابعة</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:gap-5 xl:grid-cols-12">
+                <div class="section-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-8">
+                    <div class="mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">تطور التقييمات والشكاوى</h3>
+                        <p class="mt-1 text-sm text-gray-500">المؤشر الرئيسي لمراقبة النشاط اليومي خلال آخر 30 يوم.</p>
+                    </div>
+                    <div class="dashboard-chart">
+                        <canvas id="daily_chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="section-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-4">
+                    <div class="mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">توزيع تقييمات النجوم</h3>
+                        <p class="mt-1 text-sm text-gray-500">يوضح مستوى رضا العملاء من 1 إلى 5 نجوم.</p>
+                    </div>
+                    <div class="dashboard-chart dashboard-chart--compact">
+                        <canvas id="rating_breakdown_chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="section-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-8">
+                    <div class="mb-4 flex items-start justify-between gap-4">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800">الطلبات والتقييمات حسب الشهر</h3>
+                            <p class="mt-1 text-sm text-gray-500">نظرة شهرية على حجم النشاط خلال آخر 6 أشهر.</p>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart">
+                        <canvas id="monthly_chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="section-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-4">
+                    <div class="mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">معدل الرضا</h3>
+                        <p class="mt-1 text-sm text-gray-500">نسبة التقييمات الممتازة من الردود المصنفة.</p>
+                        <p class="mt-1 text-xs text-gray-400">يعتمد على التقييمات المصنفة خلال الفترة الحالية.</p>
+                    </div>
+                    <div class="dashboard-chart dashboard-chart--compact flex items-center justify-center">
+                        <canvas id="satisfaction_chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="branches_view" class="client-view hidden space-y-4">
+            <div>
+                <h3 class="text-xl font-semibold text-gray-900">أداء الفروع</h3>
+                <p class="mt-1 text-sm text-gray-500">مقارنة الفروع حسب التقييمات، الشكاوى، ونسبة المتابعة.</p>
+            </div>
+            <div class="section-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+            <div class="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div class="rounded-xl bg-emerald-50 px-4 py-3">
+                    <p class="text-xs font-medium text-emerald-700">أفضل أداء</p>
+                    <span id="best_branch_badge" class="mt-1 hidden text-sm font-semibold text-emerald-900"></span>
+                </div>
+                <div class="rounded-xl bg-rose-50 px-4 py-3">
+                    <p class="text-xs font-medium text-rose-700">يحتاج متابعة</p>
+                    <span id="weak_branch_badge" class="mt-1 hidden text-sm font-semibold text-rose-900"></span>
+                </div>
+                <div class="rounded-xl bg-blue-50 px-4 py-3">
+                    <p class="text-xs font-medium text-[#465fff]">فروع مقاسة</p>
+                    <span id="branch_count_badge" class="mt-1 block text-sm font-semibold text-blue-900">0</span>
+                </div>
+            </div>
+            <div id="branch_performance" class="overflow-hidden rounded-xl border border-gray-100">
+                <div class="px-4 py-6 text-center text-sm text-gray-500">لا توجد بيانات كافية حسب الفرع حالياً</div>
+            </div>
+            </div>
+        </section>
+
+        <section id="send_view" class="client-view hidden space-y-4">
+        <div>
+            <h3 class="text-xl font-semibold text-gray-900">إرسال طلب تقييم</h3>
+            <p class="mt-1 text-sm text-gray-500">أرسل رابط تقييم للعميل عبر واتساب.</p>
+        </div>
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div class="section-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm xl:col-span-4 xl:order-2">
+            <div class="mb-3 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-800">رابط التقييم الخاص بك</h3>
+                    <p class="mt-1 text-sm text-gray-500">استخدمه قبل أو بعد إرسال طلبات التقييم.</p>
+                </div>
+                <div class="flex flex-col gap-2 sm:flex-row">
+                    <button type="button" onclick="copyReviewLink()" class="inline-flex h-10 items-center justify-center rounded-lg bg-[#465fff] px-4 text-sm font-medium text-white shadow-sm transition hover:bg-[#3641f5]">نسخ رابط التقييم</button>
+                    <a id="send_open_review" href="#" target="_blank" rel="noopener" class="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">فتح رابط التقييم</a>
+                </div>
+            </div>
+        </div>
+        <div class="xl:col-span-8 xl:order-1">
+        <div id="send_section" class="section-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div class="mb-5">
+                <h3 class="font-semibold text-gray-800">إرسال طلب تقييم</h3>
+                <p class="mt-1 text-sm text-gray-500">سيتم إرسال رسالة واتساب للعميل لطلب تقييم التجربة</p>
+            </div>
+            <div class="space-y-5">
+                <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">اسم العميل</label>
+                    <input id="cust_name" type="text" placeholder="مثال: محمد أحمد" class="app-input h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
+                </div>
+                
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">رقم الجوال</label>
+                    <input id="cust_phone" type="tel" placeholder="05xxxxxxxx" class="app-input h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
+                </div>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700">الفرع</label>
+                        <select id="branch" class="app-input h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
+                            <option>الفرع الرئيسي</option>
+                            <option>فرع الصالحية</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700">وقت الإرسال</label>
+                        <select id="delay_time" class="app-input h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
+                            <option value="0">الآن فوراً</option>
+                            <option value="30">بعد 30 دقيقة</option>
+                            <option value="60">بعد ساعة</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button id="send_btn" onclick="send()" class="app-button app-button-primary flex h-11 w-full items-center justify-center gap-3 rounded-lg bg-[#465fff] text-sm font-medium text-white shadow-sm transition hover:bg-[#3641f5]">
+                    <span>إرسال عبر واتساب</span>
+                </button>
+            </div>
+        </div>
+        </div>
+        </div>
+
+        </section>
+
+        </div>
+
+        <section id="settings_section" class="client-view hidden space-y-4 md:space-y-6">
+            <div>
+                <h3 class="text-xl font-semibold text-gray-900">الإعدادات</h3>
+                <p class="mt-1 text-sm text-gray-500">بيانات المنشأة وروابط التقييم وسياسات الشكاوى للعرض فقط.</p>
+            </div>
+            <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <h4 class="text-base font-semibold text-gray-900">بيانات المنشأة</h4>
+                    <div class="mt-4 grid gap-3">
+                        <div class="rounded-xl bg-gray-50 p-4">
+                            <p class="text-xs font-medium text-gray-500">اسم المنشأة</p>
+                            <p id="settings_name" class="mt-2 break-words text-sm font-semibold text-gray-800">-</p>
+                        </div>
+                        <div class="rounded-xl bg-gray-50 p-4">
+                            <p class="text-xs font-medium text-gray-500">NFC ID</p>
+                            <p id="settings_nfc_id" class="mt-2 break-words text-sm font-semibold text-gray-800">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div class="flex items-start justify-between gap-3">
+                        <h4 class="text-base font-semibold text-gray-900">روابط التقييم</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" onclick="copySettingsReviewLink()" class="inline-flex h-9 items-center justify-center rounded-lg bg-[#465fff] px-3 text-xs font-medium text-white shadow-sm transition hover:bg-[#3641f5]">نسخ الرابط</button>
+                            <a id="settings_open_review" href="#" target="_blank" rel="noopener" class="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">فتح الصفحة</a>
+                        </div>
+                    </div>
+                    <div class="mt-4 grid gap-3">
+                        <div class="rounded-xl bg-gray-50 p-4">
+                            <p class="text-xs font-medium text-gray-500">رابط التقييم الخاص</p>
+                            <p id="settings_review_link" class="mt-2 break-all text-left font-mono text-sm font-semibold text-gray-800" dir="ltr">-</p>
+                        </div>
+                        <div class="rounded-xl bg-gray-50 p-4">
+                            <p class="text-xs font-medium text-gray-500">Google Maps review link</p>
+                            <p id="settings_google_link" class="mt-2 break-all text-left font-mono text-sm font-semibold text-gray-800" dir="ltr">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <h4 class="text-base font-semibold text-gray-900">سياسة الشكاوى</h4>
+                    <div class="mt-4 grid gap-3">
+                        <div class="rounded-xl bg-gray-50 p-4">
+                            <p class="text-xs font-medium text-gray-500">سياسة التعامل مع الشكوى</p>
+                            <p id="settings_complaint_action" class="mt-2 text-sm font-semibold text-gray-800">-</p>
+                        </div>
+                        <div class="rounded-xl bg-gray-50 p-4">
+                            <p class="text-xs font-medium text-gray-500">كود الخصم</p>
+                            <p id="settings_discount_code" class="mt-2 break-words text-sm font-semibold text-gray-800">-</p>
+                        </div>
+                        <div class="rounded-xl bg-gray-50 p-4">
+                            <p class="text-xs font-medium text-gray-500">رسالة الشكوى</p>
+                            <p id="settings_complaint_message" class="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-gray-800">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <h4 class="text-base font-semibold text-gray-900">التواصل</h4>
+                    <div class="mt-4 rounded-xl bg-gray-50 p-4">
+                        <p class="text-xs font-medium text-gray-500">رقم واتساب المنشأة</p>
+                        <p id="settings_whatsapp_number" class="mt-2 break-words text-sm font-semibold text-gray-800">-</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        </div>
+        </main>
+    </div>
+
+    <script>
+        let currentClientInfo = null;
+        let lastDashboardSummary = null;
+        const dashboardCharts = {};
+
+        function buildReviewLink(nfcId) {
+            return nfcId ? `${window.location.origin}/r/${encodeURIComponent(nfcId)}` : '';
+        }
+
+        function updateReviewLink(nfcId) {
+            const ready = document.getElementById('review_link_ready');
+            const missing = document.getElementById('review_link_missing');
+            const input = document.getElementById('review_link_input');
+            const quickQrLink = document.getElementById('quick_qr_link');
+            const sendOpenReview = document.getElementById('send_open_review');
+
+            if (nfcId) {
+                input.value = buildReviewLink(nfcId);
+                const quickOpenReview = document.getElementById('quick_open_review');
+                if (quickOpenReview) {
+                    quickOpenReview.href = input.value;
+                    quickOpenReview.classList.remove('pointer-events-none', 'opacity-50');
+                }
+                if (sendOpenReview) {
+                    sendOpenReview.href = input.value;
+                    sendOpenReview.classList.remove('pointer-events-none', 'opacity-50');
+                }
+                if (quickQrLink) {
+                    quickQrLink.href = `/api/qr/${encodeURIComponent(nfcId)}`;
+                    quickQrLink.classList.remove('pointer-events-none', 'opacity-50');
+                }
+                ready.classList.remove('hidden');
+                missing.classList.add('hidden');
+            } else {
+                input.value = '';
+                const quickOpenReview = document.getElementById('quick_open_review');
+                if (quickOpenReview) {
+                    quickOpenReview.href = '#';
+                    quickOpenReview.classList.add('pointer-events-none', 'opacity-50');
+                }
+                if (sendOpenReview) {
+                    sendOpenReview.href = '#';
+                    sendOpenReview.classList.add('pointer-events-none', 'opacity-50');
+                }
+                if (quickQrLink) {
+                    quickQrLink.href = '#';
+                    quickQrLink.classList.add('pointer-events-none', 'opacity-50');
+                }
+                ready.classList.add('hidden');
+                missing.classList.remove('hidden');
+            }
+        }
+
+        function copyReviewLink() {
+            const input = document.getElementById('review_link_input');
+            if (!input.value) return;
+            navigator.clipboard.writeText(input.value);
+            alert('تم نسخ رابط التقييم');
+        }
+
+        function setText(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.innerText = value || '-';
+        }
+
+        function complaintActionLabel(action) {
+            if (action === 'discount') return 'كود خصم فقط';
+            if (action === 'contact_discount') return 'تواصل + كود خصم';
+            return 'تواصل فقط';
+        }
+
+        function renderStats(data) {
+            const total = document.getElementById('total');
+            const positive = document.getElementById('positive_count');
+            const complaints = document.getElementById('complaint_count');
+            const satisfaction = document.getElementById('satisfaction_rate');
+
+            if (total) total.innerText = data.total_evaluations ?? data.total ?? 0;
+            if (positive) positive.innerText = data.positive_count ?? 0;
+            if (complaints) complaints.innerText = data.complaint_count ?? 0;
+            if (satisfaction) satisfaction.innerText = `${data.satisfaction_rate ?? 0}%`;
+            setText('analytics_positive_count', String(data.positive_count ?? 0));
+        }
+
+        function renderRatingInsights(summary) {
+            const averageRating = Number(summary.average_rating || 0).toFixed(1);
+            setText('average_rating', `${averageRating} / 5`);
+            setText('rating_count', String(summary.rating_count ?? 0));
+            setText('analytics_rating_count', `${summary.rating_count ?? 0} تقييمات مسجلة`);
+            setText('low_rating_rate', `${summary.low_rating_rate ?? 0}% تحتاج متابعة`);
+        }
+
+        function renderExecutiveSummary(summary) {
+            const rawAverageRating = Number(summary.average_rating || 0);
+            const averageRating = rawAverageRating.toFixed(1);
+            const satisfactionRate = Number(summary.satisfaction_rate || 0);
+            const workflow = summary.complaint_workflow_summary || {};
+            const activeComplaints = Number(workflow.new_count || 0) + Number(workflow.in_progress_count || 0) + Number(workflow.contacted_count || 0);
+            const healthScore = rawAverageRating > 0
+                ? Math.round((rawAverageRating / 5) * 60 + satisfactionRate * 0.4)
+                : Math.round(satisfactionRate);
+            const branchCount = Array.isArray(summary.branch_performance) ? summary.branch_performance.length : 0;
+            setText('summary_average_rating', `${averageRating} / 5`);
+            setText('summary_satisfaction_rate', `${summary.satisfaction_rate ?? 0}%`);
+            setText('summary_complaint_count', String(activeComplaints));
+            setText('summary_overdue_count', String(workflow.overdue_count ?? 0));
+            setText('kpi_average_rating', `${averageRating} / 5`);
+            setText('kpi_satisfaction_rate', `${summary.satisfaction_rate ?? 0}%`);
+            setText('kpi_complaint_count', String(activeComplaints));
+            setText('kpi_overdue_count', String(workflow.overdue_count ?? 0));
+            setText('analytics_satisfaction_rate', `${summary.satisfaction_rate ?? 0}%`);
+            setText('analytics_active_complaints', String(activeComplaints));
+            setText('summary_branch_count', `فروع مقاسة: ${branchCount}`);
+            setText('branch_count_badge', String(branchCount));
+            setText('health_score', String(healthScore));
+            renderHealthStatus(healthScore);
+        }
+
+        function renderHealthStatus(score) {
+            const label = document.getElementById('health_status_label');
+            const meter = document.querySelector('#health_meter span');
+            if (meter) meter.style.width = `${Math.max(0, Math.min(100, Number(score) || 0))}%`;
+            if (!label) return;
+            let text = 'حرج';
+            let className = 'inline-flex w-fit rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700';
+            if (score >= 80) {
+                text = 'ممتاز';
+                className = 'inline-flex w-fit rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700';
+            } else if (score >= 65) {
+                text = 'جيد';
+                className = 'inline-flex w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700';
+            } else if (score >= 50) {
+                text = 'يحتاج متابعة';
+                className = 'inline-flex w-fit rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700';
+            }
+            label.textContent = text;
+            label.className = className;
+        }
+
+        function ratingBadgeClass(rating) {
+            const value = Number(rating || 0);
+            if (value >= 4) return 'bg-emerald-50 text-emerald-700';
+            if (value >= 3) return 'bg-amber-50 text-amber-700';
+            return 'bg-rose-50 text-rose-700';
+        }
+
+        function branchStatusBadge(branch) {
+            const ratingCount = Number(branch.rating_count || 0);
+            const averageRating = Number(branch.average_rating || 0);
+            if (ratingCount === 0) return { label: 'لا توجد بيانات', className: 'bg-slate-100 text-slate-500' };
+            if (averageRating >= 4.5) return { label: 'ممتاز', className: 'bg-emerald-50 text-emerald-700' };
+            if (averageRating >= 4) return { label: 'جيد', className: 'bg-blue-50 text-blue-700' };
+            if (averageRating >= 3) return { label: 'يحتاج متابعة', className: 'bg-amber-50 text-amber-700' };
+            return { label: 'حرج', className: 'bg-rose-50 text-rose-700' };
+        }
+
+        function renderBranchPerformance(summary) {
+            const container = document.getElementById('branch_performance');
+            const branches = Array.isArray(summary.branch_performance) ? summary.branch_performance : [];
+            const bestBadge = document.getElementById('best_branch_badge');
+            const weakBadge = document.getElementById('weak_branch_badge');
+            const bestBranch = Array.isArray(summary.best_branches) ? summary.best_branches[0] : null;
+            const weakBranch = Array.isArray(summary.weak_branches) ? summary.weak_branches[0] : null;
+
+            if (bestBadge) {
+                if (bestBranch) {
+                    bestBadge.textContent = bestBranch.branch;
+                    bestBadge.classList.remove('hidden');
+                } else {
+                    bestBadge.textContent = 'لا توجد بيانات كافية بعد.';
+                    bestBadge.classList.remove('hidden');
+                }
+            }
+
+            if (weakBadge) {
+                if (weakBranch) {
+                    weakBadge.textContent = weakBranch.branch;
+                    weakBadge.classList.remove('hidden');
+                } else {
+                    weakBadge.classList.add('hidden');
+                }
+            }
+
+            if (!container) return;
+            if (branches.length === 0) {
+                container.innerHTML = '<div class="px-4 py-6 text-center text-sm text-gray-500">لا توجد بيانات كافية حسب الفرع حالياً</div>';
+                return;
+            }
+
+            container.innerHTML = `<div class="overflow-x-auto">
+                <table class="w-full min-w-[720px] text-right">
+                    <thead class="bg-gray-50 text-xs font-medium text-gray-500">
+                        <tr>
+                            <th class="px-4 py-3">الفرع</th>
+                            <th class="px-4 py-3 text-center">الحالة</th>
+                            <th class="px-4 py-3 text-center">متوسط التقييم</th>
+                            <th class="px-4 py-3 text-center">التقييمات</th>
+                            <th class="px-4 py-3 text-center">الشكاوى</th>
+                            <th class="px-4 py-3 text-center">تحتاج متابعة</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        ${branches.map(branch => {
+                            const averageRating = Number(branch.average_rating || 0);
+                            const statusBadge = branchStatusBadge(branch);
+                            return `<tr>
+                                <td class="px-4 py-3 text-sm font-medium text-gray-800">${escapeHtml(branch.branch || 'غير محدد')}</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadge.className}">${statusBadge.label}</span>
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${ratingBadgeClass(averageRating)}">${averageRating.toFixed(1)} / 5</span>
+                                </td>
+                                <td class="px-4 py-3 text-center text-sm font-medium text-gray-700">${branch.rating_count ?? branch.total_evaluations ?? 0}</td>
+                                <td class="px-4 py-3 text-center text-sm font-medium text-gray-700">${branch.complaint_count ?? 0}</td>
+                                <td class="px-4 py-3 text-center text-sm font-medium text-gray-700">${branch.low_rating_rate ?? 0}%</td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+        }
+
+        function renderHomeBranchInsights(summary) {
+            const container = document.getElementById('home_branch_insights');
+            if (!container) return;
+            const bestBranch = Array.isArray(summary.best_branches) ? summary.best_branches[0] : null;
+            const weakBranch = Array.isArray(summary.weak_branches) ? summary.weak_branches[0] : null;
+            const branchCount = Array.isArray(summary.branch_performance) ? summary.branch_performance.length : 0;
+
+            if (!bestBranch && !weakBranch && branchCount === 0) {
+                container.innerHTML = '<div class="rounded-xl bg-slate-50 px-4 py-4 text-sm text-gray-500">لا توجد بيانات كافية بعد.</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="subtle-row rounded-xl px-4 py-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-xs font-medium text-gray-500">أفضل أداء</p>
+                        <span class="subtle-row-accent bg-emerald-500"></span>
+                    </div>
+                    <p class="mt-2 text-sm font-semibold text-gray-900">${escapeHtml(bestBranch?.branch || 'لا توجد بيانات كافية بعد.')}</p>
+                </div>
+                <div class="subtle-row rounded-xl px-4 py-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-xs font-medium text-gray-500">يحتاج متابعة</p>
+                        <span class="subtle-row-accent bg-rose-500"></span>
+                    </div>
+                    <p class="mt-2 text-sm font-semibold text-gray-900">${escapeHtml(weakBranch?.branch || 'لا توجد بيانات كافية بعد.')}</p>
+                </div>
+                <div class="subtle-row rounded-xl px-4 py-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-xs font-medium text-gray-500">فروع مقاسة</p>
+                        <span class="subtle-row-accent bg-[#465fff]"></span>
+                    </div>
+                    <p class="mt-2 text-sm font-semibold text-gray-900">${branchCount}</p>
+                </div>`;
+        }
+
+        function destroyChart(id) {
+            if (dashboardCharts[id]) {
+                dashboardCharts[id].destroy();
+                delete dashboardCharts[id];
+            }
+        }
+
+        function chartOptions(extra = {}) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: 10,
+                            boxHeight: 10,
+                            usePointStyle: true,
+                            font: { family: 'Cairo' }
+                        }
+                    },
+                    tooltip: {
+                        rtl: true,
+                        textDirection: 'rtl',
+                        titleFont: { family: 'Cairo' },
+                        bodyFont: { family: 'Cairo' }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { family: 'Cairo' } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#eef2f7' },
+                        ticks: { precision: 0, font: { family: 'Cairo' } }
+                    }
+                },
+                ...extra
+            };
+        }
+
+        function renderDashboardCharts(summary) {
+            if (typeof Chart === 'undefined') return;
+
+            const monthly = summary.monthly_counts || [];
+            destroyChart('monthly_chart');
+            dashboardCharts.monthly_chart = new Chart(document.getElementById('monthly_chart'), {
+                type: 'bar',
+                data: {
+                    labels: monthly.map(item => item.month),
+                    datasets: [{
+                        label: 'عدد الطلبات / التقييمات',
+                        data: monthly.map(item => item.total),
+                        backgroundColor: '#465FFF',
+                        borderRadius: 8,
+                        maxBarThickness: 44
+                    }]
+                },
+                options: chartOptions()
+            });
+
+            const daily = summary.daily_counts_last_30_days || summary.daily_counts_last_7_days || [];
+            destroyChart('daily_chart');
+            dashboardCharts.daily_chart = new Chart(document.getElementById('daily_chart'), {
+                type: 'line',
+                data: {
+                    labels: daily.map(item => String(item.date).slice(5, 10)),
+                    datasets: [
+                        {
+                            label: 'تقييمات ممتازة',
+                            data: daily.map(item => item.positive_count),
+                            borderColor: '#465FFF',
+                            backgroundColor: 'rgba(70, 95, 255, 0.12)',
+                            tension: 0.35,
+                            fill: true,
+                            pointRadius: 2
+                        },
+                        {
+                            label: 'شكاوى',
+                            data: daily.map(item => item.complaint_count),
+                            borderColor: '#F04438',
+                            backgroundColor: 'rgba(240, 68, 56, 0.08)',
+                            tension: 0.35,
+                            fill: true,
+                            pointRadius: 2
+                        }
+                    ]
+                },
+                options: chartOptions()
+            });
+
+            const satisfaction = Number(summary.satisfaction_rate || 0);
+            destroyChart('satisfaction_chart');
+            dashboardCharts.satisfaction_chart = new Chart(document.getElementById('satisfaction_chart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['معدل الرضا', 'غير مصنف'],
+                    datasets: [{
+                        data: [satisfaction, Math.max(0, 100 - satisfaction)],
+                        backgroundColor: ['#12B76A', '#EEF2F7'],
+                        borderWidth: 0,
+                        cutout: '72%'
+                    }]
+                },
+                options: chartOptions({
+                    scales: {},
+                    plugins: {
+                        ...chartOptions().plugins,
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: `${satisfaction}%`,
+                            color: '#101828',
+                            font: { family: 'Cairo', size: 28, weight: '700' },
+                            padding: { top: 18, bottom: 0 }
+                        }
+                    }
+                })
+            });
+
+            renderRatingInsights(summary);
+            const ratingBreakdown = Array.isArray(summary.rating_breakdown)
+                ? summary.rating_breakdown
+                : [5, 4, 3, 2, 1].map(rating => ({ rating, count: 0 }));
+            destroyChart('rating_breakdown_chart');
+            dashboardCharts.rating_breakdown_chart = new Chart(document.getElementById('rating_breakdown_chart'), {
+                type: 'bar',
+                data: {
+                    labels: ratingBreakdown.map(item => item.rating === 1 ? '1 نجمة' : `${item.rating} نجوم`),
+                    datasets: [{
+                        label: 'عدد التقييمات',
+                        data: ratingBreakdown.map(item => item.count),
+                        backgroundColor: ['#12B76A', '#34D399', '#F79009', '#FB7185', '#F04438'],
+                        borderRadius: 8,
+                        maxBarThickness: 36
+                    }]
+                },
+                options: chartOptions({
+                    plugins: {
+                        ...chartOptions().plugins,
+                        legend: { display: false }
+                    }
+                })
+            });
+        }
+
+        function renderSettings(data) {
+            const nfcId = data.nfc_id || data.nfcId || '';
+            const reviewLink = buildReviewLink(nfcId);
+            const openReview = document.getElementById('settings_open_review');
+
+            setText('settings_name', data.name);
+            setText('settings_review_link', reviewLink);
+            setText('settings_nfc_id', nfcId);
+            setText('settings_google_link', data.google_link);
+            setText('settings_complaint_action', complaintActionLabel(data.complaint_action));
+            setText('settings_discount_code', data.discount_code);
+            setText('settings_complaint_message', data.complaint_message);
+            setText('settings_whatsapp_number', data.whatsapp_number || data.whatsapp_contact);
+
+            if (reviewLink) {
+                openReview.href = reviewLink;
+                openReview.classList.remove('pointer-events-none', 'opacity-50');
+            } else {
+                openReview.href = '#';
+                openReview.classList.add('pointer-events-none', 'opacity-50');
+            }
+        }
+
+        function showClientView(view, event) {
+            if (event) event.preventDefault();
+            const targetView = view || 'home';
+            document.querySelectorAll('.client-view').forEach(section => {
+                section.classList.toggle('hidden', section.id !== `${targetView}_view` && !(targetView === 'settings' && section.id === 'settings_section'));
+            });
+            document.querySelectorAll('.client-nav').forEach(link => {
+                const active = link.dataset.navView === targetView;
+                link.classList.toggle('bg-[#EEF4FF]', active);
+                link.classList.toggle('text-[#465FFF]', active);
+                link.classList.toggle('text-gray-700', !active);
+            });
+            if (targetView === 'analytics' && lastDashboardSummary) {
+                setTimeout(() => renderDashboardCharts(lastDashboardSummary), 0);
+            }
+            window.location.hash = targetView === 'settings' ? 'settings_section' : `${targetView}_view`;
+            applyTopbarSearch();
+        }
+
+        function showDashboardView(event) {
+            showClientView('home', event);
+        }
+
+        function showSettingsView(event) {
+            showClientView('settings', event);
+        }
+
+        function activeClientView() {
+            return Array.from(document.querySelectorAll('.client-view')).find(section => !section.classList.contains('hidden')) || null;
+        }
+
+        function ensureSearchEmptyState(view) {
+            let empty = view.querySelector('[data-search-empty]');
+            if (!empty) {
+                empty = document.createElement('div');
+                empty.dataset.searchEmpty = 'true';
+                empty.className = 'search-empty-state hidden';
+                empty.textContent = 'لا توجد نتائج مطابقة';
+                view.appendChild(empty);
+            }
+            return empty;
+        }
+
+        function searchableItems(view) {
+            const selectors = [
+                '#home_urgent_preview > div',
+                '#latest_activity > div',
+                '#home_branch_insights > div',
+                '#urgent_complaints > div',
+                '#branch_performance tbody tr',
+                '.section-card',
+                '.metric-card',
+                'tbody tr'
+            ];
+            const items = [];
+            view.querySelectorAll(selectors.join(',')).forEach(item => {
+                if (item.matches('[data-search-empty]')) return;
+                if (item.closest('aside, nav, header')) return;
+                const hasNestedMatches = items.some(existing => item.contains(existing));
+                if (hasNestedMatches) return;
+                items.push(item);
+            });
+            return items;
+        }
+
+        function applyTopbarSearch() {
+            const input = document.getElementById('topbar_search');
+            const count = document.getElementById('topbar_search_count');
+            const view = activeClientView();
+            if (!input || !view) return;
+            const query = input.value.trim().toLowerCase();
+            const items = searchableItems(view);
+            let visible = 0;
+
+            items.forEach(item => {
+                const match = !query || item.textContent.toLowerCase().includes(query);
+                item.classList.toggle('is-search-hidden', !match);
+                if (match) visible++;
+            });
+
+            const empty = ensureSearchEmptyState(view);
+            empty.classList.toggle('hidden', !query || visible > 0);
+            if (count) {
+                count.textContent = query ? String(visible) : '';
+                count.classList.toggle('hidden', !query);
+            }
+        }
+
+        function initTopbarSearch() {
+            const input = document.getElementById('topbar_search');
+            if (!input) return;
+            input.addEventListener('input', applyTopbarSearch);
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    input.value = '';
+                    applyTopbarSearch();
+                    input.blur();
+                }
+            });
+        }
+
+        function copySettingsReviewLink() {
+            const link = document.getElementById('settings_review_link').innerText;
+            if (!link || link === '-') return;
+            navigator.clipboard.writeText(link);
+            alert('تم نسخ رابط التقييم');
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[char]));
+        }
+
+        function activitySourceLabel(source) {
+            if (source === 'nfc') return 'NFC / QR';
+            if (source === 'dashboard') return 'لوحة العميل';
+            if (source === 'whatsapp') return 'واتساب';
+            return 'غير محدد';
+        }
+
+        function activityStatusLabel(ev) {
+            if (ev.status === 'complaint') return 'شكوى';
+            if (ev.status === 'replied' && ev.answer === '1') return 'ممتاز';
+            if (ev.status === 'sent') return 'بانتظار الرد';
+            return ev.status || 'غير محدد';
+        }
+
+        function activityTitle(ev) {
+            if (ev.source === 'nfc' && ev.status === 'complaint') return 'NFC / QR - شكوى';
+            if (ev.source === 'nfc' && ev.answer === '1') return 'NFC / QR - تقييم ممتاز';
+            if (ev.source === 'dashboard' && ev.status === 'sent') return 'لوحة العميل - تم الإرسال';
+            if (ev.source === 'whatsapp') return `واتساب - ${ev.status || 'نشاط جديد'}`;
+            return 'نشاط جديد';
+        }
+
+        function formatActivityTime(value) {
+            if (!value) return '';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return '';
+            return date.toLocaleString('ar-SA', {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function renderLatestActivity(items) {
+            const container = document.getElementById('latest_activity');
+            const recent = Array.isArray(items) ? items.slice(0, 3) : [];
+
+            if (recent.length === 0) {
+                container.className = 'rounded-xl border border-gray-100 px-4 py-6 text-center';
+                container.innerHTML = '<p class="text-sm text-gray-500">لا توجد بيانات حديثة</p>';
+                return;
+            }
+
+            container.className = 'rounded-xl border border-gray-100 bg-white p-2';
+            container.innerHTML = recent.map(ev => {
+                const status = activityStatusLabel(ev);
+                const statusClass = ev.status === 'replied' && ev.answer === '1'
+                    ? 'bg-blue-50 text-blue-700'
+                    : ev.status === 'complaint' || ev.answer === '2'
+                        ? 'bg-rose-50 text-rose-700'
+                        : 'bg-slate-100 text-slate-500';
+                const source = activitySourceLabel(ev.source);
+                const time = formatActivityTime(ev.sent_at);
+                const feedback = ev.feedback ? `<p class="mt-1 truncate text-xs leading-5 text-gray-500">${escapeHtml(ev.feedback)}</p>` : '<p class="mt-1 text-xs text-gray-400">لا توجد ملاحظات نصية</p>';
+                const branch = ev.branch ? `<p class="mt-1 text-xs font-medium text-slate-500">فرع: ${escapeHtml(ev.branch)}</p>` : '';
+
+                return `<div class="timeline-dot grid gap-3 rounded-lg px-3 py-3 text-right md:grid-cols-[1fr_auto] md:items-center">
+                    <div class="min-w-0 pr-6">
+                        <span class="absolute right-3 mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-[#465fff] shadow-sm"></span>
+                        <p class="text-sm font-medium text-gray-800">${escapeHtml(activityTitle(ev))}</p>
+                        ${branch}
+                        ${feedback}
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 md:justify-end">
+                        <span class="rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">${escapeHtml(source)}</span>
+                        <span class="rounded-full px-2.5 py-1 text-xs font-medium ${statusClass}">${status}</span>
+                        ${time ? `<span class="text-xs text-gray-400">${escapeHtml(time)}</span>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderHomeUrgentPreview(items) {
+            const container = document.getElementById('home_urgent_preview');
+            if (!container) return;
+            const complaints = Array.isArray(items) ? items.slice(0, 2) : [];
+
+            if (complaints.length === 0) {
+                container.className = 'rounded-xl border border-gray-100 px-4 py-6 text-center';
+                container.innerHTML = '<p class="text-sm text-gray-500">كل شيء تحت السيطرة — لا توجد شكاوى عاجلة حالياً</p>';
+                return;
+            }
+
+            container.className = 'grid gap-2';
+            container.innerHTML = complaints.map(ev => {
+                const complaintStatus = normalizeComplaintWorkflowStatus(ev.complaint_status);
+                const statusMeta = complaintWorkflowMeta(complaintStatus);
+                const overdueBadge = ev.is_overdue ? '<span class="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700">متأخرة</span>' : '';
+                const branch = ev.branch ? `<span class="rounded-full bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">فرع: ${escapeHtml(ev.branch)}</span>` : '';
+                const phone = String(ev.phone || '').replace(/\D/g, '');
+                const phoneLabel = ev.phone ? `<p class="mt-1 text-xs text-gray-500">${escapeHtml(ev.phone)}</p>` : '';
+                const contactButton = phone
+                    ? `<a href="https://wa.me/${phone}" target="_blank" rel="noopener noreferrer" class="inline-flex h-8 items-center justify-center rounded-lg bg-[#25d366] px-3 text-xs font-medium text-white hover:bg-[#1ebe5d]">واتساب</a>`
+                    : '';
+                const feedback = ev.feedback ? `<p class="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">${escapeHtml(ev.feedback)}</p>` : '<p class="mt-2 text-xs text-gray-400">لا توجد ملاحظات مكتوبة</p>';
+                return `<div class="rounded-xl border border-gray-100 bg-white px-4 py-3 text-right shadow-sm">
+                    <div class="grid gap-3 md:grid-cols-[1fr_auto] md:items-start">
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-gray-800">${escapeHtml(ev.name || ev.phone || 'عميل غير محدد')}</p>
+                        ${phoneLabel}
+                        <div class="mt-2 flex flex-wrap gap-1.5">${branch}</div>
+                        ${feedback}
+                    </div>
+                    <div class="flex flex-wrap gap-2 md:justify-end">
+                        <span class="rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}">${statusMeta.label}</span>
+                        ${overdueBadge}
+                        ${contactButton}
+                        <select onchange="updateComplaintStatus(${ev.id}, this.value)" class="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-700 outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
+                            ${complaintWorkflowOptions(complaintStatus)}
+                        </select>
+                    </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderUrgentComplaints(items) {
+            const container = document.getElementById('urgent_complaints');
+            const count = document.getElementById('urgent_complaints_count');
+            const complaints = Array.isArray(items) ? items : [];
+            count.innerText = complaints.length;
+
+            if (complaints.length === 0) {
+                container.className = 'rounded-xl border border-gray-100 px-4 py-8 text-center';
+                container.innerHTML = '<p class="text-sm text-gray-500">كل شيء تحت السيطرة — لا توجد شكاوى عاجلة حالياً</p>';
+                return;
+            }
+
+            container.className = 'divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-100 bg-white';
+            container.innerHTML = complaints.map(ev => {
+                const customer = ev.name || ev.phone || 'عميل غير محدد';
+                const phoneLabel = ev.phone ? `<p class="mt-1 text-xs text-gray-500">${escapeHtml(ev.phone)}</p>` : '';
+                const feedback = ev.feedback ? escapeHtml(ev.feedback) : 'لا توجد ملاحظات مكتوبة';
+                const branch = ev.branch ? `<span class="inline-flex rounded-full bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">فرع: ${escapeHtml(ev.branch)}</span>` : '';
+                const complaintStatus = normalizeComplaintWorkflowStatus(ev.complaint_status);
+                const statusMeta = complaintWorkflowMeta(complaintStatus);
+                const overdueBadge = ev.is_overdue ? '<span class="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700">متأخرة</span>' : '';
+                const phone = String(ev.phone || '').replace(/\D/g, '');
+                const contactButton = phone
+                    ? `<a href="https://wa.me/${phone}" target="_blank" rel="noopener noreferrer" class="inline-flex h-8 items-center justify-center rounded-lg bg-[#25d366] px-3 text-xs font-medium text-white hover:bg-[#1ebe5d]">تواصل</a>`
+                    : '';
+                return `<div class="grid gap-3 px-4 py-3 text-right md:grid-cols-[1.05fr_1.4fr_auto_auto] md:items-center">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-semibold text-gray-800">${escapeHtml(customer)}</p>
+                        ${phoneLabel}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="line-clamp-2 text-xs leading-5 text-gray-500">${feedback}</p>
+                        <div class="mt-1.5 flex flex-wrap gap-1.5">${branch}</div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 md:justify-center">
+                        <span class="rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}">${statusMeta.label}</span>
+                        ${overdueBadge}
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 md:justify-end">
+                        ${contactButton}
+                        <select onchange="updateComplaintStatus(${ev.id}, this.value)" class="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-700 outline-none focus:border-[#465fff] focus:ring-2 focus:ring-blue-100">
+                            ${complaintWorkflowOptions(complaintStatus)}
+                        </select>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function normalizeComplaintWorkflowStatus(status) {
+            return ['new', 'in_progress', 'contacted', 'resolved', 'closed'].includes(status) ? status : 'new';
+        }
+
+        function complaintWorkflowMeta(status) {
+            const normalized = normalizeComplaintWorkflowStatus(status);
+            const map = {
+                new: { label: 'جديدة', className: 'bg-slate-100 text-slate-700' },
+                in_progress: { label: 'قيد المعالجة', className: 'bg-amber-50 text-amber-700' },
+                contacted: { label: 'تم التواصل', className: 'bg-blue-50 text-blue-700' },
+                resolved: { label: 'تم الحل', className: 'bg-emerald-50 text-emerald-700' },
+                closed: { label: 'مغلقة', className: 'bg-gray-100 text-gray-600' }
+            };
+            return map[normalized];
+        }
+
+        function complaintWorkflowOptions(currentStatus) {
+            const options = [
+                ['new', 'جديدة'],
+                ['in_progress', 'قيد المعالجة'],
+                ['contacted', 'تم التواصل'],
+                ['resolved', 'تم الحل'],
+                ['closed', 'مغلقة']
+            ];
+            return options.map(([value, label]) => `<option value="${value}" ${value === currentStatus ? 'selected' : ''}>${label}</option>`).join('');
+        }
+
+        function renderComplaintWorkflowSummary(summary) {
+            const workflow = summary.complaint_workflow_summary || {};
+            setText('workflow_new_count', String(workflow.new_count ?? 0));
+            setText('workflow_in_progress_count', String(workflow.in_progress_count ?? 0));
+            setText('workflow_contacted_count', String(workflow.contacted_count ?? 0));
+            setText('workflow_resolved_closed_count', String(Number(workflow.resolved_count || 0) + Number(workflow.closed_count || 0)));
+            setText('workflow_overdue_count', `${workflow.overdue_count ?? 0} متأخرة`);
+        }
+
+        async function updateComplaintStatus(id, complaintStatus) {
+            const apiKey = localStorage.getItem('repu_key');
+            if (!apiKey) return;
+
+            try {
+                const res = await fetch(`/api/client/complaints/${id}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': apiKey
+                    },
+                    body: JSON.stringify({ complaint_status: complaintStatus })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || 'تعذر تحديث حالة الشكوى');
+                loadDashboardSummary(apiKey);
+            } catch (e) {
+                alert(e.message);
+                loadDashboardSummary(apiKey);
+            }
+        }
+
+        async function loadDashboardSummary(apiKey) {
+            try {
+                const res = await fetch('/api/dashboard-summary', {
+                    headers: { 'x-api-key': apiKey }
+                });
+                const summary = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(summary.error || `HTTP ${res.status}`);
+
+                lastDashboardSummary = summary;
+                renderStats(summary);
+                renderExecutiveSummary(summary);
+                renderHomeBranchInsights(summary);
+                renderDashboardCharts(summary);
+                renderBranchPerformance(summary);
+                renderLatestActivity(summary.recent_activity || []);
+                renderComplaintWorkflowSummary(summary);
+                renderHomeUrgentPreview(summary.urgent_complaints || []);
+                renderUrgentComplaints(summary.urgent_complaints || []);
+                applyTopbarSearch();
+            } catch (e) {
+                console.error('Dashboard summary fetch failed:', e);
+            }
+        }
+
+        async function loadLatestActivity(apiKey) {
+            try {
+                const res = await fetch(`/api/client-recent?apiKey=${encodeURIComponent(apiKey)}`);
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                renderLatestActivity(data.items || []);
+                applyTopbarSearch();
+            } catch (e) {
+                console.error('Latest activity fetch failed:', e);
+            }
+        }
+
+        // دالة تسجيل الدخول والتحقق من الـ API Key
+        async function login() {
+            const key = document.getElementById('key_input').value || localStorage.getItem('repu_key');
+            if(!key) { 
+                document.getElementById('login_screen').style.display = 'flex'; 
+                return; 
+            }
+
+            try {
+                const res = await fetch('/api/client-info', { 
+                    headers: { 'x-api-key': key } 
+                });
+                
+                if(res.ok) {
+                    const data = await res.json();
+                    currentClientInfo = data;
+                    localStorage.setItem('repu_key', key);
+                    document.getElementById('restaurant_name').innerText = data.name;
+                    renderStats(data);
+                    renderSettings(data);
+                    updateReviewLink(data.nfc_id || data.nfcId);
+                    document.getElementById('login_screen').style.display = 'none';
+                    document.getElementById('main_app').classList.remove('hidden');
+                    initTopbarSearch();
+                    const hashView = {
+                        '#send_view': 'send',
+                        '#complaints_view': 'complaints',
+                        '#branches_view': 'branches',
+                        '#analytics_view': 'analytics',
+                        '#settings_section': 'settings'
+                    }[window.location.hash] || 'home';
+                    showClientView(hashView);
+                    loadDashboardSummary(key);
+                    checkComplaints(key);
+                } else {
+                    localStorage.removeItem('repu_key');
+                    document.getElementById('login_screen').style.display = 'flex';
+                }
+            } catch(e) { 
+                console.error("Login Error:", e);
+                alert('خطأ في الاتصال بالخادم');
+            }
+        }
+
+        // التحقق من وجود شكاوى غير مقروءة (status: 'complaint')
+        async function checkComplaints(key) {
+            try {
+                const res = await fetch('/api/my-reports', { headers: { 'x-api-key': key } });
+                const data = await res.json();
+                // إذا وجدنا حالة complaint يظهر التنبيه الأحمر
+                if(data.some(r => r.status === 'complaint')) {
+                    document.getElementById('complaint_alert').classList.remove('hidden');
+                }
+            } catch(e) { console.error("Reports Fetch Error:", e); }
+        }
+
+        // دالة إرسال الطلب للسيرفر
+        async function send() {
+            const btn = document.getElementById('send_btn');
+            const name = document.getElementById('cust_name').value.trim();
+            const phone = document.getElementById('cust_phone').value.trim();
+            const key = localStorage.getItem('repu_key');
+
+            if(!name || !phone) return alert('يرجى إدخال اسم العميل ورقم الجوال');
+            
+            // تأكد أن الرقم يبدأ بـ 05 وطوله 10
+            if(!/^05\d{8}$/.test(phone)) return alert('يرجى إدخال رقم جوال صحيح (05xxxxxxxx)');
+
+            btn.disabled = true; 
+            btn.innerHTML = `<span>جاري المعالجة...</span>`;
+
+            try {
+                const res = await fetch('/api/send', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'x-api-key': key 
+                    },
+                    body: JSON.stringify({ 
+                        name, 
+                        phone, 
+                        branch: document.getElementById('branch').value, 
+                        delayMinutes: document.getElementById('delay_time').value 
+                    })
+                });
+
+                if(res.ok) { 
+                    alert('✅ تمت عملية الإرسال بنجاح'); 
+                    document.getElementById('cust_name').value = ''; 
+                    document.getElementById('cust_phone').value = ''; 
+                    login(); // لتحديث إجمالي الرسائل
+                } else {
+                    const errData = await res.json();
+                    alert('❌ خطأ: ' + (errData.error || 'فشل الإرسال'));
+                }
+            } catch(e) {
+                alert('⚠️ حدث خطأ أثناء الاتصال بالسيرفر');
+            } finally {
+                btn.disabled = false; 
+                btn.innerText = "إرسال عبر واتساب";
+            }
+        }
+
+        function logout() { 
+            localStorage.removeItem('repu_key'); 
+            location.reload(); 
+        }
+
+        window.onload = login;
+    </script>
+</body>
+</html>
