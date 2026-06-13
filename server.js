@@ -1,11 +1,33 @@
 require('dotenv').config();
 const express = require('express');
+const cors    = require('cors');
 const { Pool }  = require('pg');
 const axios     = require('axios');
 const path      = require('path');
 const QRCode    = require('qrcode');
 
 const app = express();
+
+// ─── CORS allowlist (Phase 3) ──────────────────────────────────────────────
+// New Next.js frontend is hosted at app.repu.mawjatalsamt.com (prod) and
+// localhost:3000 (dev). Same-origin requests from the legacy admin.html
+// dashboard skip the cors middleware entirely, so this change is non-breaking.
+const CORS_ALLOWLIST = [
+    'https://app.repu.mawjatalsamt.com',
+    'http://localhost:3000'
+];
+app.use(cors({
+    origin: (origin, cb) => {
+        // Allow same-origin / non-browser callers (curl, server-side fetch)
+        if (!origin) return cb(null, true);
+        if (CORS_ALLOWLIST.includes(origin)) return cb(null, true);
+        return cb(new Error('CORS: origin not allowed'));
+    },
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'x-api-key', 'x-admin-password'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -187,6 +209,24 @@ const initDB = async (retries = 10) => {
         await pool.query('CREATE INDEX IF NOT EXISTS idx_evaluations_phone     ON evaluations (phone)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_evaluations_client_id ON evaluations (client_id)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_evaluations_sent_at   ON evaluations (sent_at DESC)');
+
+        // ─── Phase 3 schema additions ───────────────────────────────────
+        await pool.query('ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS reply_text TEXT');
+        await pool.query('ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS replied_at TIMESTAMPTZ');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_evaluations_client_status ON evaluations (client_id, status, sent_at DESC)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_evaluations_client_rating ON evaluations (client_id, rating, sent_at DESC)');
+
+        // Unique (client_id, name) on branches — guards the text-match join
+        // used by branch aggregations. Fails loudly if existing data violates,
+        // which is intentional: fix manually before retrying.
+        await pool.query(`
+            DO $$ BEGIN
+                ALTER TABLE branches ADD CONSTRAINT uniq_branch_name_per_client UNIQUE (client_id, name);
+            EXCEPTION
+                WHEN duplicate_table THEN NULL;
+                WHEN duplicate_object THEN NULL;
+            END $$;
+        `);
 
         console.log('✅ PostgreSQL ready');
     } catch (e) {
@@ -1084,6 +1124,522 @@ app.get('/api/export-excel', async (req, res) => {
     res.setHeader('Content-Type', 'application/vnd.ms-excel; charset=utf-16le');
     res.setHeader('Content-Disposition', 'attachment; filename="repusystem-reports.xls"');
     res.send(Buffer.concat([bom, bodyBuffer]));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── Phase 3 — New client-scoped endpoints for the Next.js frontend ───────
+// ═══════════════════════════════════════════════════════════════════════════
+// All routes below authenticate via x-api-key (the existing `authenticate`
+// middleware). Every query is scoped by req.clientData.id — no client_id is
+// ever accepted from the request body or URL for client routes.
+
+// ─── Pagination + filter helpers ──────────────────────────────────────────
+const parsePagination = (q) => {
+    const page = Math.max(1, parseInt(q.page, 10) || 1);
+    const pageSizeRaw = parseInt(q.pageSize, 10) || 25;
+    if (pageSizeRaw > 100) {
+        const err = new Error('pageSize must be <= 100');
+        err.statusCode = 400;
+        throw err;
+    }
+    const pageSize = Math.max(1, pageSizeRaw);
+    return { page, pageSize, offset: (page - 1) * pageSize };
+};
+
+const paginatedResponse = (items, total, page, pageSize) => ({
+    items,
+    total,
+    page,
+    pageSize,
+    hasMore: page * pageSize < total
+});
+
+// Derived complaint priority — never stored, always computed.
+// Rule (per Phase 2 spec): closed > urgent (overdue OR new+>12h) > medium (new) > low.
+const computeComplaintFields = (row) => {
+    const sentAt = row.sent_at ? new Date(row.sent_at).getTime() : Date.now();
+    const ageHours = (Date.now() - sentAt) / 36e5;
+    const status = row.complaint_status || 'new';
+    const closed = status === 'resolved' || status === 'closed';
+    const isOverdue = !closed && ageHours > 24;
+
+    let priority;
+    if (closed) priority = 'closed';
+    else if (isOverdue || (status === 'new' && ageHours > 12)) priority = 'urgent';
+    else if (status === 'new') priority = 'medium';
+    else priority = 'low';
+
+    return {
+        ...row,
+        priority,
+        is_overdue: isOverdue,
+        age_hours: Math.round(ageHours * 10) / 10
+    };
+};
+
+// ─── Client-scoped branch CRUD ────────────────────────────────────────────
+// Replaces super-admin branch endpoints for client use. Every query checks
+// b.client_id = req.clientData.id; cross-tenant access returns 404 (not 403,
+// to avoid leaking existence of other clients' branch IDs).
+
+app.get('/api/branches', authenticate, async (req, res) => {
+    try {
+        const { rows } = await pool.query(
+            `WITH branch_eval_stats AS (
+                SELECT
+                    e.branch AS branch_name,
+                    COUNT(*)::int AS total_evaluations,
+                    COUNT(e.rating)::int AS rating_count,
+                    COALESCE(ROUND(AVG(e.rating)::numeric, 1), 0)::float AS average_rating,
+                    COUNT(*) FILTER (WHERE e.status = 'complaint' OR e.answer = '2')::int AS complaint_count,
+                    COUNT(*) FILTER (WHERE e.status = 'replied' AND e.answer = '1')::int AS positive_count,
+                    MAX(e.sent_at) AS last_activity_at
+                FROM evaluations e
+                WHERE e.client_id = $1
+                GROUP BY e.branch
+            )
+            SELECT
+                b.id, b.client_id, b.name, b.city, b.area, b.nfc_id, b.google_link,
+                b.is_active, b.created_at,
+                COALESCE(s.total_evaluations, 0) AS total_evaluations,
+                COALESCE(s.rating_count, 0) AS rating_count,
+                COALESCE(s.average_rating, 0) AS average_rating,
+                COALESCE(s.complaint_count, 0) AS complaint_count,
+                COALESCE(s.positive_count, 0) AS positive_count,
+                s.last_activity_at
+            FROM branches b
+            LEFT JOIN branch_eval_stats s ON s.branch_name = b.name
+            WHERE b.client_id = $1
+            ORDER BY b.created_at DESC`,
+            [req.clientData.id]
+        );
+        res.json({ items: rows });
+    } catch (e) {
+        console.error('GET /api/branches:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.get('/api/branches/:id', authenticate, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid branch ID' });
+    try {
+        const { rows } = await pool.query(
+            `SELECT b.id, b.client_id, b.name, b.city, b.area, b.nfc_id, b.google_link,
+                    b.is_active, b.created_at
+             FROM branches b
+             WHERE b.id = $1 AND b.client_id = $2`,
+            [id, req.clientData.id]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'Branch not found' });
+
+        const { rows: stats } = await pool.query(
+            `SELECT
+                COUNT(*)::int AS total_evaluations,
+                COUNT(rating)::int AS rating_count,
+                COALESCE(ROUND(AVG(rating)::numeric, 1), 0)::float AS average_rating,
+                COUNT(*) FILTER (WHERE status = 'complaint' OR answer = '2')::int AS complaint_count,
+                COUNT(*) FILTER (WHERE status = 'replied' AND answer = '1')::int AS positive_count,
+                MAX(sent_at) AS last_activity_at
+             FROM evaluations
+             WHERE client_id = $1 AND branch = $2`,
+            [req.clientData.id, rows[0].name]
+        );
+        res.json({ ...rows[0], stats: stats[0] });
+    } catch (e) {
+        console.error('GET /api/branches/:id:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.post('/api/branches', authenticate, async (req, res) => {
+    const name = String(req.body.name || '').trim();
+    const city = String(req.body.city || '').trim() || null;
+    const area = String(req.body.area || '').trim() || null;
+    let nfcId = String(req.body.nfc_id || '').trim();
+    const googleLink = String(req.body.google_link || '').trim() || null;
+
+    if (!name) return res.status(400).json({ error: 'Branch name is required' });
+
+    try {
+        // Auto-generate nfc_id if not supplied: client_id + 4-digit timestamp slice
+        if (!nfcId) {
+            nfcId = `${req.clientData.id}${Date.now().toString().slice(-6)}`;
+        }
+        // NFC ID must be globally unique across branches AND clients.nfc_id
+        const { rows: dup1 } = await pool.query('SELECT id FROM branches WHERE nfc_id = $1', [nfcId]);
+        if (dup1[0]) return res.status(400).json({ error: 'NFC ID already exists' });
+        const { rows: dup2 } = await pool.query('SELECT id FROM clients WHERE nfc_id = $1', [nfcId]);
+        if (dup2[0]) return res.status(400).json({ error: 'NFC ID already exists' });
+
+        const { rows } = await pool.query(
+            `INSERT INTO branches (client_id, name, city, area, nfc_id, google_link)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id, client_id, name, city, area, nfc_id, google_link, is_active, created_at`,
+            [req.clientData.id, name, city, area, nfcId, googleLink]
+        );
+        res.json({ success: true, branch: rows[0] });
+    } catch (e) {
+        if (e.code === '23505') {
+            // Could be uniq_branch_name_per_client OR the nfc_id unique index
+            const msg = String(e.constraint || '').includes('name') ? 'Branch name already exists' : 'NFC ID already exists';
+            return res.status(400).json({ error: msg });
+        }
+        console.error('POST /api/branches:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.patch('/api/branches/:id', authenticate, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid branch ID' });
+    try {
+        const { rows: existingRows } = await pool.query(
+            'SELECT * FROM branches WHERE id = $1 AND client_id = $2',
+            [id, req.clientData.id]
+        );
+        const existing = existingRows[0];
+        if (!existing) return res.status(404).json({ error: 'Branch not found' });
+
+        const name = req.body.name === undefined ? existing.name : String(req.body.name || '').trim();
+        const city = req.body.city === undefined ? existing.city : (String(req.body.city || '').trim() || null);
+        const area = req.body.area === undefined ? existing.area : (String(req.body.area || '').trim() || null);
+        const nfcId = req.body.nfc_id === undefined ? existing.nfc_id : String(req.body.nfc_id || '').trim();
+        const googleLink = req.body.google_link === undefined ? existing.google_link : (String(req.body.google_link || '').trim() || null);
+        const isActive = req.body.is_active === undefined
+            ? existing.is_active
+            : (req.body.is_active === true || req.body.is_active === 'true');
+
+        if (!name) return res.status(400).json({ error: 'Branch name is required' });
+        if (!nfcId) return res.status(400).json({ error: 'Branch NFC ID is required' });
+
+        // If NFC ID changed, check global uniqueness against clients + other branches
+        if (nfcId !== existing.nfc_id) {
+            const { rows: dup1 } = await pool.query('SELECT id FROM branches WHERE nfc_id = $1 AND id <> $2', [nfcId, id]);
+            if (dup1[0]) return res.status(400).json({ error: 'NFC ID already exists' });
+            const { rows: dup2 } = await pool.query('SELECT id FROM clients WHERE nfc_id = $1', [nfcId]);
+            if (dup2[0]) return res.status(400).json({ error: 'NFC ID already exists' });
+        }
+
+        const { rows } = await pool.query(
+            `UPDATE branches
+             SET name = $1, city = $2, area = $3, nfc_id = $4, google_link = $5, is_active = $6
+             WHERE id = $7 AND client_id = $8
+             RETURNING id, client_id, name, city, area, nfc_id, google_link, is_active, created_at`,
+            [name, city, area, nfcId, googleLink, isActive, id, req.clientData.id]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'Branch not found' });
+        res.json({ success: true, branch: rows[0] });
+    } catch (e) {
+        if (e.code === '23505') {
+            const msg = String(e.constraint || '').includes('name') ? 'Branch name already exists' : 'NFC ID already exists';
+            return res.status(400).json({ error: msg });
+        }
+        console.error('PATCH /api/branches/:id:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.delete('/api/branches/:id', authenticate, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid branch ID' });
+    try {
+        const { rowCount } = await pool.query(
+            'UPDATE branches SET is_active = false WHERE id = $1 AND client_id = $2',
+            [id, req.clientData.id]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'Branch not found' });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('DELETE /api/branches/:id:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+// ─── Complaints (paginated, filtered, with computed priority) ─────────────
+app.get('/api/complaints', authenticate, async (req, res) => {
+    try {
+        const { page, pageSize, offset } = parsePagination(req.query);
+        const branch = String(req.query.branch || '').trim();
+        const status = String(req.query.status || '').trim();
+        const priorityFilter = String(req.query.priority || '').trim();
+        const from = String(req.query.from || '').trim();
+        const to = String(req.query.to || '').trim();
+        const q = String(req.query.q || '').trim();
+
+        const conds = ['client_id = $1', '(status = $2 OR answer = $3)'];
+        const params = [req.clientData.id, 'complaint', '2'];
+        if (branch)  { params.push(branch); conds.push(`branch = $${params.length}`); }
+        if (status)  { params.push(status); conds.push(`complaint_status = $${params.length}`); }
+        if (from)    { params.push(from);   conds.push(`sent_at >= $${params.length}`); }
+        if (to)      { params.push(to);     conds.push(`sent_at <= $${params.length}`); }
+        if (q)       { params.push(q);      conds.push(`(name ILIKE '%' || $${params.length} || '%' OR phone ILIKE '%' || $${params.length} || '%' OR branch ILIKE '%' || $${params.length} || '%' OR feedback ILIKE '%' || $${params.length} || '%')`); }
+
+        const where = conds.join(' AND ');
+
+        // Priority is derived in JS, so fetch all matching rows for counting
+        // separately, then page the actual rows.
+        const { rows: countRows } = await pool.query(
+            `SELECT COUNT(*)::int AS total FROM evaluations WHERE ${where}`,
+            params
+        );
+        const total = Number(countRows[0]?.total || 0);
+
+        const pagedParams = [...params, pageSize, offset];
+        const { rows } = await pool.query(
+            `SELECT id, name, phone, branch, status, answer, source, feedback, sent_at,
+                    complaint_status, complaint_updated_at, complaint_resolved_at, complaint_note,
+                    rating, reply_text, replied_at
+             FROM evaluations
+             WHERE ${where}
+             ORDER BY sent_at DESC
+             LIMIT $${pagedParams.length - 1} OFFSET $${pagedParams.length}`,
+            pagedParams
+        );
+
+        let items = rows.map(computeComplaintFields);
+        if (priorityFilter) {
+            const allowed = ['urgent', 'medium', 'low', 'closed'];
+            if (!allowed.includes(priorityFilter)) {
+                return res.status(400).json({ error: 'Invalid priority' });
+            }
+            items = items.filter(r => r.priority === priorityFilter);
+        }
+        res.json(paginatedResponse(items, total, page, pageSize));
+    } catch (e) {
+        if (e.statusCode === 400) return res.status(400).json({ error: e.message });
+        console.error('GET /api/complaints:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.get('/api/complaints/:id', authenticate, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid complaint ID' });
+    try {
+        const { rows } = await pool.query(
+            `SELECT id, name, phone, branch, status, answer, source, feedback, sent_at,
+                    complaint_status, complaint_updated_at, complaint_resolved_at, complaint_note,
+                    rating, reply_text, replied_at
+             FROM evaluations
+             WHERE id = $1 AND client_id = $2 AND (status = 'complaint' OR answer = '2')`,
+            [id, req.clientData.id]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'Complaint not found' });
+        res.json(computeComplaintFields(rows[0]));
+    } catch (e) {
+        console.error('GET /api/complaints/:id:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+// ─── Reviews (paginated, filtered) + reply ────────────────────────────────
+app.get('/api/reviews', authenticate, async (req, res) => {
+    try {
+        const { page, pageSize, offset } = parsePagination(req.query);
+        const minR = req.query.min_rating !== undefined ? parseInt(req.query.min_rating, 10) : null;
+        const maxR = req.query.max_rating !== undefined ? parseInt(req.query.max_rating, 10) : null;
+        const branch = String(req.query.branch || '').trim();
+        const hasReply = String(req.query.has_reply || '').trim();
+        const source = String(req.query.source || '').trim();
+        const q = String(req.query.q || '').trim();
+
+        const conds = ['client_id = $1', 'rating IS NOT NULL'];
+        const params = [req.clientData.id];
+        if (Number.isFinite(minR))    { params.push(minR); conds.push(`rating >= $${params.length}`); }
+        if (Number.isFinite(maxR))    { params.push(maxR); conds.push(`rating <= $${params.length}`); }
+        if (branch)                   { params.push(branch); conds.push(`branch = $${params.length}`); }
+        if (source)                   { params.push(source); conds.push(`source = $${params.length}`); }
+        if (hasReply === 'true')      { conds.push('reply_text IS NOT NULL'); }
+        if (hasReply === 'false')     { conds.push('reply_text IS NULL'); }
+        if (q)                        { params.push(q); conds.push(`(name ILIKE '%' || $${params.length} || '%' OR phone ILIKE '%' || $${params.length} || '%' OR branch ILIKE '%' || $${params.length} || '%' OR feedback ILIKE '%' || $${params.length} || '%')`); }
+
+        const where = conds.join(' AND ');
+        const { rows: countRows } = await pool.query(
+            `SELECT COUNT(*)::int AS total FROM evaluations WHERE ${where}`,
+            params
+        );
+        const total = Number(countRows[0]?.total || 0);
+
+        const pagedParams = [...params, pageSize, offset];
+        const { rows } = await pool.query(
+            `SELECT id, name, phone, branch, rating, feedback, source, status, answer,
+                    sent_at, reply_text, replied_at
+             FROM evaluations
+             WHERE ${where}
+             ORDER BY sent_at DESC
+             LIMIT $${pagedParams.length - 1} OFFSET $${pagedParams.length}`,
+            pagedParams
+        );
+        res.json(paginatedResponse(rows, total, page, pageSize));
+    } catch (e) {
+        if (e.statusCode === 400) return res.status(400).json({ error: e.message });
+        console.error('GET /api/reviews:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.post('/api/reviews/:id/reply', authenticate, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const text = String(req.body.text || '').trim();
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid review ID' });
+    if (!text) return res.status(400).json({ error: 'Reply text is required' });
+    if (text.length > 2000) return res.status(400).json({ error: 'Reply text too long' });
+    try {
+        const { rows } = await pool.query(
+            `UPDATE evaluations
+             SET reply_text = $1, replied_at = NOW()
+             WHERE id = $2 AND client_id = $3 AND rating IS NOT NULL
+             RETURNING id, name, phone, branch, rating, feedback, source, status, answer,
+                       sent_at, reply_text, replied_at`,
+            [text, id, req.clientData.id]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'Review not found' });
+        res.json({ success: true, review: rows[0] });
+    } catch (e) {
+        console.error('POST /api/reviews/:id/reply:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+// ─── Analytics ────────────────────────────────────────────────────────────
+const ANALYTICS_RANGES = {
+    '30d': "30 days",
+    '90d': "90 days",
+    '6m':  "180 days",
+    '1y':  "365 days"
+};
+
+app.get('/api/analytics/nps', authenticate, async (req, res) => {
+    const range = String(req.query.range || '30d');
+    if (!ANALYTICS_RANGES[range]) return res.status(400).json({ error: 'Invalid range' });
+    // Bucket size: daily for 30/90d, weekly for 6m/1y
+    const bucket = (range === '30d' || range === '90d') ? 'day' : 'week';
+    try {
+        const { rows } = await pool.query(
+            `WITH base AS (
+                SELECT
+                    date_trunc($1, sent_at) AS bucket,
+                    COUNT(*)::int AS total,
+                    COUNT(*) FILTER (WHERE status = 'replied' AND answer = '1')::int AS positive_count,
+                    COUNT(*) FILTER (WHERE status = 'complaint' OR answer = '2')::int AS complaint_count,
+                    COALESCE(ROUND(AVG(rating)::numeric, 2), 0)::float AS avg_rating
+                FROM evaluations
+                WHERE client_id = $2
+                  AND sent_at >= NOW() - $3::interval
+                GROUP BY bucket
+                ORDER BY bucket
+            )
+            SELECT bucket, total, positive_count, complaint_count, avg_rating,
+                   CASE WHEN (positive_count + complaint_count) = 0 THEN 0
+                        ELSE ROUND((positive_count::numeric / (positive_count + complaint_count)) * 100)::int
+                   END AS satisfaction_rate
+            FROM base`,
+            [bucket, req.clientData.id, ANALYTICS_RANGES[range]]
+        );
+        res.json({ range, bucket, points: rows });
+    } catch (e) {
+        console.error('GET /api/analytics/nps:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.get('/api/analytics/branch-comparison', authenticate, async (req, res) => {
+    const range = String(req.query.range || '30d');
+    if (!ANALYTICS_RANGES[range]) return res.status(400).json({ error: 'Invalid range' });
+    try {
+        const { rows } = await pool.query(
+            `SELECT
+                COALESCE(NULLIF(TRIM(branch), ''), 'غير محدد') AS branch,
+                COUNT(*)::int AS total_evaluations,
+                COUNT(rating)::int AS rating_count,
+                COALESCE(ROUND(AVG(rating)::numeric, 1), 0)::float AS average_rating,
+                COUNT(*) FILTER (WHERE status = 'replied' AND answer = '1')::int AS positive_count,
+                COUNT(*) FILTER (WHERE status = 'complaint' OR answer = '2')::int AS complaint_count
+             FROM evaluations
+             WHERE client_id = $1
+               AND sent_at >= NOW() - $2::interval
+             GROUP BY COALESCE(NULLIF(TRIM(branch), ''), 'غير محدد')
+             ORDER BY total_evaluations DESC`,
+            [req.clientData.id, ANALYTICS_RANGES[range]]
+        );
+        res.json({ range, branches: rows });
+    } catch (e) {
+        console.error('GET /api/analytics/branch-comparison:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.get('/api/analytics/complaint-reasons', authenticate, async (req, res) => {
+    const range = String(req.query.range || '30d');
+    if (!ANALYTICS_RANGES[range]) return res.status(400).json({ error: 'Invalid range' });
+    // v1: group by complaint_status (see BACKEND_CHANGELOG.md "Known limitations")
+    try {
+        const { rows } = await pool.query(
+            `SELECT COALESCE(complaint_status, 'new') AS category,
+                    COUNT(*)::int AS count
+             FROM evaluations
+             WHERE client_id = $1
+               AND (status = 'complaint' OR answer = '2')
+               AND sent_at >= NOW() - $2::interval
+             GROUP BY COALESCE(complaint_status, 'new')
+             ORDER BY count DESC`,
+            [req.clientData.id, ANALYTICS_RANGES[range]]
+        );
+        const total = rows.reduce((sum, r) => sum + Number(r.count), 0);
+        res.json({ range, total, segments: rows });
+    } catch (e) {
+        console.error('GET /api/analytics/complaint-reasons:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+// ─── Activity feed (lightweight, polled by overview every 30s) ────────────
+app.get('/api/activity', authenticate, async (req, res) => {
+    const limitRaw = parseInt(req.query.limit, 10) || 20;
+    if (limitRaw > 100) return res.status(400).json({ error: 'limit must be <= 100' });
+    const limit = Math.max(1, limitRaw);
+    try {
+        const { rows } = await pool.query(
+            `SELECT id, name, branch, rating, status, answer, source, sent_at
+             FROM evaluations
+             WHERE client_id = $1
+             ORDER BY sent_at DESC
+             LIMIT $2`,
+            [req.clientData.id, limit]
+        );
+        res.json({ items: rows });
+    } catch (e) {
+        console.error('GET /api/activity:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+// ─── Client-scoped complaint settings (replaces super-admin route for client use) ──
+app.patch('/api/client/complaint-settings', authenticate, async (req, res) => {
+    const complaintAction = String(req.body.complaint_action || '').trim();
+    const discountCode = String(req.body.discount_code || '').trim();
+    const complaintMessage = String(req.body.complaint_message || '').trim()
+        || 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.';
+    const whatsappContact = normalizeWhatsappContact(req.body.whatsapp_contact);
+
+    if (!['contact', 'discount', 'contact_discount'].includes(complaintAction)) {
+        return res.status(400).json({ error: 'Invalid complaint action' });
+    }
+    try {
+        const { rowCount, rows } = await pool.query(
+            `UPDATE clients
+             SET complaint_action = $1, discount_code = $2, complaint_message = $3, whatsapp_contact = $4
+             WHERE id = $5
+             RETURNING id, complaint_action, discount_code, complaint_message, whatsapp_contact`,
+            [complaintAction, discountCode || null, complaintMessage, whatsappContact || null, req.clientData.id]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'Client not found' });
+        res.json({ success: true, settings: rows[0] });
+    } catch (e) {
+        console.error('PATCH /api/client/complaint-settings:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
 });
 
 // ─── Start ─────────────────────────────────────────────────────────────────
