@@ -399,15 +399,28 @@ app.post('/webhook', async (req, res) => {
     }
 });
 
+// ─── SPA (Vite build) — Phase C: served at /admin.html ───────────────────
+// public-app/ contains the Vite production build. Order matters:
+//   1. Serve hashed assets (/assets/*, /brand/*) directly so file requests work.
+//   2. /admin.html returns the SPA's index.html (HashRouter handles internal
+//      paths via the #/<route> fragment — no server catch-all needed).
+// admin-tailadmin.html keeps the previous TailAdmin V2 dashboard available
+// as a fallback. admin-legacy.html holds the original (pre-V44) dashboard.
+const PUBLIC_APP_DIR = path.join(__dirname, 'public-app');
+app.use('/assets', express.static(path.join(PUBLIC_APP_DIR, 'assets'), { maxAge: '1y', immutable: true }));
+app.use('/brand',  express.static(path.join(PUBLIC_APP_DIR, 'brand'),  { maxAge: '1y', immutable: true }));
+
 // ─── Static pages ──────────────────────────────────────────────────────────
-app.get('/',                (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/app',             (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
-app.get('/admin.html',      (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
-app.get('/reports',         (req, res) => res.sendFile(path.join(__dirname, 'reports.html')));
-app.get('/reports.html',    (req, res) => res.sendFile(path.join(__dirname, 'reports.html')));
-app.get('/super-admin',     (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
-app.get('/super-admin.html',(req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
-app.get('/r/:nfcId',        (req, res) => res.sendFile(path.join(__dirname, 'review.html')));
+app.get('/',                    (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/app',                 (req, res) => res.sendFile(path.join(PUBLIC_APP_DIR, 'index.html')));
+app.get('/admin.html',          (req, res) => res.sendFile(path.join(PUBLIC_APP_DIR, 'index.html')));
+app.get('/admin-tailadmin.html',(req, res) => res.sendFile(path.join(__dirname, 'admin-tailadmin.html')));
+app.get('/admin-legacy.html',   (req, res) => res.sendFile(path.join(__dirname, 'admin-legacy.html')));
+app.get('/reports',             (req, res) => res.sendFile(path.join(__dirname, 'reports.html')));
+app.get('/reports.html',        (req, res) => res.sendFile(path.join(__dirname, 'reports.html')));
+app.get('/super-admin',         (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
+app.get('/super-admin.html',    (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
+app.get('/r/:nfcId',            (req, res) => res.sendFile(path.join(__dirname, 'review.html')));
 
 // ─── Super admin APIs ──────────────────────────────────────────────────────
 app.get('/api/super-admin/clients', superAdminAuth, async (req, res) => {

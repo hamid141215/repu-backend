@@ -5,3 +5,21 @@ auth_new_session/
 .wwebjs_cache/
 npm-debug.log*
 auth_stable_v111
+
+# Vite SPA — build output is a deploy artifact, not committed.
+public-app/
+spa/node_modules/
+spa/dist/
+spa/.vite/
+*.tsbuildinfo
+
+# Local dev / deploy artifacts
+*.zip
+*.png
+*.jpg
+deploy-preview-*/
+.local-tailadmin-preview/
+repu-frontend-tailadmin/
+reports-corrupted-backup.html
+global-bundle.pem
+files.zip

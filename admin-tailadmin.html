@@ -1,0 +1,1458 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>RepuSystem | لوحة إدارة السمعة</title>
+    <style>
+      .repu-skeleton {
+        display: inline-block;
+        min-width: 56px;
+        height: 18px;
+        border-radius: 9999px;
+        background: linear-gradient(90deg, #f2f4f7 25%, #e5e7eb 37%, #f2f4f7 63%);
+        background-size: 400% 100%;
+        animation: repu-shimmer 1.4s ease infinite;
+      }
+      .repu-skeleton-lg { min-width: 86px; height: 30px; }
+      @keyframes repu-shimmer {
+        0% { background-position: 100% 50%; }
+        100% { background-position: 0 50%; }
+      }
+    </style>
+  <link rel="icon" type="image/svg+xml" href="/assets/logo-icon-tight.svg">
+  <link rel="alternate icon" type="image/png" href="/assets/favicon.png">
+  <link href="/tailadmin/style.css" rel="stylesheet"></head>
+  <body
+    x-data="{ page: 'repu-dashboard', 'loaded': true, 'darkMode': false, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
+    :class="{'dark bg-gray-900': darkMode === true}"
+  >
+    <div
+  x-show="loaded"
+  x-init="window.addEventListener('DOMContentLoaded', () => {setTimeout(() => loaded = false, 500)})"
+  class="fixed left-0 top-0 z-999999 flex h-screen w-screen items-center justify-center bg-white dark:bg-black"
+>
+  <div
+    class="h-16 w-16 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"
+  ></div>
+</div>
+
+
+    <div id="login_screen" class="fixed inset-0 z-999999 hidden items-center justify-center bg-gray-50 p-4">
+      <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-lg">
+        <div class="mb-6 text-center">
+          <img src="/assets/logo-full.svg" alt="RepuSystem" class="mx-auto mb-4 h-auto max-h-[70px] w-60 max-w-full object-contain">
+          <h1 class="text-xl font-semibold text-gray-800">RepuSystem</h1>
+          <p class="mt-1 text-theme-sm text-gray-500">أدخل مفتاح المنشأة للمتابعة</p>
+        </div>
+        <input id="key_input" type="password" placeholder="مفتاح الدخول" class="h-11 w-full rounded-lg border border-gray-300 px-4 text-center text-theme-sm outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10" />
+        <button id="login_btn" onclick="login()" class="mt-4 flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-theme-sm font-medium text-white hover:bg-brand-600">الدخول إلى لوحة التحكم</button>
+      </div>
+    </div>
+
+    <div id="main_app" class="hidden flex h-screen overflow-hidden">
+      <aside
+        :class="sidebarToggle ? 'translate-x-0' : 'translate-x-full'"
+        class="fixed right-0 top-0 z-9999 flex h-screen w-[290px] flex-col overflow-y-hidden border-l border-gray-200 bg-white px-5 dark:border-gray-800 dark:bg-black lg:static lg:translate-x-0"
+      >
+        <div class="flex items-center justify-between gap-2 pb-5 pt-6">
+          <a href="/admin.html" class="flex items-center gap-3">
+            <img src="/assets/logo-icon-tight.svg" alt="RepuSystem" class="h-10 w-10 shrink-0 object-contain">
+            <span>
+              <span class="block text-lg font-semibold text-gray-900 dark:text-white">RepuSystem</span>
+              <span class="block text-xs text-gray-500 dark:text-gray-400">لوحة إدارة السمعة</span>
+            </span>
+          </a>
+          <button
+            class="block text-gray-500 dark:text-gray-400 lg:hidden"
+            @click.stop="sidebarToggle = !sidebarToggle"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
+          <nav>
+            <div>
+              <h3 class="mb-2.5 text-xs font-medium leading-[20px] text-gray-400">
+                لوحة التحكم
+              </h3>
+              <ul class="mb-4 flex flex-col gap-1.5">
+                <li>
+                  <a href="#home_view" onclick="showClientView('home', event)" data-nav-view="home" class="client-nav menu-item menu-item-active group">
+                    <svg class="menu-item-icon-active" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.5 3.25C4.25736 3.25 3.25 4.25736 3.25 5.5V9C3.25 10.2426 4.25736 11.25 5.5 11.25H9C10.2426 11.25 11.25 10.2426 11.25 9V5.5C11.25 4.25736 10.2426 3.25 9 3.25H5.5ZM12.75 5.5C12.75 4.25736 13.7574 3.25 15 3.25H18.5C19.7426 3.25 20.75 4.25736 20.75 5.5V9C20.75 10.2426 19.7426 11.25 18.5 11.25H15C13.7574 11.25 12.75 10.2426 12.75 9V5.5ZM3.25 15C3.25 13.7574 4.25736 12.75 5.5 12.75H9C10.2426 12.75 11.25 13.7574 11.25 15V18.5C11.25 19.7426 10.2426 20.75 9 20.75H5.5C4.25736 20.75 3.25 19.7426 3.25 18.5V15ZM12.75 15C12.75 13.7574 13.7574 12.75 15 12.75H18.5C19.7426 12.75 20.75 13.7574 20.75 15V18.5C20.75 19.7426 19.7426 20.75 18.5 20.75H15C13.7574 20.75 12.75 19.7426 12.75 18.5V15Z" fill="currentColor"/></svg>
+                    الرئيسية
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="mb-2.5 text-xs font-medium leading-[20px] text-gray-400">
+                التقييمات
+              </h3>
+              <ul class="mb-4 flex flex-col gap-1.5">
+                <li>
+                  <a href="#send_view" onclick="showClientView('send', event)" data-nav-view="send" class="client-nav menu-item menu-item-inactive group">
+                    <svg class="menu-item-icon-inactive" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M7 3.25H17C18.2426 3.25 19.25 4.25736 19.25 5.5V18.5C19.25 19.7426 18.2426 20.75 17 20.75H7C5.75736 20.75 4.75 19.7426 4.75 18.5V5.5C4.75 4.25736 5.75736 3.25 7 3.25ZM7 4.75C6.58579 4.75 6.25 5.08579 6.25 5.5V18.5C6.25 18.9142 6.58579 19.25 7 19.25H17C17.4142 19.25 17.75 18.9142 17.75 18.5V5.5C17.75 5.08579 17.4142 4.75 17 4.75H7ZM8.75 8C8.75 7.58579 9.08579 7.25 9.5 7.25H14.5C14.9142 7.25 15.25 7.58579 15.25 8C15.25 8.41421 14.9142 8.75 14.5 8.75H9.5C9.08579 8.75 8.75 8.41421 8.75 8ZM8.75 12C8.75 11.5858 9.08579 11.25 9.5 11.25H14.5C14.9142 11.25 15.25 11.5858 15.25 12C15.25 12.4142 14.9142 12.75 14.5 12.75H9.5C9.08579 12.75 8.75 12.4142 8.75 12Z" fill="currentColor"/></svg>
+                    إرسال تقييم
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="mb-2.5 text-xs font-medium leading-[20px] text-gray-400">
+                المتابعة
+              </h3>
+              <ul class="mb-4 flex flex-col gap-1.5">
+                <li>
+                  <a href="#complaints_view" onclick="showClientView('complaints', event)" data-nav-view="complaints" class="client-nav menu-item menu-item-inactive group">
+                    <svg class="menu-item-icon-inactive" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.25 5.5C3.25 4.25736 4.25736 3.25 5.5 3.25H18.5C19.7426 3.25 20.75 4.25736 20.75 5.5V18.5C20.75 19.7426 19.7426 20.75 18.5 20.75H5.5C4.25736 20.75 3.25 19.7426 3.25 18.5V5.5ZM5.5 4.75C5.08579 4.75 4.75 5.08579 4.75 5.5V8.25H19.25V5.5C19.25 5.08579 18.9142 4.75 18.5 4.75H5.5ZM4.75 9.75V18.5C4.75 18.9142 5.08579 19.25 5.5 19.25H18.5C18.9142 19.25 19.25 18.9142 19.25 18.5V9.75H4.75Z" fill="currentColor"/></svg>
+                    الشكاوى
+                  </a>
+                </li>
+                <li>
+                  <a href="#branches_view" onclick="showClientView('branches_view', event)" data-nav-view="branches_view" class="client-nav menu-item menu-item-inactive group">
+                    <svg class="menu-item-icon-inactive" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.25 5.5C4.25 4.25736 5.25736 3.25 6.5 3.25H17.5C18.7426 3.25 19.75 4.25736 19.75 5.5V18.5C19.75 19.7426 18.7426 20.75 17.5 20.75H6.5C5.25736 20.75 4.25 19.7426 4.25 18.5V5.5ZM7.25 6.75C7.25 6.33579 7.58579 6 8 6H10C10.4142 6 10.75 6.33579 10.75 6.75V8.75C10.75 9.16421 10.4142 9.5 10 9.5H8C7.58579 9.5 7.25 9.16421 7.25 8.75V6.75ZM13.25 6.75C13.25 6.33579 13.5858 6 14 6H16C16.4142 6 16.75 6.33579 16.75 6.75V8.75C16.75 9.16421 16.4142 9.5 16 9.5H14C13.5858 9.5 13.25 9.16421 13.25 8.75V6.75ZM7.25 12.75C7.25 12.3358 7.58579 12 8 12H10C10.4142 12 10.75 12.3358 10.75 12.75V14.75C10.75 15.1642 10.4142 15.5 10 15.5H8C7.58579 15.5 7.25 15.1642 7.25 14.75V12.75ZM13.25 12.75C13.25 12.3358 13.5858 12 14 12H16C16.4142 12 16.75 12.3358 16.75 12.75V14.75C16.75 15.1642 16.4142 15.5 16 15.5H14C13.5858 15.5 13.25 15.1642 13.25 14.75V12.75Z" fill="currentColor"/></svg>
+                    الفروع
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="mb-2.5 text-xs font-medium leading-[20px] text-gray-400">
+                الأداء
+              </h3>
+              <ul class="mb-4 flex flex-col gap-1.5">
+                <li>
+                  <a href="#analytics_view" onclick="showClientView('analytics', event)" data-nav-view="analytics" class="client-nav menu-item menu-item-inactive group">
+                    <svg class="menu-item-icon-inactive" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.75 19.25H19.25C19.6642 19.25 20 19.5858 20 20C20 20.4142 19.6642 20.75 19.25 20.75H4.75C4.33579 20.75 4 20.4142 4 20C4 19.5858 4.33579 19.25 4.75 19.25ZM6.25 13C6.25 12.5858 6.58579 12.25 7 12.25C7.41421 12.25 7.75 12.5858 7.75 13V17C7.75 17.4142 7.41421 17.75 7 17.75C6.58579 17.75 6.25 17.4142 6.25 17V13ZM11.25 8C11.25 7.58579 11.5858 7.25 12 7.25C12.4142 7.25 12.75 7.58579 12.75 8V17C12.75 17.4142 12.4142 17.75 12 17.75C11.5858 17.75 11.25 17.4142 11.25 17V8ZM16.25 5C16.25 4.58579 16.5858 4.25 17 4.25C17.4142 4.25 17.75 4.58579 17.75 5V17C17.75 17.4142 17.4142 17.75 17 17.75C16.5858 17.75 16.25 17.4142 16.25 17V5Z" fill="currentColor"/></svg>
+                    التحليلات
+                  </a>
+                </li>
+                <li>
+                  <a href="/reports.html" class="menu-item menu-item-inactive group">
+                    <svg class="menu-item-icon-inactive" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M6.5 3.25H14.5C14.6989 3.25 14.8897 3.32902 15.0303 3.46967L19.5303 7.96967C19.671 8.11032 19.75 8.30109 19.75 8.5V18.5C19.75 19.7426 18.7426 20.75 17.5 20.75H6.5C5.25736 20.75 4.25 19.7426 4.25 18.5V5.5C4.25 4.25736 5.25736 3.25 6.5 3.25ZM14.25 4.75V8C14.25 8.41421 14.5858 8.75 15 8.75H18.25L14.25 4.75ZM9 13.25H15C15.4142 13.25 15.75 13.5858 15.75 14C15.75 14.4142 15.4142 14.75 15 14.75H9C8.58579 14.75 8.25 14.4142 8.25 14C8.25 13.5858 8.58579 13.25 9 13.25Z" fill="currentColor"/></svg>
+                    التقارير
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="mb-2.5 text-xs font-medium leading-[20px] text-gray-400">
+                الحساب
+              </h3>
+              <ul class="mb-4 flex flex-col gap-1.5">
+                <li>
+                  <a href="#settings_section" onclick="showClientView('settings', event)" data-nav-view="settings" class="client-nav menu-item menu-item-inactive group">
+                    <svg class="menu-item-icon-inactive" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 8.25C9.92893 8.25 8.25 9.92893 8.25 12C8.25 14.0711 9.92893 15.75 12 15.75C14.0711 15.75 15.75 14.0711 15.75 12C15.75 9.92893 14.0711 8.25 12 8.25ZM9.75 12C9.75 10.7574 10.7574 9.75 12 9.75C13.2426 9.75 14.25 10.7574 14.25 12C14.25 13.2426 13.2426 14.25 12 14.25C10.7574 14.25 9.75 13.2426 9.75 12Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2.25C12.4142 2.25 12.75 2.58579 12.75 3V4.063C13.6111 4.171 14.4255 4.432 15.165 4.818L15.9167 4.06629C16.2096 3.7734 16.6845 3.7734 16.9773 4.06629C17.2702 4.35918 17.2702 4.83406 16.9773 5.12695L16.2258 5.87853C16.6118 6.61825 16.873 7.43278 16.981 8.294H18.044C18.4582 8.294 18.794 8.62979 18.794 9.044C18.794 9.45821 18.4582 9.794 18.044 9.794H16.981C16.873 10.6552 16.6118 11.4698 16.2258 12.2095L16.9773 12.9611C17.2702 13.254 17.2702 13.7288 16.9773 14.0217C16.6845 14.3146 16.2096 14.3146 15.9167 14.0217L15.165 13.27C14.4255 13.656 13.6111 13.917 12.75 14.025V15.088C12.75 15.5022 12.4142 15.838 12 15.838C11.5858 15.838 11.25 15.5022 11.25 15.088V14.025C10.3889 13.917 9.5745 13.656 8.835 13.27L8.08329 14.0217C7.7904 14.3146 7.31553 14.3146 7.02263 14.0217C6.72974 13.7288 6.72974 13.254 7.02263 12.9611L7.7742 12.2095C7.3882 11.4698 7.12704 10.6552 7.019 9.794H5.956C5.54179 9.794 5.206 9.45821 5.206 9.044C5.206 8.62979 5.54179 8.294 5.956 8.294H7.019C7.12704 7.43278 7.3882 6.61825 7.7742 5.87853L7.02263 5.12695C6.72974 4.83406 6.72974 4.35918 7.02263 4.06629C7.31553 3.7734 7.7904 3.7734 8.08329 4.06629L8.835 4.818C9.5745 4.432 10.3889 4.171 11.25 4.063V3C11.25 2.58579 11.5858 2.25 12 2.25Z" fill="currentColor"/></svg>
+                    الإعدادات
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </nav>
+
+          <div class="mt-auto rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-white/[0.03]">
+            <p id="sidebar_client_name" class="text-theme-sm font-medium text-gray-800 dark:text-white/90">RepuSystem</p>
+            <p class="mt-1 text-theme-xs text-gray-500 dark:text-gray-400">لوحة متابعة تجربة العملاء</p>
+          </div>
+        </div>
+      </aside>
+
+      <div class="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
+        <div
+  @click="sidebarToggle = false"
+  :class="sidebarToggle ? 'block lg:hidden' : 'hidden'"
+  class="fixed w-full h-screen z-9 bg-gray-900/50"
+></div>
+<header x-data="{menuToggle: false}" class="sticky top-0 z-99999 flex w-full border-gray-200 bg-white lg:border-b dark:border-gray-800 dark:bg-gray-900">
+          <div class="flex grow flex-col items-center justify-between lg:flex-row lg:px-6">
+            <div class="flex w-full items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4 dark:border-gray-800">
+              <button
+                :class="sidebarToggle ? 'lg:bg-transparent dark:lg:bg-transparent bg-gray-100 dark:bg-gray-800' : ''"
+                class="z-99999 flex h-10 w-10 items-center justify-center rounded-lg border-gray-200 text-gray-500 lg:h-11 lg:w-11 lg:border dark:border-gray-800 dark:text-gray-400"
+                @click.stop="sidebarToggle = !sidebarToggle"
+              >
+                <svg class="fill-current" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.25 6C3.25 5.58579 3.58579 5.25 4 5.25H20C20.4142 5.25 20.75 5.58579 20.75 6C20.75 6.41421 20.4142 6.75 20 6.75H4C3.58579 6.75 3.25 6.41421 3.25 6ZM3.25 12C3.25 11.5858 3.58579 11.25 4 11.25H15C15.4142 11.25 15.75 11.5858 15.75 12C15.75 12.4142 15.4142 12.75 15 12.75H4C3.58579 12.75 3.25 12.4142 3.25 12ZM4 17.25C3.58579 17.25 3.25 17.5858 3.25 18C3.25 18.4142 3.58579 18.75 4 18.75H20C20.4142 18.75 20.75 18.4142 20.75 18C20.75 17.5858 20.4142 17.25 20 17.25H4Z" fill="currentColor"/></svg>
+              </button>
+
+              <a href="/admin.html" class="lg:hidden">
+                <img src="/assets/logo-icon-tight.svg" alt="RepuSystem" class="h-8 w-8 object-contain">
+              </a>
+
+              <button
+                class="z-99999 flex h-10 w-10 items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100 lg:hidden dark:text-gray-400 dark:hover:bg-gray-800"
+                :class="menuToggle ? 'bg-gray-100 dark:bg-gray-800' : ''"
+                @click.stop="menuToggle = !menuToggle"
+              >
+                <svg class="fill-current" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.99902 10.4951C6.82745 10.4951 7.49902 11.1667 7.49902 11.9951V12.0051C7.49902 12.8335 6.82745 13.5051 5.99902 13.5051C5.1706 13.5051 4.49902 12.8335 4.49902 12.0051V11.9951C4.49902 11.1667 5.1706 10.4951 5.99902 10.4951ZM17.999 10.4951C18.8275 10.4951 19.499 11.1667 19.499 11.9951V12.0051C19.499 12.8335 18.8275 13.5051 17.999 13.5051C17.1706 13.5051 16.499 12.8335 16.499 12.0051V11.9951C16.499 11.1667 17.1706 10.4951 17.999 10.4951ZM13.499 11.9951C13.499 11.1667 12.8275 10.4951 11.999 10.4951C11.1706 10.4951 10.499 11.1667 10.499 11.9951V12.0051C10.499 12.8335 11.1706 13.5051 11.999 13.5051C12.8275 13.5051 13.499 12.8335 13.499 11.9951V11.9951Z" fill="currentColor"/></svg>
+              </button>
+
+              <div class="hidden lg:block">
+                <form onsubmit="return false">
+                  <div class="relative">
+                    <span class="absolute top-1/2 right-4 -translate-y-1/2">
+                      <svg class="fill-gray-500 dark:fill-gray-400" width="20" height="20" viewBox="0 0 20 20" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.04175 9.37363C3.04175 5.87693 5.87711 3.04199 9.37508 3.04199C12.8731 3.04199 15.7084 5.87693 15.7084 9.37363C15.7084 12.8703 12.8731 15.7053 9.37508 15.7053C5.87711 15.7053 3.04175 12.8703 3.04175 9.37363ZM9.37508 1.54199C5.04902 1.54199 1.54175 5.04817 1.54175 9.37363C1.54175 13.6991 5.04902 17.2053 9.37508 17.2053C11.2674 17.2053 13.003 16.5344 14.357 15.4176L17.177 18.238C17.4699 18.5309 17.9448 18.5309 18.2377 18.238C18.5306 17.9451 18.5306 17.4703 18.2377 17.1774L15.418 14.3573C16.5365 13.0033 17.2084 11.2669 17.2084 9.37363C17.2084 5.04817 13.7011 1.54199 9.37508 1.54199Z" fill=""/></svg>
+                    </span>
+                    <input id="dashboard_search" type="text" placeholder="بحث في الشكاوى، الفروع، النشاط..." class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pr-12 pl-14 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden xl:w-[430px] dark:border-gray-800 dark:bg-gray-900 dark:bg-white/[0.03] dark:text-white/90 dark:placeholder:text-white/30" />
+                    <button type="button" class="absolute top-1/2 left-2.5 inline-flex -translate-y-1/2 items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 px-[7px] py-[4.5px] text-xs -tracking-[0.2px] text-gray-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400">
+                      <span>⌘</span><span>K</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div :class="menuToggle ? 'flex' : 'hidden'" class="shadow-theme-md w-full items-center justify-between gap-4 px-5 py-4 lg:flex lg:justify-end lg:px-0 lg:shadow-none">
+              <div class="flex items-center gap-2 2xsm:gap-3">
+                <div class="relative" x-data="{ dropdownOpen: false, notifying: true }" @click.outside="dropdownOpen = false">
+                  <button class="hover:text-dark-900 relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white" @click.prevent="dropdownOpen = !dropdownOpen; notifying = false">
+                    <span :class="!notifying ? 'hidden' : 'flex'" class="absolute right-0 top-0.5 z-1 h-2 w-2 rounded-full bg-orange-400"><span class="absolute -z-1 inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75"></span></span>
+                    <svg class="fill-current" width="20" height="20" viewBox="0 0 20 20" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.75 2.29248C10.75 1.87827 10.4143 1.54248 10 1.54248C9.58583 1.54248 9.25004 1.87827 9.25004 2.29248V2.83613C6.08266 3.20733 3.62504 5.9004 3.62504 9.16748V14.4591H3.33337C2.91916 14.4591 2.58337 14.7949 2.58337 15.2091C2.58337 15.6234 2.91916 15.9591 3.33337 15.9591H16.6667C17.0809 15.9591 17.4167 15.6234 17.4167 15.2091C17.4167 14.7949 17.0809 14.4591 16.6667 14.4591H16.375V9.16748C16.375 5.9004 13.9174 3.20733 10.75 2.83613V2.29248ZM14.875 14.4591V9.16748C14.875 6.47509 12.6924 4.29248 10 4.29248C7.30765 4.29248 5.12504 6.47509 5.12504 9.16748V14.4591H14.875Z" fill="currentColor"/></svg>
+                  </button>
+                  <div x-show="dropdownOpen" class="shadow-theme-lg absolute left-0 mt-[17px] flex h-[280px] w-[350px] flex-col rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-dark sm:w-[361px]">
+                    <div class="mb-3 flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-800">
+                      <h5 class="text-lg font-semibold text-gray-800 dark:text-white/90">الإشعارات</h5>
+                      <button @click="dropdownOpen = false" class="text-gray-500">✕</button>
+                    </div>
+                    <ul class="custom-scrollbar flex h-auto flex-col overflow-y-auto">
+                      <li>
+                        <button
+                          type="button"
+                          class="w-full rounded-lg p-3 text-right hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-white/5"
+                          aria-label="عرض الشكاوى النشطة"
+                          @click="dropdownOpen = false; navigateToView('complaints_view')"
+                        >
+                          <p class="text-theme-sm text-gray-700 dark:text-gray-300">تنبيه: شكاوى نشطة تحتاج متابعة.</p>
+                          <p class="mt-1 text-theme-xs text-gray-500">تنبيه تشغيلي</p>
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          type="button"
+                          class="w-full rounded-lg p-3 text-right hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-white/5"
+                          aria-label="عرض تحليلات الأداء"
+                          @click="dropdownOpen = false; navigateToView('analytics_view')"
+                        >
+                          <p class="text-theme-sm text-gray-700 dark:text-gray-300">تم تحديث مؤشرات الرضا.</p>
+                          <p class="mt-1 text-theme-xs text-gray-500">تحديث الأداء</p>
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div class="relative" x-data="{ dropdownOpen: false }" @click.outside="dropdownOpen = false">
+                  <button @click.prevent="dropdownOpen = !dropdownOpen" class="flex items-center text-gray-700 dark:text-gray-400">
+                    <span class="mr-3 h-11 w-11 overflow-hidden rounded-full bg-brand-50">
+                      <span id="header_client_avatar" class="flex h-full w-full items-center justify-center text-sm font-semibold text-brand-500">R</span>
+                    </span>
+                    <span id="header_client_name" class="ml-1 hidden text-theme-sm font-medium lg:block">RepuSystem</span>
+                    <svg class="ml-0.5 hidden stroke-gray-500 lg:block" width="18" height="20" viewBox="0 0 18 20" fill="none"><path d="M4.3125 8.65625L9 13.3437L13.6875 8.65625" stroke="" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                  <div x-show="dropdownOpen" class="shadow-theme-lg absolute left-0 mt-[17px] flex w-[260px] flex-col rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-dark">
+                    <div><span id="header_client_name_dropdown" class="block text-theme-sm font-medium text-gray-700 dark:text-gray-400">RepuSystem</span><span class="mt-0.5 block text-theme-xs text-gray-500 dark:text-gray-400">مدير الحساب</span></div>
+                    <ul class="my-3 flex flex-col gap-1 border-y border-gray-100 py-3 dark:border-gray-800">
+                      <li><a href="#settings_section" onclick="showClientView('settings', event)" class="flex items-center gap-3 rounded-lg px-3 py-2 text-theme-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5">الإعدادات</a></li>
+                      <li><a href="/reports.html" class="flex items-center gap-3 rounded-lg px-3 py-2 text-theme-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5">التقارير</a></li>
+                    </ul>
+                    <button type="button" onclick="logout()" class="flex items-center gap-3 rounded-lg px-3 py-2 text-theme-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5">تسجيل الخروج</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main>
+          <div class="mx-auto max-w-(--breakpoint-2xl) p-4 pt-5 md:p-6">
+            <div id="auth_notice" class="mb-6 hidden rounded-2xl border border-warning-200 bg-warning-50 p-4 text-theme-sm text-warning-700">
+              يرجى تسجيل الدخول لعرض لوحة المنشأة.
+            </div>
+
+            <section id="home_view" class="client-view grid scroll-mt-24 grid-cols-12 gap-4 md:gap-5">
+              <div class="col-span-12 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 md:gap-4">
+                <div
+                  class="min-h-[88px] rounded-2xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-brand-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض التحليلات - معدل الرضا"
+                  onclick="navigateToView('analytics_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('analytics_view')}"
+                >
+                  <span class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">معدل الرضا</span>
+                  <div class="mt-2 flex items-end justify-between gap-3">
+                    <h4 id="satisfaction_rate" class="text-[28px] font-bold leading-none text-gray-800 dark:text-white/90"><span class="repu-skeleton repu-skeleton-lg"></span></h4>
+                    <span class="rounded-full bg-success-50 px-2.5 py-0.5 text-theme-xs font-medium text-success-600">رضا</span>
+                  </div>
+                </div>
+                <div
+                  class="min-h-[88px] rounded-2xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-brand-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض التحليلات - متوسط التقييم"
+                  onclick="navigateToView('analytics_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('analytics_view')}"
+                >
+                  <span class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">متوسط التقييم</span>
+                  <div class="mt-2 flex items-end justify-between gap-3">
+                    <h4 id="average_rating" class="text-[28px] font-bold leading-none text-gray-800 dark:text-white/90" dir="ltr"><span class="repu-skeleton repu-skeleton-lg"></span></h4>
+                    <span class="rounded-full bg-brand-50 px-2.5 py-0.5 text-theme-xs font-medium text-brand-500">نجوم</span>
+                  </div>
+                </div>
+                <div
+                  class="min-h-[88px] rounded-2xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-error-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-error-400 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض الشكاوى النشطة"
+                  onclick="navigateToView('complaints_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('complaints_view')}"
+                >
+                  <span class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">الشكاوى النشطة</span>
+                  <div class="mt-2 flex items-end justify-between gap-3">
+                    <h4 id="active_complaints" class="text-[28px] font-bold leading-none text-gray-800 dark:text-white/90"><span class="repu-skeleton repu-skeleton-lg"></span></h4>
+                    <span class="rounded-full bg-error-50 px-2.5 py-0.5 text-theme-xs font-medium text-error-600">نشطة</span>
+                  </div>
+                </div>
+                <div
+                  class="min-h-[88px] rounded-2xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-warning-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-warning-400 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض الشكاوى المتأخرة"
+                  onclick="navigateToView('complaints_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('complaints_view')}"
+                >
+                  <span class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">متأخرة +24 ساعة</span>
+                  <div class="mt-2 flex items-end justify-between gap-3">
+                    <h4 id="overdue_complaints" class="text-[28px] font-bold leading-none text-gray-800 dark:text-white/90"><span class="repu-skeleton repu-skeleton-lg"></span></h4>
+                    <span class="rounded-full bg-warning-50 px-2.5 py-0.5 text-theme-xs font-medium text-warning-600">متابعة</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-span-12 xl:col-span-5">
+                <div class="rounded-2xl border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-white/[0.03]">
+                  <div class="shadow-default rounded-2xl bg-white px-5 pb-3 pt-4 dark:bg-gray-900 sm:px-5">
+                    <div class="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">مؤشر صحة العملاء</h3>
+                        <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">ملخص تنفيذي للتجربة</p>
+                      </div>
+                      <span id="health_status" class="h-fit rounded-full bg-gray-100 px-3 py-1 text-theme-xs font-medium text-gray-600"><span class="repu-skeleton"></span></span>
+                    </div>
+                    <div class="relative mx-auto h-[112px] max-w-[220px]">
+                      <svg viewBox="0 0 260 150" class="h-full w-full overflow-visible">
+                        <path d="M30 130 A100 100 0 0 1 230 130" fill="none" stroke="#EEF2F6" stroke-width="18" stroke-linecap="round" />
+                        <path id="health_gauge_arc" d="M30 130 A100 100 0 0 1 230 130" fill="none" stroke="#465FFF" stroke-width="18" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100" />
+                      </svg>
+                      <div class="absolute inset-x-0 top-[50px] text-center">
+                        <span id="health_score" class="text-2xl font-bold text-gray-800 dark:text-white/90"><span class="repu-skeleton repu-skeleton-lg"></span></span>
+                        <span class="text-sm text-gray-400">%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-center gap-4 px-5 py-2.5 sm:gap-6">
+                    <div class="text-center">
+                      <p class="text-theme-xs text-gray-500">متوسط التقييم</p>
+                      <p id="rating_count" class="mt-1 text-sm font-semibold text-gray-800 dark:text-white/90"><span class="repu-skeleton"></span></p>
+                    </div>
+                    <div class="h-7 w-px bg-gray-200 dark:bg-gray-800"></div>
+                    <div class="text-center">
+                      <p class="text-theme-xs text-gray-500">الرضا</p>
+                      <p id="health_satisfaction" class="mt-1 text-sm font-semibold text-gray-800 dark:text-white/90"><span class="repu-skeleton"></span></p>
+                    </div>
+                    <div class="h-7 w-px bg-gray-200 dark:bg-gray-800"></div>
+                    <div class="text-center">
+                      <p class="text-theme-xs text-gray-500">أثر الشكاوى</p>
+                      <p id="complaint_impact" class="mt-1 text-sm font-semibold text-gray-800 dark:text-white/90"><span class="repu-skeleton"></span></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-span-12 grid grid-cols-1 gap-4 xl:col-span-7 xl:grid-cols-3">
+                <div
+                  class="self-start rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-success-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-success-400 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض الفروع - أفضل فرع"
+                  onclick="navigateToView('branches_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('branches_view')}"
+                >
+                  <p class="text-theme-xs font-semibold text-success-600">أفضل فرع</p>
+                  <h4 id="home_best_branch_name" class="mt-2 text-base font-semibold text-gray-800 dark:text-white/90">لا توجد بيانات</h4>
+                  <div class="mt-3 flex items-center justify-between gap-3 text-theme-sm">
+                    <span id="home_best_branch_rating" class="font-semibold text-gray-800" dir="ltr">-</span>
+                    <span id="home_best_branch_complaints" class="rounded-full bg-success-50 px-2.5 py-1 text-theme-xs font-medium text-success-600">0 شكاوى</span>
+                  </div>
+                </div>
+                <div
+                  class="self-start rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-error-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-error-400 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض الفروع - يحتاج متابعة"
+                  onclick="navigateToView('branches_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('branches_view')}"
+                >
+                  <p class="text-theme-xs font-semibold text-error-600">يحتاج متابعة</p>
+                  <h4 id="home_weak_branch_name" class="mt-2 text-base font-semibold text-gray-800 dark:text-white/90">لا توجد بيانات</h4>
+                  <div class="mt-3 flex items-center justify-between gap-3 text-theme-sm">
+                    <span id="home_weak_branch_rating" class="font-semibold text-gray-800" dir="ltr">-</span>
+                    <span id="home_weak_branch_complaints" class="rounded-full bg-error-50 px-2.5 py-1 text-theme-xs font-medium text-error-600">0 شكاوى</span>
+                  </div>
+                </div>
+                <div
+                  id="critical_complaint_card"
+                  class="self-start rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] cursor-pointer hover:border-warning-300 hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-warning-400 focus-visible:outline-none"
+                  tabindex="0" role="button" aria-label="عرض الشكاوى - آخر شكوى حرجة"
+                  onclick="navigateToView('complaints_view')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigateToView('complaints_view')}"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <p class="text-theme-xs font-semibold text-warning-700">آخر شكوى حرجة</p>
+                    <span id="critical_complaint_status" class="rounded-full bg-gray-100 px-2.5 py-1 text-theme-xs font-medium text-gray-600">لا توجد</span>
+                  </div>
+                  <h4 id="critical_complaint_customer" class="mt-2 text-theme-sm font-semibold text-gray-800 dark:text-white/90">لا توجد شكاوى نشطة</h4>
+                  <p id="critical_complaint_branch" class="mt-1 text-theme-xs text-gray-500">-</p>
+                  <p id="critical_complaint_summary" class="mt-2 line-clamp-1 text-theme-xs leading-5 text-gray-500">كل شيء تحت السيطرة حالياً.</p>
+                  <a id="critical_complaint_whatsapp" href="#" target="_blank" rel="noopener noreferrer"
+                     class="mt-2 hidden h-8 w-fit items-center rounded-lg bg-success-500 px-3 text-theme-xs font-medium text-white"
+                     onclick="event.stopPropagation()"
+                  >واتساب</a>
+                </div>
+              </div>
+
+              <div class="col-span-12">
+                <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">تطور التقييمات والشكاوى</h3>
+                      <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">آخر 30 يوم من التقييمات والشكاوى</p>
+                    </div>
+                    <span class="rounded-full bg-gray-100 px-3 py-1 text-theme-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">آخر 30 يوم</span>
+                  </div>
+                  <div class="mt-4 max-w-full overflow-x-auto custom-scrollbar">
+                    <div class="min-w-[650px] xl:min-w-full">
+                      <div class="h-[280px] relative">
+                        <canvas id="daily_chart"></canvas>
+                        <div id="daily_chart_placeholder" class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white dark:bg-white/[0.03] rounded-lg">
+                          <svg id="daily_chart_spinner" class="animate-spin h-6 w-6 text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                          </svg>
+                          <p id="daily_chart_msg" class="text-sm text-gray-400 dark:text-gray-500">جاري تحميل بيانات الرسم…</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="home_activity_panel" class="col-span-12 xl:col-span-5">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                  <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">آخر النشاط</h3>
+                    <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">آخر عمليات التقييم والإرسال المسجلة</p>
+                  </div>
+                  <div id="latest_activity" class="rounded-xl border border-gray-100 px-4 py-6 text-center">
+                    <p class="text-theme-sm text-gray-500">جاري تحميل النشاط...</p>
+                  </div>
+                </div>
+              </div>
+
+              <div id="home_complaints_panel" class="col-span-12 xl:col-span-7">
+                <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+                  <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">الشكاوى الأخيرة</h3>
+                      <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">أحدث البلاغات التي تحتاج متابعة</p>
+                    </div>
+                    <button
+                      type="button"
+                      onclick="navigateToView('complaints_view')"
+                      class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50"
+                    >عرض الكل</button>
+                  </div>
+                  <div id="complaints_list" class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <div class="space-y-4 py-4">
+                      <div class="h-4 w-2/3 rounded-full bg-gray-100"></div>
+                      <div class="h-4 w-1/2 rounded-full bg-gray-100"></div>
+                      <div class="h-4 w-3/4 rounded-full bg-gray-100"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="home_branches_panel" class="col-span-12">
+                <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+                  <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">أداء الفروع</h3>
+                      <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">مقارنة أداء الفروع حسب التقييمات والشكاوى</p>
+                    </div>
+                  </div>
+                  <div class="w-full overflow-x-auto">
+                    <table class="min-w-full">
+                      <thead>
+                        <tr class="border-y border-gray-100 dark:border-gray-800">
+                          <th class="py-3 text-right"><p class="text-theme-xs font-medium text-gray-500">الفرع</p></th>
+                          <th class="py-3 text-right"><p class="text-theme-xs font-medium text-gray-500">متوسط التقييم</p></th>
+                          <th class="py-3 text-right"><p class="text-theme-xs font-medium text-gray-500">عدد التقييمات</p></th>
+                          <th class="py-3 text-right"><p class="text-theme-xs font-medium text-gray-500">الشكاوى</p></th>
+                          <th class="py-3 text-right"><p class="text-theme-xs font-medium text-gray-500">الحالة</p></th>
+                        </tr>
+                      </thead>
+                      <tbody id="branch_table_body" class="divide-y divide-gray-100 dark:divide-gray-800">
+                        <tr>
+                          <td colspan="5" class="py-8 text-center text-theme-sm text-gray-500">لا توجد بيانات محملة بعد.</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+            </section>
+
+            <section id="send_view" class="client-view hidden space-y-6">
+              <div class="grid grid-cols-12 gap-4 md:gap-6">
+                <div class="col-span-12 xl:col-span-8">
+                  <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">إرسال طلب تقييم</h3>
+                    <p class="mt-1 text-theme-sm text-gray-500">سيتم إرسال رسالة واتساب للعميل لطلب تقييم التجربة</p>
+                    <div class="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+                      <div>
+                        <label class="mb-1.5 block text-theme-sm font-medium text-gray-700">اسم العميل</label>
+                        <input id="cust_name" type="text" placeholder="مثال: محمد أحمد" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-theme-sm outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10" />
+                      </div>
+                      <div>
+                        <label class="mb-1.5 block text-theme-sm font-medium text-gray-700">رقم الجوال</label>
+                        <input id="cust_phone" type="tel" placeholder="05xxxxxxxx" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-theme-sm outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10" />
+                      </div>
+                      <div>
+                        <label class="mb-1.5 block text-theme-sm font-medium text-gray-700">الفرع</label>
+                        <select id="branch" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-theme-sm outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10">
+                          <option>الفرع الرئيسي</option>
+                          <option>فرع الصالحية</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="mb-1.5 block text-theme-sm font-medium text-gray-700">وقت الإرسال</label>
+                        <select id="delay_time" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-theme-sm outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10">
+                          <option value="0">الآن فوراً</option>
+                          <option value="30">بعد 30 دقيقة</option>
+                          <option value="60">بعد ساعة</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button id="send_btn" onclick="send()" class="mt-6 flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-theme-sm font-medium text-white hover:bg-brand-600">إرسال عبر واتساب</button>
+                  </div>
+                </div>
+                <div class="col-span-12 xl:col-span-4">
+                  <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">رابط التقييم</h3>
+                    <div id="review_link_ready" class="mt-4 hidden">
+                      <input id="review_link_input" type="text" readonly dir="ltr" class="h-11 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 text-left font-mono text-xs text-gray-600" />
+                    </div>
+                    <div id="review_link_missing" class="mt-4 hidden rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-theme-sm text-warning-700">لم يتم تعيين NFC ID لهذا الحساب</div>
+                    <div class="mt-4 grid grid-cols-1 gap-2">
+                      <button onclick="copyReviewLink()" class="h-10 rounded-lg bg-brand-500 px-3 text-theme-sm font-medium text-white">نسخ رابط التقييم</button>
+                      <a id="send_open_review" href="#" target="_blank" rel="noopener" class="flex h-10 items-center justify-center rounded-lg border border-gray-200 px-3 text-theme-sm font-medium text-gray-700">فتح رابط التقييم</a>
+                      <a id="quick_open_review" href="#" target="_blank" rel="noopener" class="flex h-10 items-center justify-center rounded-lg border border-gray-200 px-3 text-theme-sm font-medium text-gray-700">فتح صفحة التقييم</a>
+                      <a id="quick_qr_link" href="#" class="flex h-10 items-center justify-center rounded-lg border border-gray-200 px-3 text-theme-sm font-medium text-gray-700">QR للرابط</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section id="complaints_view" class="client-view hidden space-y-6">
+              <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div class="mb-4 flex items-center justify-between">
+                  <div>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">مركز الشكاوى</h3>
+                    <p class="mt-1 text-theme-sm text-gray-500">الشكاوى النشطة التي تحتاج متابعة تشغيلية.</p>
+                  </div>
+                  <div class="flex gap-2"><span id="urgent_complaints_count" class="rounded-full bg-error-50 px-2.5 py-1 text-theme-xs text-error-600">0</span><span id="workflow_overdue_count" class="rounded-full bg-warning-50 px-2.5 py-1 text-theme-xs text-warning-700">0 متأخرة</span></div>
+                </div>
+                <div id="complaint_workflow_summary" class="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+                  <div class="rounded-xl bg-gray-50 p-3 text-center"><p class="text-theme-xs text-gray-500">جديدة</p><p id="workflow_new_count" class="font-semibold">0</p></div>
+                  <div class="rounded-xl bg-gray-50 p-3 text-center"><p class="text-theme-xs text-gray-500">قيد المعالجة</p><p id="workflow_in_progress_count" class="font-semibold">0</p></div>
+                  <div class="rounded-xl bg-gray-50 p-3 text-center"><p class="text-theme-xs text-gray-500">تم التواصل</p><p id="workflow_contacted_count" class="font-semibold">0</p></div>
+                  <div class="rounded-xl bg-gray-50 p-3 text-center"><p class="text-theme-xs text-gray-500">مغلقة/محلولة</p><p id="workflow_resolved_closed_count" class="font-semibold">0</p></div>
+                </div>
+                <div id="urgent_complaints" class="rounded-xl border border-gray-100 px-4 py-8 text-center text-theme-sm text-gray-500">لا توجد شكاوى عاجلة حالياً</div>
+              </div>
+            </section>
+
+            <section id="branches_view" class="client-view hidden space-y-6">
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+                  <p class="text-theme-xs font-medium text-gray-500">إجمالي الفروع</p>
+                  <p id="branch_count_badge" class="mt-2 text-[28px] font-bold leading-none text-gray-800 dark:text-white/90">0</p>
+                </div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+                  <p class="text-theme-xs font-medium text-gray-500">أفضل فرع</p>
+                  <p id="best_branch_badge" class="mt-2 text-lg font-semibold text-gray-800 dark:text-white/90">لا توجد بيانات</p>
+                </div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+                  <p class="text-theme-xs font-medium text-gray-500">يحتاج متابعة</p>
+                  <p id="weak_branch_badge" class="mt-2 text-lg font-semibold text-gray-800 dark:text-white/90">لا توجد بيانات</p>
+                </div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+                  <p class="text-theme-xs font-medium text-gray-500">متوسط تقييم الفروع</p>
+                  <p id="branches_average_rating" class="mt-2 text-[28px] font-bold leading-none text-gray-800 dark:text-white/90" dir="ltr">0.0 / 5</p>
+                </div>
+              </div>
+
+              <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+                <div class="mb-4">
+                  <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">مقارنة الفروع</h3>
+                  <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">تفصيل أداء الفروع حسب التقييمات والشكاوى.</p>
+                </div>
+                <div id="branch_performance" class="w-full overflow-x-auto">
+                  <table class="min-w-[900px] xl:min-w-full">
+                    <thead>
+                      <tr class="border-y border-gray-100 dark:border-gray-800">
+                        <th class="px-3 py-3 text-right"><p class="text-theme-xs font-medium text-gray-500">الفرع</p></th>
+                        <th class="px-3 py-3 text-right"><p class="text-theme-xs font-medium text-gray-500">متوسط التقييم</p></th>
+                        <th class="px-3 py-3 text-right"><p class="text-theme-xs font-medium text-gray-500">التقييمات</p></th>
+                        <th class="px-3 py-3 text-right"><p class="text-theme-xs font-medium text-gray-500">الشكاوى</p></th>
+                        <th class="px-3 py-3 text-right"><p class="text-theme-xs font-medium text-gray-500">تحتاج متابعة</p></th>
+                        <th class="px-3 py-3 text-right"><p class="text-theme-xs font-medium text-gray-500">الحالة</p></th>
+                      </tr>
+                    </thead>
+                    <tbody id="branch_detail_table_body" class="divide-y divide-gray-100 dark:divide-gray-800">
+                      <tr>
+                        <td colspan="6" class="py-8 text-center text-theme-sm text-gray-500">لا توجد بيانات فروع.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section id="analytics_view" class="client-view hidden space-y-6">
+              <div class="grid grid-cols-1 gap-4 xl:grid-cols-4">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5"><p class="text-theme-sm text-gray-500">متوسط التقييم</p><p id="analytics_average_rating" class="mt-2 text-title-sm font-bold">0 / 5</p><span id="analytics_rating_count" class="text-theme-xs text-gray-400">0 تقييمات</span></div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5"><p class="text-theme-sm text-gray-500">معدل الرضا</p><p id="analytics_satisfaction_rate" class="mt-2 text-title-sm font-bold">0%</p></div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5"><p class="text-theme-sm text-gray-500">تقييمات إيجابية</p><p id="analytics_positive_count" class="mt-2 text-title-sm font-bold">0</p></div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5"><p class="text-theme-sm text-gray-500">شكاوى نشطة</p><p id="analytics_active_complaints" class="mt-2 text-title-sm font-bold">0</p><span id="low_rating_rate" class="text-theme-xs text-error-600">0%</span></div>
+              </div>
+              <div id="analytics_reports_panel" class="grid grid-cols-1 gap-4 xl:grid-cols-3 md:gap-6">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                  <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">التوزيع بالنجوم</h3>
+                  <div class="mt-5 h-64"><canvas id="rating_breakdown_chart"></canvas></div>
+                </div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                  <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">الرضا</h3>
+                  <div class="mt-5 h-64"><canvas id="satisfaction_chart"></canvas></div>
+                </div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                  <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">شهرياً</h3>
+                  <div class="mt-5 h-64"><canvas id="monthly_chart"></canvas></div>
+                </div>
+              </div>
+            </section>
+
+            <section id="settings_view" class="client-view hidden space-y-6">
+              <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5"><h3 class="font-semibold">بيانات المنشأة</h3><div class="mt-4 grid gap-3"><div class="rounded-xl bg-gray-50 p-4"><p class="text-theme-xs text-gray-500">اسم المنشأة</p><p id="settings_name" class="mt-2 font-semibold">-</p></div><div class="rounded-xl bg-gray-50 p-4"><p class="text-theme-xs text-gray-500">NFC ID</p><p id="settings_nfc_id" class="mt-2 font-semibold">-</p></div></div></div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5"><div class="flex justify-between gap-3"><h3 class="font-semibold">روابط التقييم</h3><button onclick="copySettingsReviewLink()" class="rounded-lg bg-brand-500 px-3 py-2 text-theme-xs text-white">نسخ الرابط</button></div><a id="settings_open_review" href="#" target="_blank" class="mt-3 inline-flex rounded-lg border border-gray-200 px-3 py-2 text-theme-xs">فتح الصفحة</a><p id="settings_review_link" dir="ltr" class="mt-4 break-all text-left font-mono text-theme-sm">-</p><p id="settings_google_link" dir="ltr" class="mt-3 break-all text-left font-mono text-theme-sm">-</p></div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5"><h3 class="font-semibold">سياسة الشكاوى</h3><p id="settings_complaint_action" class="mt-4">-</p><p id="settings_discount_code" class="mt-3">-</p><p id="settings_complaint_message" class="mt-3 whitespace-pre-wrap">-</p></div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5"><h3 class="font-semibold">التواصل</h3><p id="settings_whatsapp_number" class="mt-4">-</p></div>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      const charts = {};
+      let currentClientInfo = null;
+      let lastDashboardSummary = null;
+      let dailyChartHasRealData = false;
+      const fallbackDailyTrend = [
+        { date: '2026-06-01', average_rating: 3.8, complaints: 2 },
+        { date: '2026-06-02', average_rating: 4.1, complaints: 1 },
+        { date: '2026-06-03', average_rating: 3.9, complaints: 3 },
+        { date: '2026-06-04', average_rating: 4.4, complaints: 1 },
+        { date: '2026-06-05', average_rating: 4.2, complaints: 2 },
+        { date: '2026-06-06', average_rating: 4.6, complaints: 0 },
+      ];
+      const fallbackMonthlyCounts = [
+        { month: 'يناير', total: 118 },
+        { month: 'فبراير', total: 132 },
+        { month: 'مارس', total: 149 },
+        { month: 'أبريل', total: 141 },
+        { month: 'مايو', total: 166 },
+        { month: 'يونيو', total: 154 },
+      ];
+      const fallbackRatingBreakdown = [
+        { rating: 5, count: 124 },
+        { rating: 4, count: 68 },
+        { rating: 3, count: 24 },
+        { rating: 2, count: 12 },
+        { rating: 1, count: 8 },
+      ];
+
+      function setText(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = cleanValue(value);
+      }
+
+      function cleanValue(value, fallback = 'لا توجد بيانات') {
+        if (value === undefined || value === null || value === '' || value === 'NaN') return fallback;
+        return String(value);
+      }
+
+      function safeNumber(value, fallback = 0) {
+        const number = Number(value);
+        return Number.isFinite(number) ? number : fallback;
+      }
+
+      function getClientInitial(name) {
+        if (!name || typeof name !== 'string') return 'R';
+        const trimmed = name.trim();
+        // Strip Arabic definite article "ال" if word is longer than 2 chars
+        const stripped = trimmed.startsWith('ال') && trimmed.length > 2
+          ? trimmed.slice(2)
+          : trimmed;
+        // Return first non-space visible character
+        const first = stripped.replace(/^\s+/, '').charAt(0);
+        return first || 'R';
+      }
+
+      function setClientAvatar(name) {
+        const el = document.getElementById('header_client_avatar');
+        if (el) el.textContent = getClientInitial(name);
+      }
+
+      function formatDate(value) {
+        if (!value) return 'غير محدد';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return 'غير محدد';
+        return date.toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' });
+      }
+
+      function formatActivityTime(value) {
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        return date.toLocaleString('ar-SA', {
+          day: '2-digit',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+
+      function activitySourceLabel(source) {
+        if (source === 'nfc') return 'NFC / QR';
+        if (source === 'dashboard') return 'لوحة العميل';
+        if (source === 'whatsapp') return 'واتساب';
+        return 'غير محدد';
+      }
+
+      function activityStatusLabel(ev) {
+        if (ev.status === 'complaint' || ev.answer === '2') return 'شكوى';
+        if (ev.status === 'replied' && ev.answer === '1') return 'ممتاز';
+        if (ev.status === 'sent') return 'بانتظار الرد';
+        return ev.status || 'غير محدد';
+      }
+
+      function activityTitle(ev) {
+        if (ev.source === 'nfc' && (ev.status === 'complaint' || ev.answer === '2')) return 'NFC / QR - شكوى';
+        if (ev.source === 'nfc' && ev.answer === '1') return 'NFC / QR - تقييم ممتاز';
+        if (ev.source === 'dashboard' && ev.status === 'sent') return 'لوحة العميل - تم الإرسال';
+        if (ev.source === 'whatsapp') return `واتساب - ${ev.status || 'نشاط جديد'}`;
+        return 'نشاط جديد';
+      }
+
+      function destroyChart(id) {
+        if (charts[id]) charts[id].destroy();
+      }
+
+      function emptyChart(canvasId, type = 'bar') {
+        const el = document.getElementById(canvasId);
+        if (!el || typeof Chart === 'undefined') return;
+        destroyChart(canvasId);
+        charts[canvasId] = new Chart(el, {
+          type,
+          data: { labels: [], datasets: [] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+        });
+      }
+
+      function statusForScore(score) {
+        if (score >= 80) return ['ممتاز', 'bg-success-50 text-success-600'];
+        if (score >= 65) return ['جيد', 'bg-brand-50 text-brand-500'];
+        if (score >= 50) return ['يحتاج متابعة', 'bg-warning-50 text-warning-700'];
+        return ['حرج', 'bg-error-50 text-error-600'];
+      }
+
+      function statusLabel(status) {
+        const map = {
+          complaint: 'شكوى',
+          new: 'جديدة',
+          in_progress: 'قيد المعالجة',
+          contacted: 'تم التواصل',
+          resolved: 'تم الحل',
+          closed: 'مغلقة',
+        };
+        return map[status] || 'متابعة';
+      }
+
+      function normalizeComplaintWorkflowStatus(status) {
+        return ['new', 'in_progress', 'contacted', 'resolved', 'closed'].includes(status) ? status : 'new';
+      }
+
+      function complaintWorkflowMeta(status) {
+        const normalized = normalizeComplaintWorkflowStatus(status);
+        const map = {
+          new: { label: 'جديدة', className: 'bg-gray-100 text-gray-700' },
+          in_progress: { label: 'قيد المعالجة', className: 'bg-warning-50 text-warning-700' },
+          contacted: { label: 'تم التواصل', className: 'bg-brand-50 text-brand-500' },
+          resolved: { label: 'تم الحل', className: 'bg-success-50 text-success-600' },
+          closed: { label: 'مغلقة', className: 'bg-gray-100 text-gray-600' },
+        };
+        return map[normalized];
+      }
+
+      function complaintWorkflowOptions(currentStatus) {
+        return [
+          ['new', 'جديدة'],
+          ['in_progress', 'قيد المعالجة'],
+          ['contacted', 'تم التواصل'],
+          ['resolved', 'تم الحل'],
+          ['closed', 'مغلقة'],
+        ].map(([value, label]) => `<option value="${value}" ${value === currentStatus ? 'selected' : ''}>${label}</option>`).join('');
+      }
+
+      function buildReviewLink(nfcId) {
+        return nfcId ? `${window.location.origin}/r/${encodeURIComponent(nfcId)}` : '';
+      }
+
+      function updateReviewLink(nfcId) {
+        const ready = document.getElementById('review_link_ready');
+        const missing = document.getElementById('review_link_missing');
+        const input = document.getElementById('review_link_input');
+        const reviewLink = buildReviewLink(nfcId);
+        if (input) input.value = reviewLink;
+        ['quick_open_review', 'send_open_review', 'settings_open_review'].forEach((id) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.href = reviewLink || '#';
+          el.classList.toggle('pointer-events-none', !reviewLink);
+          el.classList.toggle('opacity-50', !reviewLink);
+        });
+        const qr = document.getElementById('quick_qr_link');
+        if (qr) {
+          qr.href = nfcId ? `/api/qr/${encodeURIComponent(nfcId)}` : '#';
+          qr.classList.toggle('pointer-events-none', !nfcId);
+          qr.classList.toggle('opacity-50', !nfcId);
+        }
+        if (ready) ready.classList.toggle('hidden', !reviewLink);
+        if (missing) missing.classList.toggle('hidden', !!reviewLink);
+        setText('settings_review_link', reviewLink || '-');
+      }
+
+      /* ── Toast system ── */
+      function showToast(message, type) {
+        const existing = document.getElementById('repu_toast');
+        if (existing) existing.remove();
+        const colors = {
+          success: 'bg-success-500',
+          error:   'bg-error-600',
+          info:    'bg-brand-500',
+        };
+        const bg = colors[type] || colors.info;
+        const toast = document.createElement('div');
+        toast.id = 'repu_toast';
+        toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
+        toast.className = `fixed bottom-6 left-1/2 z-[9999] -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-medium text-white shadow-lg transition-opacity duration-300 ${bg}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 320); }, 2800);
+      }
+
+      /* ── navigateToView: single reusable helper ── */
+      function navigateToView(viewId) {
+        showClientView(viewId);
+      }
+
+      function copyReviewLink() {
+        const input = document.getElementById('review_link_input');
+        if (!input || !input.value) return;
+        navigator.clipboard.writeText(input.value)
+          .then(() => showToast('تم نسخ رابط التقييم', 'success'))
+          .catch(() => showToast('تعذر نسخ الرابط', 'error'));
+      }
+
+      function copySettingsReviewLink() {
+        const link = document.getElementById('settings_review_link')?.innerText;
+        if (!link || link === '-') return;
+        navigator.clipboard.writeText(link)
+          .then(() => showToast('تم نسخ رابط التقييم', 'success'))
+          .catch(() => showToast('تعذر نسخ الرابط', 'error'));
+      }
+
+      function renderSummary(summary) {
+        const workflow = summary.complaint_workflow_summary || {};
+        const active = safeNumber(workflow.new_count) + safeNumber(workflow.in_progress_count) + safeNumber(workflow.contacted_count);
+        const average = safeNumber(summary.average_rating);
+        const satisfaction = safeNumber(summary.satisfaction_rate);
+        const health = average > 0 ? Math.round((average / 5) * 60 + satisfaction * 0.4) : Math.round(satisfaction);
+        const branches = Array.isArray(summary.branch_performance) ? summary.branch_performance : [];
+
+        setText('satisfaction_rate', `${satisfaction}%`);
+        setText('average_rating', `${average.toFixed(1)} / 5`);
+        setText('active_complaints', String(active));
+        setText('overdue_complaints', String(workflow.overdue_count ?? 0));
+        setText('health_score', String(health));
+        setText('rating_count', `${average.toFixed(1)} / 5`);
+        setText('health_satisfaction', `${satisfaction}%`);
+        setText('complaint_impact', `${active} نشطة`);
+        setText('analytics_average_rating', `${average.toFixed(1)} / 5`);
+        setText('analytics_rating_count', `${summary.rating_count ?? 0} تقييمات مسجلة`);
+        setText('analytics_satisfaction_rate', `${satisfaction}%`);
+        setText('analytics_positive_count', String(summary.positive_count ?? 0));
+        setText('analytics_active_complaints', String(active));
+        setText('low_rating_rate', `${summary.low_rating_rate ?? 0}% تحتاج متابعة`);
+        setText('workflow_new_count', String(workflow.new_count ?? 0));
+        setText('workflow_in_progress_count', String(workflow.in_progress_count ?? 0));
+        setText('workflow_contacted_count', String(workflow.contacted_count ?? 0));
+        setText('workflow_resolved_closed_count', String(safeNumber(workflow.resolved_count) + safeNumber(workflow.closed_count)));
+        setText('workflow_overdue_count', `${workflow.overdue_count ?? 0} متأخرة`);
+        setText('urgent_complaints_count', String((summary.urgent_complaints || []).length));
+        setText('branch_count_badge', String(branches.length));
+        setText('best_branch_badge', summary.best_branches?.[0]?.branch || 'لا توجد بيانات');
+        setText('weak_branch_badge', summary.weak_branches?.[0]?.branch || 'لا توجد بيانات');
+        document.getElementById('best_branch_badge')?.classList.remove('hidden');
+        document.getElementById('weak_branch_badge')?.classList.remove('hidden');
+
+        const arc = document.getElementById('health_gauge_arc');
+        if (arc) arc.setAttribute('stroke-dasharray', `${Math.max(0, Math.min(100, health))} 100`);
+        const [label, cls] = statusForScore(health);
+        const status = document.getElementById('health_status');
+        if (status) {
+          status.textContent = label;
+          status.className = `h-fit rounded-full px-3 py-1 text-theme-xs font-medium ${cls}`;
+        }
+
+        renderBranches(branches);
+        renderBranchPerformance(branches);
+        renderExecutiveSnapshot(branches, summary.urgent_complaints || []);
+        renderUrgentComplaints(summary.urgent_complaints || []);
+        renderLatestActivity(summary.recent_activity || []);
+        const dailySource = summary.daily_counts_last_30_days || summary.daily_counts_last_7_days || summary.daily_trend;
+        summary._chartDataMissing = !Array.isArray(dailySource) || dailySource.length === 0;
+        renderCharts(summary);
+      }
+
+      function renderComplaints(items) {
+        const target = document.getElementById('complaints_list');
+        if (!target) return;
+        const complaints = Array.isArray(items) ? items
+          .filter((item) => item.status === 'complaint' || item.answer === '2' || item.complaint_status)
+          .sort((a, b) => new Date(b.sent_at || b.created_at || 0) - new Date(a.sent_at || a.created_at || 0))
+          : [];
+        if (!complaints.length) {
+          target.innerHTML = '<div class="py-8 text-center text-theme-sm text-gray-500">لا توجد شكاوى حديثة.</div>';
+          return;
+        }
+        target.innerHTML = complaints.slice(0, 6).map((item) => {
+          const status = item.complaint_status || (item.status === 'complaint' ? 'new' : item.status);
+          return `
+          <div class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">${escapeHtml(item.name || item.phone || 'عميل غير محدد')}</p>
+              <p class="mt-1 text-theme-xs text-gray-500">${escapeHtml(item.branch || 'فرع غير محدد')} · ${formatDate(item.sent_at || item.created_at)}</p>
+              <p class="mt-2 line-clamp-1 text-theme-sm text-gray-500">${escapeHtml(item.feedback || 'لا توجد ملاحظات نصية')}</p>
+            </div>
+            <span class="w-fit rounded-full bg-warning-50 px-2.5 py-0.5 text-theme-xs font-medium text-warning-700">${escapeHtml(statusLabel(status))}</span>
+          </div>
+        `;
+        }).join('');
+      }
+
+      function renderBranches(items) {
+        const target = document.getElementById('branch_table_body');
+        if (!target) return;
+        if (!items.length) {
+          target.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-theme-sm text-gray-500">لا توجد بيانات فروع.</td></tr>';
+          return;
+        }
+        const sorted = [...items].sort((a, b) => branchAvgRating(b) - branchAvgRating(a));
+        target.innerHTML = sorted.map((branch) => {
+          const rating = branchAvgRating(branch);
+          const status = branchStatusMeta(rating);
+          return `
+            <tr>
+              <td class="py-3"><p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">${escapeHtml(branch.branch || branch.name || '-')}</p></td>
+              <td class="py-3"><p class="text-theme-sm text-gray-500" dir="ltr">${rating.toFixed(1)} / 5</p></td>
+              <td class="py-3"><p class="text-theme-sm text-gray-500">${safeNumber(branch.rating_count ?? branch.total_evaluations)}</p></td>
+              <td class="py-3"><p class="text-theme-sm text-gray-500">${safeNumber(branch.complaint_count)}</p></td>
+              <td class="py-3"><span class="rounded-full px-2 py-0.5 text-theme-xs font-medium ${status[1]}">${status[0]}</span></td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      function branchAvgRating(branch) {
+        const raw = safeNumber(branch.average_rating);
+        const count = safeNumber(branch.rating_count ?? branch.total_evaluations);
+        return raw > 5 && count > 0 ? raw / count : raw;
+      }
+
+      function branchStatusMeta(rating) {
+        if (rating >= 4.5) return ['ممتاز', 'bg-success-50 text-success-600'];
+        if (rating >= 4) return ['جيد', 'bg-brand-50 text-brand-500'];
+        if (rating >= 3.5) return ['متوسط', 'bg-warning-50 text-warning-700'];
+        return ['يحتاج متابعة', 'bg-error-50 text-error-600'];
+      }
+
+      function branchFollowupCount(branch) {
+        return safeNumber(branch.needs_followup_count ?? branch.needs_followup ?? branch.low_rating_count ?? branch.complaint_count);
+      }
+
+      function renderBranchPerformance(items) {
+        const target = document.getElementById('branch_detail_table_body');
+        if (!target) return;
+        if (!Array.isArray(items) || !items.length) {
+          setText('branch_count_badge', '0');
+          setText('best_branch_badge', 'لا توجد بيانات');
+          setText('weak_branch_badge', 'لا توجد بيانات');
+          setText('branches_average_rating', '0.0 / 5');
+          target.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-theme-sm text-gray-500">لا توجد بيانات فروع.</td></tr>';
+          return;
+        }
+        const sorted = [...items].sort((a, b) => branchAvgRating(b) - branchAvgRating(a));
+        const average = sorted.reduce((sum, branch) => sum + branchAvgRating(branch), 0) / sorted.length;
+        setText('branch_count_badge', String(sorted.length));
+        setText('best_branch_badge', branchName(sorted[0]));
+        setText('weak_branch_badge', branchName(sorted[sorted.length - 1]));
+        setText('branches_average_rating', `${average.toFixed(1)} / 5`);
+        target.innerHTML = sorted.map((branch) => {
+          const rating = branchAvgRating(branch);
+          const status = branchStatusMeta(rating);
+          return `<tr>
+            <td class="px-3 py-3"><p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">${escapeHtml(branchName(branch))}</p></td>
+            <td class="px-3 py-3"><p class="whitespace-nowrap text-theme-sm text-gray-500" dir="ltr">${rating.toFixed(1)} / 5</p></td>
+            <td class="px-3 py-3"><p class="text-theme-sm text-gray-500">${safeNumber(branch.rating_count ?? branch.total_evaluations)}</p></td>
+            <td class="px-3 py-3"><p class="text-theme-sm text-gray-500">${safeNumber(branch.complaint_count)}</p></td>
+            <td class="px-3 py-3"><p class="text-theme-sm text-gray-500">${branchFollowupCount(branch)}</p></td>
+            <td class="px-3 py-3"><span class="whitespace-nowrap rounded-full px-2.5 py-1 text-theme-xs font-medium ${status[1]}">${status[0]}</span></td>
+          </tr>`;
+        }).join('');
+      }
+
+      function branchName(branch) {
+        return branch?.branch || branch?.name || 'لا توجد بيانات';
+      }
+
+      function renderBranchCard(prefix, branch) {
+        setText(`${prefix}_name`, branchName(branch));
+        setText(`${prefix}_rating`, branch ? `${branchAvgRating(branch).toFixed(1)} / 5` : '-');
+        setText(`${prefix}_complaints`, `${safeNumber(branch?.complaint_count)} شكاوى`);
+      }
+
+      function renderExecutiveSnapshot(branches, complaints) {
+        const sorted = Array.isArray(branches) ? [...branches].sort((a, b) => branchAvgRating(b) - branchAvgRating(a)) : [];
+        renderBranchCard('home_best_branch', sorted[0]);
+        renderBranchCard('home_weak_branch', sorted.length ? sorted[sorted.length - 1] : null);
+
+        const activeComplaints = Array.isArray(complaints) ? complaints
+          .filter((item) => !['resolved', 'closed'].includes(normalizeComplaintWorkflowStatus(item.complaint_status)))
+          .sort((a, b) => new Date(b.sent_at || b.created_at || 0) - new Date(a.sent_at || a.created_at || 0))
+          : [];
+        const complaint = activeComplaints[0];
+        const statusEl = document.getElementById('critical_complaint_status');
+        const whatsapp = document.getElementById('critical_complaint_whatsapp');
+        if (!complaint) {
+          setText('critical_complaint_customer', 'لا توجد شكاوى نشطة');
+          setText('critical_complaint_branch', '-');
+          setText('critical_complaint_summary', 'كل شيء تحت السيطرة حالياً.');
+          if (statusEl) {
+            statusEl.textContent = 'لا توجد';
+            statusEl.className = 'rounded-full bg-gray-100 px-2.5 py-1 text-theme-xs font-medium text-gray-600';
+          }
+          whatsapp?.classList.add('hidden');
+          whatsapp?.classList.remove('inline-flex');
+          return;
+        }
+
+        const status = normalizeComplaintWorkflowStatus(complaint.complaint_status);
+        const meta = complaintWorkflowMeta(status);
+        setText('critical_complaint_customer', complaint.name || complaint.phone || 'عميل غير محدد');
+        setText('critical_complaint_branch', complaint.branch || 'فرع غير محدد');
+        setText('critical_complaint_summary', complaint.feedback || 'لا توجد ملاحظات مكتوبة.');
+        if (statusEl) {
+          statusEl.textContent = meta.label;
+          statusEl.className = `rounded-full px-2.5 py-1 text-theme-xs font-medium ${meta.className}`;
+        }
+        const phone = String(complaint.phone || '').replace(/\D/g, '');
+        if (whatsapp && phone) {
+          whatsapp.href = `https://wa.me/${phone}`;
+          whatsapp.classList.remove('hidden');
+          whatsapp.classList.add('inline-flex');
+        } else {
+          whatsapp?.classList.add('hidden');
+          whatsapp?.classList.remove('inline-flex');
+        }
+      }
+
+      function renderUrgentComplaints(items) {
+        const target = document.getElementById('urgent_complaints');
+        if (!target) return;
+        const complaints = Array.isArray(items) ? items : [];
+        if (!complaints.length) {
+          target.className = 'rounded-xl border border-gray-100 px-4 py-8 text-center text-theme-sm text-gray-500';
+          target.innerHTML = 'لا توجد شكاوى عاجلة حالياً';
+          return;
+        }
+        target.className = 'divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-100 bg-white';
+        target.innerHTML = complaints.map((ev) => {
+          const status = normalizeComplaintWorkflowStatus(ev.complaint_status);
+          const meta = complaintWorkflowMeta(status);
+          const phone = String(ev.phone || '').replace(/\D/g, '');
+          const whatsapp = phone ? `<a href="https://wa.me/${phone}" target="_blank" rel="noopener noreferrer" class="inline-flex h-8 items-center rounded-lg bg-success-500 px-3 text-theme-xs font-medium text-white">واتساب</a>` : '';
+          return `<div class="grid gap-3 px-4 py-3 md:grid-cols-[1fr_1.4fr_auto_auto] md:items-center"><div><p class="text-theme-sm font-semibold text-gray-800">${escapeHtml(ev.name || ev.phone || 'عميل غير محدد')}</p><p class="mt-1 text-theme-xs text-gray-500">${escapeHtml(ev.phone || '')}</p></div><div><p class="line-clamp-2 text-theme-xs text-gray-500">${escapeHtml(ev.feedback || 'لا توجد ملاحظات مكتوبة')}</p><p class="mt-1 text-theme-xs text-gray-400">${escapeHtml(ev.branch || '')}</p></div><span class="w-fit rounded-full px-2.5 py-1 text-theme-xs font-medium ${meta.className}">${meta.label}</span><div class="flex gap-2">${whatsapp}<select onchange="updateComplaintStatus(${ev.id}, this.value)" class="h-8 rounded-lg border border-gray-200 bg-white px-2 text-theme-xs">${complaintWorkflowOptions(status)}</select></div></div>`;
+        }).join('');
+      }
+
+      function renderLatestActivity(items) {
+        const target = document.getElementById('latest_activity');
+        if (!target) return;
+        const recent = Array.isArray(items) ? items.slice(0, 5) : [];
+        if (!recent.length) {
+          target.className = 'rounded-xl border border-gray-100 px-4 py-6 text-center';
+          target.innerHTML = '<p class="text-theme-sm text-gray-500">لا توجد بيانات حديثة.</p>';
+          return;
+        }
+        target.className = 'rounded-xl border border-gray-100 bg-white p-2';
+        target.innerHTML = recent.map((ev) => {
+          const isComplaint = ev.status === 'complaint' || ev.answer === '2';
+          const isPositive = ev.status === 'replied' && ev.answer === '1';
+          const statusClass = isPositive ? 'bg-brand-50 text-brand-500' : isComplaint ? 'bg-error-50 text-error-600' : 'bg-gray-100 text-gray-600';
+          const feedback = ev.feedback ? `<p class="mt-1 line-clamp-1 text-theme-xs text-gray-500">${escapeHtml(ev.feedback)}</p>` : '<p class="mt-1 text-theme-xs text-gray-400">لا توجد ملاحظات نصية</p>';
+          const branch = ev.branch ? `<p class="mt-1 text-theme-xs font-medium text-gray-500">فرع: ${escapeHtml(ev.branch)}</p>` : '';
+          const time = formatActivityTime(ev.sent_at || ev.created_at);
+          return `<div class="grid gap-3 rounded-lg px-3 py-3 text-right md:grid-cols-[1fr_auto] md:items-center">
+            <div class="min-w-0">
+              <p class="text-theme-sm font-medium text-gray-800">${escapeHtml(activityTitle(ev))}</p>
+              ${branch}
+              ${feedback}
+            </div>
+            <div class="flex flex-wrap items-center gap-2 md:justify-end">
+              <span class="rounded-full bg-gray-50 px-2.5 py-1 text-theme-xs font-medium text-gray-600">${escapeHtml(activitySourceLabel(ev.source))}</span>
+              <span class="rounded-full px-2.5 py-1 text-theme-xs font-medium ${statusClass}">${escapeHtml(activityStatusLabel(ev))}</span>
+              ${time ? `<span class="text-theme-xs text-gray-400">${escapeHtml(time)}</span>` : ''}
+            </div>
+          </div>`;
+        }).join('');
+      }
+
+      function showDailyChartPlaceholder(msg, showSpinner) {
+        const placeholder = document.getElementById('daily_chart_placeholder');
+        const spinner = document.getElementById('daily_chart_spinner');
+        const msgEl = document.getElementById('daily_chart_msg');
+        if (!placeholder) return;
+        if (msgEl) msgEl.textContent = msg;
+        if (spinner) spinner.style.display = showSpinner ? '' : 'none';
+        placeholder.style.display = 'flex';
+      }
+
+      function hideDailyChartPlaceholder() {
+        const placeholder = document.getElementById('daily_chart_placeholder');
+        if (placeholder) placeholder.style.display = 'none';
+      }
+
+      function renderCharts(summary) {
+        if (typeof Chart === 'undefined') return;
+        const dailySource = summary.daily_counts_last_30_days || summary.daily_counts_last_7_days || summary.daily_trend;
+        const hasDaily = Array.isArray(dailySource) && dailySource.length > 0;
+        const monthly = Array.isArray(summary.monthly_counts) && summary.monthly_counts.length ? summary.monthly_counts : [];
+        const breakdown = Array.isArray(summary.rating_breakdown) && summary.rating_breakdown.length ? summary.rating_breakdown : [];
+        const satisfaction = safeNumber(summary.satisfaction_rate);
+
+        // ── daily_chart: only render with real data ──
+        if (hasDaily) {
+          dailyChartHasRealData = true;
+          hideDailyChartPlaceholder();
+          destroyChart('daily_chart');
+          charts.daily_chart = new Chart(document.getElementById('daily_chart'), {
+            type: 'line',
+            data: {
+              labels: dailySource.map((item) => String(item.date).slice(5, 10)),
+              datasets: [
+                { label: 'تقييمات ممتازة', data: dailySource.map((item) => safeNumber(item.positive_count ?? item.average_rating)), borderColor: '#465fff', backgroundColor: 'rgba(70,95,255,.12)', tension: .35, fill: true },
+                { label: 'الشكاوى', data: dailySource.map((item) => safeNumber(item.complaint_count ?? item.complaints)), borderColor: '#f04438', tension: .35 },
+              ],
+            },
+            options: { responsive: true, maintainAspectRatio: false },
+          });
+        } else if (!dailyChartHasRealData) {
+          // No real data yet — keep/show placeholder. Do NOT draw fallback.
+          showDailyChartPlaceholder(
+            summary._chartDataMissing ? 'لا توجد بيانات كافية لعرض الرسم' : 'جاري تحميل بيانات الرسم…',
+            !summary._chartDataMissing
+          );
+        }
+
+        // ── monthly_chart ──
+        destroyChart('monthly_chart');
+        if (monthly.length) {
+          charts.monthly_chart = new Chart(document.getElementById('monthly_chart'), {
+            type: 'bar',
+            data: { labels: monthly.map((item) => item.month), datasets: [{ label: 'التقييمات', data: monthly.map((item) => safeNumber(item.total ?? item.rating_count)), backgroundColor: '#465fff' }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+          });
+        }
+
+        // ── rating_breakdown_chart ──
+        destroyChart('rating_breakdown_chart');
+        if (breakdown.length) {
+          charts.rating_breakdown_chart = new Chart(document.getElementById('rating_breakdown_chart'), {
+            type: 'bar',
+            data: { labels: breakdown.map((item) => item.rating === 1 ? '1 نجمة' : `${item.rating} نجوم`), datasets: [{ data: breakdown.map((item) => safeNumber(item.count)), backgroundColor: '#465fff' }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+          });
+        }
+
+        // ── satisfaction_chart ──
+        destroyChart('satisfaction_chart');
+        charts.satisfaction_chart = new Chart(document.getElementById('satisfaction_chart'), {
+          type: 'doughnut',
+          data: { labels: ['معدل الرضا', 'غير مصنف'], datasets: [{ data: [satisfaction, Math.max(0, 100 - satisfaction)], backgroundColor: ['#12b76a', '#eaecf0'], borderWidth: 0 }] },
+          options: { responsive: true, maintainAspectRatio: false },
+        });
+      }
+
+      async function loadDashboard() {
+        dailyChartHasRealData = false;
+        showDailyChartPlaceholder('جاري تحميل بيانات الرسم…', true);
+        const apiKey = localStorage.getItem('repu_key');
+        if (!apiKey) {
+          document.getElementById('auth_notice')?.classList.remove('hidden');
+          return;
+        }
+        try {
+          const clientRes = await fetch('/api/client-info', { headers: { 'x-api-key': apiKey } });
+          if (clientRes.ok) {
+            const client = await clientRes.json();
+            currentClientInfo = client;
+            setText('header_client_name', client.name || 'RepuSystem');
+            setText('header_client_name_dropdown', client.name || 'RepuSystem');
+            setText('sidebar_client_name', client.name || 'RepuSystem');
+            setClientAvatar(client.name);
+            renderSettings(client);
+            updateReviewLink(client.nfc_id || client.nfcId);
+          }
+
+          const summaryRes = await fetch('/api/dashboard-summary', { headers: { 'x-api-key': apiKey } });
+          const summary = await summaryRes.json().catch(() => ({}));
+          if (!summaryRes.ok) throw new Error(summary.error || `HTTP ${summaryRes.status}`);
+          lastDashboardSummary = summary;
+          renderSummary(summary);
+          await loadComplaints(summary.urgent_complaints || []);
+          await loadLatestActivity(apiKey);
+        } catch (error) {
+          console.error('تعذر تحميل لوحة RepuSystem:', error);
+          document.getElementById('auth_notice')?.classList.remove('hidden');
+          if (!dailyChartHasRealData) {
+            showDailyChartPlaceholder('لا توجد بيانات كافية لعرض الرسم', false);
+          }
+        }
+      }
+
+      async function loadLatestActivity(apiKey) {
+        try {
+          const res = await fetch(`/api/client-recent?apiKey=${encodeURIComponent(apiKey)}`);
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+          renderLatestActivity(data.items || []);
+        } catch (error) {
+          console.warn('Latest activity endpoint unavailable, using dashboard recent_activity:', error);
+        }
+      }
+
+      async function loadComplaints(fallbackItems = []) {
+        const apiKey = localStorage.getItem('repu_key');
+        try {
+          const reportsRes = await fetch('/api/my-reports', { headers: { 'x-api-key': apiKey } });
+          const reports = await reportsRes.json().catch(() => []);
+          if (!reportsRes.ok) throw new Error(`HTTP ${reportsRes.status}`);
+          renderComplaints(Array.isArray(reports) ? reports : []);
+        } catch (error) {
+          console.warn('Reports endpoint unavailable, using dashboard complaints:', error);
+          renderComplaints(fallbackItems);
+        }
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;',
+        }[char]));
+      }
+
+      function complaintActionLabel(action) {
+        if (action === 'discount') return 'كود خصم فقط';
+        if (action === 'contact_discount') return 'تواصل + كود خصم';
+        return 'تواصل فقط';
+      }
+
+      function renderSettings(data) {
+        setText('settings_name', data.name || '-');
+        setText('settings_nfc_id', data.nfc_id || data.nfcId || '-');
+        setText('settings_google_link', data.google_link || '-');
+        setText('settings_complaint_action', complaintActionLabel(data.complaint_action));
+        setText('settings_discount_code', data.discount_code || '-');
+        setText('settings_complaint_message', data.complaint_message || '-');
+        setText('settings_whatsapp_number', data.whatsapp_number || data.admin_phone || '-');
+      }
+
+      function showClientView(view, event) {
+        if (event) event.preventDefault();
+        const viewId = view.endsWith('_view') ? view : (view === 'settings' ? 'settings_view' : `${view}_view`);
+        document.querySelectorAll('.client-view').forEach((section) => section.classList.add('hidden'));
+        const target = document.getElementById(viewId);
+        if (target) target.classList.remove('hidden');
+        if (viewId === 'analytics_view' && lastDashboardSummary) {
+          setTimeout(() => renderCharts(lastDashboardSummary), 0);
+        }
+        document.querySelectorAll('.client-nav').forEach((link) => {
+          const active = link.dataset.navView === view || link.dataset.navView === viewId;
+          link.classList.toggle('menu-item-active', active);
+          link.classList.toggle('menu-item-inactive', !active);
+        });
+        history.replaceState(null, '', `#${viewId === 'settings_view' ? 'settings_section' : viewId}`);
+        applySearch();
+        requestAnimationFrame(() => {
+          document.querySelector('#main_app > .relative.flex.flex-1')?.scrollTo({ top: 0, left: 0 });
+        });
+      }
+
+      function searchableItems() {
+        const active = Array.from(document.querySelectorAll('.client-view')).find((view) => !view.classList.contains('hidden'));
+        if (!active) return [];
+        return Array.from(active.querySelectorAll('tbody tr, #complaints_list > div, #urgent_complaints > div, .rounded-2xl, .rounded-xl')).filter((item) => !item.closest('aside, header'));
+      }
+
+      function applySearch() {
+        const input = document.getElementById('dashboard_search');
+        if (!input) return;
+        const query = input.value.trim().toLowerCase();
+        searchableItems().forEach((item) => {
+          item.classList.toggle('hidden', !!query && !item.textContent.toLowerCase().includes(query));
+        });
+      }
+
+      async function updateComplaintStatus(id, complaintStatus) {
+        const apiKey = localStorage.getItem('repu_key');
+        if (!apiKey) return;
+        try {
+          const res = await fetch(`/api/client/complaints/${id}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+            body: JSON.stringify({ complaint_status: complaintStatus }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || 'تعذر تحديث حالة الشكوى');
+          showToast('تم تحديث حالة الشكوى', 'success');
+          await loadDashboard();
+        } catch (error) {
+          showToast(error.message || 'تعذر تحديث حالة الشكوى', 'error');
+          await loadDashboard();
+        }
+      }
+
+      async function send() {
+        const btn = document.getElementById('send_btn');
+        const name = document.getElementById('cust_name').value.trim();
+        const phone = document.getElementById('cust_phone').value.trim();
+        const key = localStorage.getItem('repu_key');
+        if (!name || !phone) { showToast('يرجى إدخال اسم العميل ورقم الجوال', 'error'); return; }
+        if (!/^05\d{8}$/.test(phone)) { showToast('يرجى إدخال رقم جوال صحيح (05xxxxxxxx)', 'error'); return; }
+        btn.disabled = true;
+        btn.textContent = 'جاري المعالجة...';
+        try {
+          const res = await fetch('/api/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': key },
+            body: JSON.stringify({
+              name,
+              phone,
+              branch: document.getElementById('branch').value,
+              delayMinutes: document.getElementById('delay_time').value,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || 'فشل الإرسال');
+          showToast('تمت عملية الإرسال بنجاح', 'success');
+          document.getElementById('cust_name').value = '';
+          document.getElementById('cust_phone').value = '';
+          await loadDashboard();
+        } catch (error) {
+          showToast(error.message || 'حدث خطأ أثناء الاتصال بالخادم', 'error');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'إرسال عبر واتساب';
+        }
+      }
+
+      async function login() {
+        const key = document.getElementById('key_input')?.value || localStorage.getItem('repu_key');
+        if (!key) {
+          document.getElementById('login_screen').style.display = 'flex';
+          return;
+        }
+        try {
+          const res = await fetch('/api/client-info', { headers: { 'x-api-key': key } });
+          if (!res.ok) {
+            localStorage.removeItem('repu_key');
+            document.getElementById('login_screen').style.display = 'flex';
+            return;
+          }
+          localStorage.setItem('repu_key', key);
+          document.getElementById('login_screen').style.display = 'none';
+          document.getElementById('main_app').classList.remove('hidden');
+          const data = await res.json();
+          currentClientInfo = data;
+          renderSettings(data);
+          if (data.nfc_id || data.nfcId) updateReviewLink(data.nfc_id || data.nfcId);
+          setText('header_client_name', data.name || 'RepuSystem');
+          setText('header_client_name_dropdown', data.name || 'RepuSystem');
+          setText('sidebar_client_name', data.name || 'RepuSystem');
+          setClientAvatar(data.name);
+          const hashView = { '#send_view': 'send', '#complaints_view': 'complaints', '#branches_view': 'branches_view', '#analytics_view': 'analytics', '#settings_view': 'settings', '#settings_section': 'settings' }[window.location.hash] || 'home';
+          showClientView(hashView);
+          await loadDashboard();
+        } catch (error) {
+          console.error('تعذر تسجيل الدخول:', error);
+          showToast('خطأ في الاتصال بالخادم', 'error');
+        }
+      }
+
+      function logout() {
+        localStorage.removeItem('repu_key');
+        location.reload();
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const searchInput = document.getElementById('dashboard_search');
+        searchInput?.addEventListener('input', applySearch);
+        searchInput?.addEventListener('keydown', (event) => {
+          if (event.key !== 'Escape') return;
+          searchInput.value = '';
+          applySearch();
+        });
+        login();
+      });
+    </script>
+  <script defer src="/tailadmin/bundle.js"></script></body>
+</html>
+

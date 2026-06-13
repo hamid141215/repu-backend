@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* ============================================================================
+ * Design tokens — copied verbatim from RepuSystem_UI.html (user-approved).
+ * Identical to D:\repu-web\src\app\globals.css.
+ * ========================================================================= */
+@theme {
+  --color-primary:        #0052FF;
+  --color-primary-hover:  #0040C9;
+  --color-primary-light:  #EFF4FF;
+  --color-primary-50:     #F5F8FF;
+
+  --color-bg:             #FAFBFC;
+  --color-surface:        #FFFFFF;
+  --color-border:         #E6E8EB;
+  --color-border-strong:  #D4D7DB;
+
+  --color-text-1:         #0A0E1A;
+  --color-text-2:         #4A5163;
+  --color-text-3:         #8B92A3;
+  --color-text-4:         #B0B6C3;
+
+  --color-good:           #10B981;
+  --color-good-light:     #ECFDF5;
+  --color-warn:           #F59E0B;
+  --color-warn-light:     #FFFBEB;
+  --color-bad:            #EF4444;
+  --color-bad-light:      #FEF2F2;
+  --color-purple:         #8B5CF6;
+  --color-purple-light:   #F5F3FF;
+
+  --radius-sm:  6px;
+  --radius-md:  7px;
+  --radius-lg:  8px;
+  --radius-xl:  10px;
+  --radius-2xl: 12px;
+
+  /* Fonts loaded via <link> in index.html */
+  --font-sans: 'IBM Plex Sans Arabic', 'Inter', system-ui, sans-serif;
+  --font-num:  'Inter', sans-serif;
+}
+
+html, body {
+  background: var(--color-bg);
+  color: var(--color-text-1);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  margin: 0; padding: 0;
+}
+#root { min-height: 100vh; }
+* { box-sizing: border-box; }
+
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.pulse { position: relative; width: 8px; height: 8px; background: var(--color-good); border-radius: 50%; }
+.pulse::before {
+  content: ''; position: absolute; inset: -3px;
+  border: 2px solid var(--color-good); border-radius: 50%;
+  opacity: 0.5; animation: pulse 1.8s ease-out infinite;
+}
+@keyframes pulse {
+  0%   { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.prio-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
+.kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 10.5px;
+  font-family: var(--font-num);
+  color: var(--color-text-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  line-height: 1.3;
+}
