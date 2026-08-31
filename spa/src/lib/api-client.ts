@@ -1,12 +1,12 @@
 /**
- * Browser-side fetch — hits the backend at same-origin /api/* with x-api-key
- * from localStorage. No proxy, no cookie, no CORS (same origin).
- *
- * On 401 we clear the key and reload to /login. Reload — not router push —
- * to flush all TanStack Query state for the now-stale tenant.
+ * Browser-side fetch — hits the backend at same-origin /api/*.
+ * Picks credentials in this order:
+ *   1. session token (Phase E user login) → Authorization: Bearer
+ *   2. api_key (legacy / owner master)    → x-api-key
+ * On 401/403 we clear creds and redirect to login.
  */
 
-import { clearApiKey, getApiKey } from './auth';
+import { clearApiKey, clearSession, getApiKey, getSessionToken } from './auth';
 
 export class ApiClientError extends Error {
   status: number;
@@ -23,39 +23,46 @@ async function readJsonSafe(res: Response): Promise<unknown> {
   catch { return null; }
 }
 
+function authHeaders(): Record<string, string> {
+  const token = getSessionToken();
+  if (token) return { 'Authorization': `Bearer ${token}` };
+  const key = getApiKey();
+  if (key) return { 'x-api-key': key };
+  return {};
+}
+
 export async function apiClient<T = unknown>(
   path: string,
   init?: RequestInit
 ): Promise<T> {
-  const key = getApiKey();
-  if (!key) {
-    // No key in storage — kick to login if we're in the browser.
+  const auth = authHeaders();
+  if (!auth['Authorization'] && !auth['x-api-key']) {
     if (typeof window !== 'undefined' && window.location.hash !== '#/login') {
       window.location.hash = '#/login';
     }
-    throw new ApiClientError(401, null, 'No api key');
+    throw new ApiClientError(401, null, 'No credentials');
   }
 
-  // Normalise: 'api/x' / '/api/x' both work; we always prefix /api/ once.
   const cleanPath = path.replace(/^\/?api\//, '').replace(/^\//, '');
   const url = `/api/${cleanPath}`;
 
   const res = await fetch(url, {
     ...init,
     headers: {
-      'x-api-key': key,
       'Content-Type': 'application/json',
+      ...auth,
       ...(init?.headers ?? {})
     }
   });
 
-  if (res.status === 401 || res.status === 403) {
+  if (res.status === 401) {
+    // Session expired or invalid creds — clear and bounce.
     clearApiKey();
-    if (typeof window !== 'undefined') {
-      window.location.hash = '#/login';
-    }
-    throw new ApiClientError(res.status, null, 'Unauthorized');
+    clearSession();
+    if (typeof window !== 'undefined') window.location.hash = '#/login';
+    throw new ApiClientError(401, null, 'Unauthorized');
   }
+  // 403 = authenticated but lacks permission. Don't clear creds.
 
   const body = await readJsonSafe(res);
   if (!res.ok) {
@@ -78,4 +85,45 @@ export async function validateApiKey(key: string): Promise<{ ok: true } | { ok: 
       ? 'مفتاح الدخول غير صحيح'
       : `تعذر التحقق من المفتاح (HTTP ${res.status})`
   };
+}
+
+/**
+ * Email/password login.
+ * On success, returns { token, user }. Caller stores them via setSession().
+ */
+export interface LoginResult {
+  token: string;
+  expires_at: string;
+  user: {
+    id: number; email: string; name: string;
+    role: 'owner' | 'manager' | 'viewer';
+    client_id: number; client_name: string;
+  };
+}
+export async function loginWithPassword(email: string, password: string): Promise<LoginResult> {
+  const res = await fetch('/api/auth/user-login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  const body = await readJsonSafe(res);
+  if (!res.ok) {
+    const msg = body && typeof body === 'object' && 'error' in body
+      ? String((body as { error: unknown }).error)
+      : 'تعذر تسجيل الدخول';
+    throw new ApiClientError(res.status, body, msg);
+  }
+  return body as LoginResult;
+}
+
+/** Server-side logout — invalidates the current session token in the DB. */
+export async function serverLogout(): Promise<void> {
+  const token = getSessionToken();
+  if (!token) return;
+  try {
+    await fetch('/api/auth/user-logout', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+  } catch { /* ignore */ }
 }

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { IconSearch, IconFilter, IconDownload, IconFlag } from '@tabler/icons-react';
+import { IconSearch, IconFilter, IconDownload, IconFlag, IconX } from '@tabler/icons-react';
 import { ComplaintRow } from './complaint-row';
 import { ComplaintDetailDrawer } from './complaint-detail-drawer';
 import { EmptyState } from '@/components/empty-state';
@@ -15,7 +15,7 @@ const TABS: Array<{ key: StatusTab; label: string }> = [
   { key: 'all',         label: 'الكل' },
   { key: 'new',         label: 'جديدة' },
   { key: 'in_progress', label: 'قيد المعالجة' },
-  { key: 'resolved',    label: 'مُحلّت' }
+  { key: 'resolved',    label: 'حُلّت' }
 ];
 
 interface Props {
@@ -35,13 +35,21 @@ export function ComplaintsView({ initialComplaints, summary }: Props) {
   const [searchInput, setSearchInput] = useState(q);
   const [detailId, setDetailId] = useState<number | null>(null);
 
+  // Map UI tab → DB statuses (in_progress tab includes 'contacted'; resolved includes 'closed')
+  const statusFilter = useMemo(() => {
+    if (status === 'all')         return undefined;
+    if (status === 'in_progress') return 'in_progress,contacted';
+    if (status === 'resolved')    return 'resolved,closed';
+    return status;
+  }, [status]);
+
   const filters: ComplaintsQueryParams = useMemo(() => ({
     page, pageSize: 20,
-    status: status === 'all' ? undefined : status,
+    status: statusFilter,
     priority: priority || undefined,
     branch: branch || undefined,
     q: q || undefined
-  }), [page, status, priority, branch, q]);
+  }), [page, statusFilter, priority, branch, q]);
 
   const isInitial = status === 'all' && !priority && !branch && !q && page === 1;
   const query = useComplaints(filters, isInitial ? initialComplaints : undefined);
@@ -53,6 +61,9 @@ export function ComplaintsView({ initialComplaints, summary }: Props) {
     if (next.branch !== undefined)   next.branch === ''    ? params.delete('branch')   : params.set('branch', next.branch);
     if (next.q !== undefined)        next.q === ''         ? params.delete('q')        : params.set('q', next.q);
     if (next.page !== undefined)     (next.page <= 1)      ? params.delete('page')     : params.set('page', String(next.page));
+    // Changing the status tab clears the priority chip — it's confusing when
+    // "عاجلة" stays sticky and silently filters every tab to empty.
+    if (next.status !== undefined) params.delete('priority');
     if (next.status !== undefined || next.priority !== undefined || next.branch !== undefined || next.q !== undefined) {
       params.delete('page');
     }
@@ -176,7 +187,19 @@ export function ComplaintsView({ initialComplaints, summary }: Props) {
           className="w-full rounded-[7px] py-2 ps-3 pe-9 text-[13px] outline-none focus:border-[var(--color-primary)]"
           style={{ background: '#F4F5F7', border: '1px solid transparent' }}
         />
-        <IconSearch size={15} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-3)' }} />
+        {searchInput ? (
+          <button
+            type="button"
+            aria-label="مسح البحث"
+            onClick={() => { setSearchInput(''); updateUrl({ q: '' }); }}
+            className="absolute end-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 hover:bg-[var(--color-border)]"
+            style={{ color: 'var(--color-text-3)' }}
+          >
+            <IconX size={14} />
+          </button>
+        ) : (
+          <IconSearch size={15} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-3)' }} />
+        )}
       </form>
 
       {/* Table */}
@@ -186,7 +209,38 @@ export function ComplaintsView({ initialComplaints, summary }: Props) {
         ) : isLoading ? (
           <TableSkeleton />
         ) : items.length === 0 ? (
-          <div className="p-8"><EmptyState message={q ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد شكاوى ضمن هذه التصفية'} /></div>
+          <div className="p-8 flex flex-col items-center gap-3">
+            <EmptyState
+              message={
+                q
+                  ? `لا توجد نتائج مطابقة لـ "${q}"`
+                  : priority || branch
+                    ? 'لا توجد شكاوى ضمن هذه التصفية'
+                    : status === 'resolved'
+                      ? 'لا توجد شكاوى محلولة بعد'
+                      : status === 'new'
+                        ? 'لا توجد شكاوى جديدة — جيد!'
+                        : status === 'in_progress'
+                          ? 'لا توجد شكاوى قيد المعالجة'
+                          : 'لم يتم تسجيل أي شكاوى بعد'
+              }
+            />
+            {(q || priority || branch) ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('');
+                  updateUrl({ q: '', priority: '', branch: '' });
+                }}
+                className="rounded-[7px] px-3 py-1.5 text-[12.5px] font-medium border"
+                style={{
+                  borderColor: 'var(--color-primary)',
+                  color: 'var(--color-primary)',
+                  background: 'var(--color-primary-light)'
+                }}
+              >مسح كل الفلاتر</button>
+            ) : null}
+          </div>
         ) : (
           <table className="w-full text-start" style={{ borderCollapse: 'collapse' }}>
             <thead>

@@ -70,6 +70,26 @@ html, body {
 
 .prio-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 
+/* NFC card visual — copied from RepuSystem_UI.html (nfc-card class) */
+.nfc-card-dark {
+  background: linear-gradient(135deg, #0A0E1A 0%, #1A2540 50%, #0A0E1A 100%);
+  border-radius: 14px;
+  padding: 20px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+.nfc-card-dark::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  inset-inline-end: -30%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(0, 82, 255, 0.3) 0%, transparent 70%);
+  pointer-events: none;
+}
+
 .kbd {
   display: inline-block;
   padding: 1px 5px;

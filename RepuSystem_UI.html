@@ -1,0 +1,2074 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RepuSystem — لوحة التحكم</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.0/dist/tabler-icons.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #0052FF;
+    --primary-hover: #0040C9;
+    --primary-light: #EFF4FF;
+    --primary-50: #F5F8FF;
+    --bg: #FAFBFC;
+    --surface: #FFFFFF;
+    --border: #E6E8EB;
+    --border-strong: #D4D7DB;
+    --text-1: #0A0E1A;
+    --text-2: #4A5163;
+    --text-3: #8B92A3;
+    --text-4: #B0B6C3;
+    --good: #10B981;
+    --good-light: #ECFDF5;
+    --warn: #F59E0B;
+    --warn-light: #FFFBEB;
+    --bad: #EF4444;
+    --bad-light: #FEF2F2;
+    --purple: #8B5CF6;
+    --purple-light: #F5F3FF;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    font-family: 'IBM Plex Sans Arabic', 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text-1);
+    margin: 0; padding: 0;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+  .num { font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
+  /* Sidebar */
+  .sidebar {
+    width: 248px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    height: 100vh;
+    position: fixed;
+    right: 0; top: 0;
+    display: flex; flex-direction: column;
+    padding: 16px 12px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    color: var(--text-2);
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s ease;
+    text-decoration: none;
+    margin-bottom: 1px;
+  }
+  .nav-item:hover { background: #F4F5F7; }
+  .nav-item.active { background: var(--primary-light); color: var(--primary); }
+  .nav-item i { font-size: 17px; opacity: 0.9; }
+  .nav-section-label {
+    font-size: 11px; color: var(--text-4); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 14px 10px 6px;
+  }
+  .main {
+    margin-right: 248px;
+    min-height: 100vh;
+  }
+  .topbar {
+    height: 56px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .content {
+    padding: 28px;
+    max-width: 1400px;
+  }
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  /* Badges */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11.5px; font-weight: 500;
+    line-height: 1.4;
+  }
+  .badge-good { background: var(--good-light); color: #047857; }
+  .badge-warn { background: var(--warn-light); color: #B45309; }
+  .badge-bad  { background: var(--bad-light); color: #B91C1C; }
+  .badge-info { background: var(--primary-light); color: var(--primary); }
+  .badge-neutral { background: #F1F3F5; color: var(--text-2); }
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px;
+    border-radius: 7px;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer; border: 1px solid transparent;
+    transition: all 0.12s ease;
+    font-family: inherit;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-secondary { background: var(--surface); color: var(--text-1); border-color: var(--border-strong); }
+  .btn-secondary:hover { background: #F8F9FA; }
+  .btn-ghost { background: transparent; color: var(--text-2); }
+  .btn-ghost:hover { background: #F4F5F7; color: var(--text-1); }
+  /* Inputs */
+  .input {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    width: 100%;
+    transition: border-color 0.12s;
+  }
+  .input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,82,255,0.1); }
+  /* Tables */
+  table.data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    text-align: right;
+    font-size: 11.5px; font-weight: 500;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: #FAFBFC;
+  }
+  .data-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+    color: var(--text-1);
+    vertical-align: middle;
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: #FAFBFC; }
+  /* Avatar */
+  .avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+    flex-shrink: 0;
+  }
+  /* Priority dots */
+  .prio-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; margin-left: 6px;
+  }
+  /* Page transitions */
+  .page { display: none; }
+  .page.active { display: block; }
+  /* Page header */
+  .page-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .page-title { font-size: 22px; font-weight: 600; color: var(--text-1); margin: 0; letter-spacing: -0.3px; }
+  .page-subtitle { font-size: 13.5px; color: var(--text-2); margin-top: 4px; }
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tab {
+    padding: 8px 14px;
+    font-size: 13px; font-weight: 500;
+    color: var(--text-2); cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.12s;
+  }
+  .tab:hover { color: var(--text-1); }
+  .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  /* Logo */
+  .logo {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 8px 12px;
+    margin-bottom: 4px;
+  }
+  .logo-mark {
+    width: 26px; height: 26px;
+    background: var(--primary);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 14px;
+    font-family: 'Inter', sans-serif;
+  }
+  .logo-text { font-size: 14.5px; font-weight: 600; color: var(--text-1); letter-spacing: -0.2px; }
+  /* Stat block */
+  .stat-label { font-size: 12.5px; color: var(--text-2); font-weight: 500; }
+  .stat-value { font-size: 28px; font-weight: 600; color: var(--text-1); margin-top: 6px; letter-spacing: -0.5px; }
+  .stat-change { font-size: 12px; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+  .stat-change.up { color: var(--good); }
+  .stat-change.down { color: var(--bad); }
+  .stat-change.neutral { color: var(--text-3); }
+  /* Filter chips */
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    font-size: 12.5px; color: var(--text-2);
+    background: var(--surface);
+    cursor: pointer;
+  }
+  .chip:hover { border-color: var(--text-3); }
+  .chip.active { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+  /* Status icons */
+  .icon-wrap {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  /* Phone mockup */
+  .phone-frame {
+    width: 280px;
+    height: 560px;
+    background: #1A1F2E;
+    border-radius: 36px;
+    padding: 8px;
+    box-shadow: 0 25px 60px -15px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.05);
+    position: relative;
+  }
+  .phone-screen {
+    width: 100%; height: 100%;
+    background: white;
+    border-radius: 28px;
+    overflow: hidden;
+    position: relative;
+  }
+  .phone-notch {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 26px;
+    background: #1A1F2E;
+    border-radius: 14px;
+    z-index: 10;
+  }
+  /* Star rating */
+  .star { font-size: 36px; cursor: pointer; color: #E4E7EB; transition: color 0.12s; }
+  .star.filled { color: #F59E0B; }
+  /* Tooltip indicator dot */
+  .pulse {
+    position: relative;
+    width: 8px; height: 8px;
+    background: var(--good); border-radius: 50%;
+  }
+  .pulse::before {
+    content: ''; position: absolute; inset: -3px;
+    border: 2px solid var(--good); border-radius: 50%;
+    opacity: 0.5; animation: pulse 1.8s ease-out infinite;
+  }
+  @keyframes pulse { 0% { transform: scale(0.8); opacity: 0.6; } 100% { transform: scale(1.6); opacity: 0; } }
+  /* Sparkline placeholder */
+  .spark { height: 36px; width: 100%; }
+  /* Search */
+  .search-input {
+    background: #F4F5F7; border: 1px solid transparent;
+    border-radius: 7px;
+    padding: 6px 32px 6px 12px;
+    font-size: 13px; width: 280px;
+    font-family: inherit;
+  }
+  .search-input:focus { outline: none; background: white; border-color: var(--primary); }
+  .search-wrap { position: relative; }
+  .search-wrap i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 15px; }
+  .kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 10.5px;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-3);
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    line-height: 1.3;
+  }
+  /* Branch card */
+  .branch-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    transition: all 0.15s;
+    cursor: pointer;
+  }
+  .branch-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+  /* Toggle */
+  .toggle {
+    position: relative; width: 32px; height: 18px;
+    background: #D4D7DB; border-radius: 999px;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .toggle::after {
+    content: ''; position: absolute; top: 2px; right: 2px;
+    width: 14px; height: 14px; background: white;
+    border-radius: 50%; transition: transform 0.15s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  }
+  .toggle.on { background: var(--primary); }
+  .toggle.on::after { transform: translateX(-14px); }
+  /* Empty/quiet card */
+  .quiet-bg {
+    background: linear-gradient(180deg, #FAFBFC 0%, var(--surface) 100%);
+  }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #D4D7DB; border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  /* Section header */
+  .section-h {
+    font-size: 15px; font-weight: 600; color: var(--text-1);
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  /* NFC card visual */
+  .nfc-card {
+    background: linear-gradient(135deg, #0A0E1A 0%, #1A2540 50%, #0A0E1A 100%);
+    border-radius: 14px;
+    padding: 20px;
+    color: white;
+    position: relative;
+    overflow: hidden;
+  }
+  .nfc-card::before {
+    content: ''; position: absolute; top: -50%; right: -30%;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(0,82,255,0.3) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  /* Comment thread */
+  .comment {
+    display: flex; gap: 10px;
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+  }
+  .comment:first-child { border-top: none; }
+</style>
+</head>
+<body>
+
+<!-- =================== SIDEBAR =================== -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">R</div>
+    <div class="logo-text">RepuSystem</div>
+  </div>
+
+  <!-- Workspace switcher -->
+  <div style="padding: 6px 10px; margin-bottom: 8px;">
+    <button style="width: 100%; display:flex; align-items:center; justify-content:space-between; padding: 7px 10px; background: #F4F5F7; border: none; border-radius: 7px; cursor: pointer; font-family: inherit;">
+      <span style="display:flex; align-items:center; gap:8px;">
+        <span style="width: 20px; height: 20px; background: #0A0E1A; color: white; border-radius: 4px; display:flex; align-items:center; justify-content:center; font-size: 10px; font-weight: 600;">م</span>
+        <span style="font-size: 12.5px; font-weight: 500;">مطاعم الفرسان</span>
+      </span>
+      <i class="ti ti-selector" style="font-size: 14px; color: var(--text-3);"></i>
+    </button>
+  </div>
+
+  <nav style="flex: 1;">
+    <a class="nav-item active" onclick="showPage('overview')"><i class="ti ti-layout-dashboard"></i>الرئيسية</a>
+    <a class="nav-item" onclick="showPage('reviews')"><i class="ti ti-star"></i>التقييمات<span style="margin-right:auto; font-size:11px; color:var(--text-3); background:#F1F3F5; padding:0 6px; border-radius:4px;">142</span></a>
+    <a class="nav-item" onclick="showPage('complaints')"><i class="ti ti-message-2-exclamation"></i>الشكاوى<span style="margin-right:auto; font-size:11px; color:var(--bad); background:var(--bad-light); padding:0 6px; border-radius:4px;">8</span></a>
+    <a class="nav-item" onclick="showPage('branches')"><i class="ti ti-building-store"></i>الفروع</a>
+    <a class="nav-item" onclick="showPage('analytics')"><i class="ti ti-chart-histogram"></i>التحليلات</a>
+    <a class="nav-item" onclick="showPage('reports')"><i class="ti ti-file-text"></i>التقارير</a>
+
+    <div class="nav-section-label">أدوات</div>
+    <a class="nav-item" onclick="showPage('nfc')"><i class="ti ti-wifi"></i>بطاقات NFC</a>
+    <a class="nav-item" onclick="showPage('campaigns')"><i class="ti ti-send"></i>طلبات التقييم</a>
+    <a class="nav-item" onclick="showPage('customer')"><i class="ti ti-device-mobile"></i>صفحة العميل</a>
+
+    <div class="nav-section-label">الإعدادات</div>
+    <a class="nav-item" onclick="showPage('team')"><i class="ti ti-users"></i>الفريق والصلاحيات</a>
+    <a class="nav-item" onclick="showPage('settings')"><i class="ti ti-settings"></i>إعدادات الحساب</a>
+  </nav>
+
+  <!-- User card at bottom -->
+  <div style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 8px;">
+    <div style="display:flex; align-items:center; gap: 10px; padding: 6px 8px; border-radius: 7px; cursor:pointer;" onmouseover="this.style.background='#F4F5F7'" onmouseout="this.style.background=''">
+      <div class="avatar" style="background: var(--purple-light); color: var(--purple);">حم</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-size: 12.5px; font-weight: 500;">حامد العتيبي</div>
+        <div style="font-size: 11.5px; color: var(--text-3);">المدير العام</div>
+      </div>
+      <i class="ti ti-dots" style="font-size: 15px; color: var(--text-3);"></i>
+    </div>
+  </div>
+</aside>
+
+<!-- =================== MAIN =================== -->
+<main class="main">
+
+<!-- =================== TOPBAR =================== -->
+<div class="topbar">
+  <div style="display:flex; align-items:center; gap:14px;">
+    <div class="search-wrap">
+      <input class="search-input" placeholder="بحث عن شكوى، عميل، فرع…" />
+      <i class="ti ti-search"></i>
+      <span class="kbd" style="position:absolute; left:8px; top:50%; transform:translateY(-50%);">⌘K</span>
+    </div>
+  </div>
+  <div style="display:flex; align-items:center; gap:6px;">
+    <button class="btn btn-ghost" title="مركز المساعدة"><i class="ti ti-help" style="font-size:16px;"></i></button>
+    <button class="btn btn-ghost" style="position:relative;" title="الإشعارات">
+      <i class="ti ti-bell" style="font-size:16px;"></i>
+      <span style="position:absolute; top:4px; left:6px; width:7px; height:7px; background:var(--bad); border-radius:50%; border:2px solid white;"></span>
+    </button>
+    <button class="btn btn-primary"><i class="ti ti-plus" style="font-size:14px;"></i>إنشاء</button>
+  </div>
+</div>
+
+<!-- ============== PAGE: OVERVIEW ============== -->
+<div id="page-overview" class="page active">
+<div class="content">
+
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">صباح الخير، حامد 👋</h1>
+      <p class="page-subtitle">هذه نظرة سريعة على أداء مطاعمك خلال آخر 30 يوم</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-secondary"><i class="ti ti-calendar" style="font-size:14px;"></i>آخر 30 يوم<i class="ti ti-chevron-down" style="font-size:12px;"></i></button>
+      <button class="btn btn-secondary"><i class="ti ti-download" style="font-size:14px;"></i>تصدير</button>
+    </div>
+  </div>
+
+  <!-- KPI cards -->
+  <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px;">
+    <div class="kpi-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 4px;">
+        <div class="stat-label">مؤشر الرضا (NPS)</div>
+        <i class="ti ti-mood-smile" style="font-size: 18px; color: var(--text-3);"></i>
+      </div>
+      <div class="stat-value num">87<span style="font-size:18px; color:var(--text-3); font-weight:500;">٪</span></div>
+      <div class="stat-change up"><i class="ti ti-trending-up" style="font-size:13px;"></i><span class="num">+5%</span><span style="color:var(--text-3); font-weight:400;">عن الفترة السابقة</span></div>
+    </div>
+    <div class="kpi-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 4px;">
+        <div class="stat-label">معدل الاستجابة</div>
+        <i class="ti ti-clock" style="font-size: 18px; color: var(--text-3);"></i>
+      </div>
+      <div class="stat-value num">1.8<span style="font-size:14px; color:var(--text-3); font-weight:500;"> ساعة</span></div>
+      <div class="stat-change up"><i class="ti ti-trending-down" style="font-size:13px;"></i><span class="num">12%</span><span style="color:var(--text-3); font-weight:400;">أسرع من قبل</span></div>
+    </div>
+    <div class="kpi-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 4px;">
+        <div class="stat-label">الشكاوى المُحلّت</div>
+        <i class="ti ti-circle-check" style="font-size: 18px; color: var(--text-3);"></i>
+      </div>
+      <div class="stat-value num">94<span style="font-size:18px; color:var(--text-3); font-weight:500;">٪</span></div>
+      <div class="stat-change up"><i class="ti ti-trending-up" style="font-size:13px;"></i><span class="num">+2%</span><span style="color:var(--text-3); font-weight:400;">تحسّن</span></div>
+    </div>
+    <div class="kpi-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 4px;">
+        <div class="stat-label">متوسط التقييم</div>
+        <i class="ti ti-star" style="font-size: 18px; color: var(--text-3);"></i>
+      </div>
+      <div class="stat-value num">4.6<span style="font-size:18px; color:var(--text-3); font-weight:500;">/5</span></div>
+      <div class="stat-change neutral"><i class="ti ti-minus" style="font-size:13px;"></i><span>مستقر</span></div>
+    </div>
+  </div>
+
+  <!-- Chart + Activity -->
+  <div style="display:grid; grid-template-columns: 1.7fr 1fr; gap: 14px; margin-bottom: 24px;">
+    <div class="card" style="padding: 20px;">
+      <div class="section-h">
+        <div>
+          <div>تطور الشكاوى والتقييمات</div>
+          <div style="font-size:12px; color:var(--text-3); font-weight:400; margin-top:2px;">مقارنة شهرية للأداء عبر جميع الفروع</div>
+        </div>
+        <div style="display:flex; gap:4px;">
+          <span class="chip active">شهري</span>
+          <span class="chip">أسبوعي</span>
+          <span class="chip">يومي</span>
+        </div>
+      </div>
+      <div style="height: 240px; position: relative;">
+        <canvas id="mainChart"></canvas>
+      </div>
+    </div>
+    <div class="card" style="padding: 20px;">
+      <div class="section-h">
+        <div>النشاط اللحظي</div>
+        <span style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-3); font-weight:400;">
+          <span class="pulse"></span> مباشر
+        </span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:0;">
+        <div style="display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--border);">
+          <div class="icon-wrap" style="background: var(--bad-light); color: var(--bad); width: 28px; height: 28px;"><i class="ti ti-alert-triangle" style="font-size: 14px;"></i></div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size: 13px; font-weight: 500;">شكوى جديدة — فرع الرياض</div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 1px;">تأخير الطلب · منذ دقيقتين</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--border);">
+          <div class="icon-wrap" style="background: var(--good-light); color: var(--good); width: 28px; height: 28px;"><i class="ti ti-star-filled" style="font-size: 14px;"></i></div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size: 13px; font-weight: 500;">تقييم 5 نجوم — فرع جدة</div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 1px;">"خدمة ممتازة" · منذ 8 دقائق</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--border);">
+          <div class="icon-wrap" style="background: var(--primary-light); color: var(--primary); width: 28px; height: 28px;"><i class="ti ti-message-circle-check" style="font-size: 14px;"></i></div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size: 13px; font-weight: 500;">حُلّت شكوى #1042</div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 1px;">بواسطة سعد · منذ 15 دقيقة</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--border);">
+          <div class="icon-wrap" style="background: var(--warn-light); color: var(--warn); width: 28px; height: 28px;"><i class="ti ti-mood-neutral" style="font-size: 14px;"></i></div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size: 13px; font-weight: 500;">تقييم 3 نجوم — فرع الخبر</div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 1px;">يحتاج متابعة · منذ 22 دقيقة</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; padding:10px 0;">
+          <div class="icon-wrap" style="background: var(--primary-light); color: var(--primary); width: 28px; height: 28px;"><i class="ti ti-wifi" style="font-size: 14px;"></i></div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size: 13px; font-weight: 500;">12 لمسة NFC جديدة</div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 1px;">فرع الرياض - العليا · منذ 30 دقيقة</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Branches summary + Recent complaints -->
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+    <div class="card" style="padding: 20px;">
+      <div class="section-h">
+        <div>أداء الفروع</div>
+        <a style="font-size: 12.5px; color: var(--primary); cursor:pointer; font-weight:500;" onclick="showPage('branches')">عرض الكل <i class="ti ti-arrow-left" style="font-size:13px; vertical-align:-2px;"></i></a>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <!-- Branch row -->
+        <div style="display:flex; align-items:center; gap:12px; padding: 8px 0;">
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--good-light); color: var(--good); display:flex; align-items:center; justify-content:center;"><i class="ti ti-building-store" style="font-size:18px;"></i></div>
+          <div style="flex:1;">
+            <div style="font-size: 13.5px; font-weight: 500;">فرع الرياض — العليا</div>
+            <div style="font-size: 11.5px; color: var(--text-3); margin-top: 2px;">42 تقييم · 3 شكاوى مفتوحة</div>
+          </div>
+          <div style="text-align: left;">
+            <div style="font-size: 14px; font-weight: 600;" class="num">4.9</div>
+            <span class="badge badge-good" style="margin-top:2px;">ممتاز</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; padding: 8px 0; border-top: 1px solid var(--border);">
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--good-light); color: var(--good); display:flex; align-items:center; justify-content:center;"><i class="ti ti-building-store" style="font-size:18px;"></i></div>
+          <div style="flex:1;">
+            <div style="font-size: 13.5px; font-weight: 500;">فرع جدة — الحمراء</div>
+            <div style="font-size: 11.5px; color: var(--text-3); margin-top: 2px;">38 تقييم · 1 شكوى مفتوحة</div>
+          </div>
+          <div style="text-align: left;">
+            <div style="font-size: 14px; font-weight: 600;" class="num">4.6</div>
+            <span class="badge badge-good">جيد جداً</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; padding: 8px 0; border-top: 1px solid var(--border);">
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--warn-light); color: var(--warn); display:flex; align-items:center; justify-content:center;"><i class="ti ti-building-store" style="font-size:18px;"></i></div>
+          <div style="flex:1;">
+            <div style="font-size: 13.5px; font-weight: 500;">فرع مكة — العزيزية</div>
+            <div style="font-size: 11.5px; color: var(--text-3); margin-top: 2px;">22 تقييم · 4 شكاوى مفتوحة</div>
+          </div>
+          <div style="text-align: left;">
+            <div style="font-size: 14px; font-weight: 600;" class="num">4.1</div>
+            <span class="badge badge-warn">متوسط</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; padding: 8px 0; border-top: 1px solid var(--border);">
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--bad-light); color: var(--bad); display:flex; align-items:center; justify-content:center;"><i class="ti ti-building-store" style="font-size:18px;"></i></div>
+          <div style="flex:1;">
+            <div style="font-size: 13.5px; font-weight: 500;">فرع الخبر — الظهران</div>
+            <div style="font-size: 11.5px; color: var(--text-3); margin-top: 2px;">18 تقييم · 7 شكاوى مفتوحة</div>
+          </div>
+          <div style="text-align: left;">
+            <div style="font-size: 14px; font-weight: 600;" class="num">3.4</div>
+            <span class="badge badge-bad">يحتاج تدخل</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 20px;">
+      <div class="section-h">
+        <div>شكاوى تحتاج اهتمامك</div>
+        <a style="font-size: 12.5px; color: var(--primary); cursor:pointer; font-weight:500;" onclick="showPage('complaints')">عرض الكل <i class="ti ti-arrow-left" style="font-size:13px; vertical-align:-2px;"></i></a>
+      </div>
+      <div style="display:flex; flex-direction:column; gap: 0;">
+        <div style="display:flex; gap:12px; padding: 10px 0; border-bottom: 1px solid var(--border);">
+          <span class="prio-dot" style="background: var(--bad); margin-top: 7px;"></span>
+          <div style="flex: 1;">
+            <div style="display:flex; justify-content:space-between; align-items: center;">
+              <div style="font-size: 13.5px; font-weight: 500;">#1048 — تأخير الطلب</div>
+              <span style="font-size: 11.5px; color: var(--text-3);">منذ 12 دقيقة</span>
+            </div>
+            <div style="font-size: 12.5px; color: var(--text-2); margin-top: 3px;">"انتظرت 45 دقيقة ولم يصل الطلب…" — أحمد م.</div>
+            <div style="display:flex; gap:6px; margin-top: 6px;">
+              <span class="badge badge-bad">عاجل</span>
+              <span class="badge badge-neutral">فرع الخبر</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; gap:12px; padding: 10px 0; border-bottom: 1px solid var(--border);">
+          <span class="prio-dot" style="background: var(--warn); margin-top: 7px;"></span>
+          <div style="flex: 1;">
+            <div style="display:flex; justify-content:space-between; align-items: center;">
+              <div style="font-size: 13.5px; font-weight: 500;">#1047 — جودة الطعام</div>
+              <span style="font-size: 11.5px; color: var(--text-3);">منذ ساعة</span>
+            </div>
+            <div style="font-size: 12.5px; color: var(--text-2); margin-top: 3px;">"البرجر كان بارد لما وصل…" — سارة ع.</div>
+            <div style="display:flex; gap:6px; margin-top: 6px;">
+              <span class="badge badge-warn">متوسطة</span>
+              <span class="badge badge-neutral">فرع الرياض</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; gap:12px; padding: 10px 0;">
+          <span class="prio-dot" style="background: var(--warn); margin-top: 7px;"></span>
+          <div style="flex: 1;">
+            <div style="display:flex; justify-content:space-between; align-items: center;">
+              <div style="font-size: 13.5px; font-weight: 500;">#1046 — موظف الكاشير</div>
+              <span style="font-size: 11.5px; color: var(--text-3);">منذ 3 ساعات</span>
+            </div>
+            <div style="font-size: 12.5px; color: var(--text-2); margin-top: 3px;">"تعامل غير لائق من الموظف…" — خالد ف.</div>
+            <div style="display:flex; gap:6px; margin-top: 6px;">
+              <span class="badge badge-warn">متوسطة</span>
+              <span class="badge badge-neutral">فرع جدة</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ============== PAGE: COMPLAINTS ============== -->
+<div id="page-complaints" class="page">
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">مركز الشكاوى</h1>
+      <p class="page-subtitle">42 شكوى نشطة عبر 4 فروع</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-secondary"><i class="ti ti-filter" style="font-size:14px;"></i>تصفية</button>
+      <button class="btn btn-secondary"><i class="ti ti-download" style="font-size:14px;"></i>تصدير</button>
+      <button class="btn btn-primary"><i class="ti ti-plus" style="font-size:14px;"></i>شكوى جديدة</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active">الكل <span style="font-size:11px; color:var(--text-3); margin-right:4px;">42</span></div>
+    <div class="tab">جديدة <span style="font-size:11px; background:var(--bad); color:white; padding:1px 6px; border-radius:10px; margin-right:4px;">8</span></div>
+    <div class="tab">قيد المعالجة <span style="font-size:11px; color:var(--text-3); margin-right:4px;">14</span></div>
+    <div class="tab">مُحلّت <span style="font-size:11px; color:var(--text-3); margin-right:4px;">20</span></div>
+  </div>
+
+  <div style="display:flex; gap:8px; margin-bottom:14px; align-items:center; flex-wrap:wrap;">
+    <span class="chip active"><i class="ti ti-flag" style="font-size:12px;"></i>عاجلة (5)</span>
+    <span class="chip">فرع الخبر</span>
+    <span class="chip">جودة الطعام</span>
+    <span class="chip">تأخير</span>
+    <span class="chip">خدمة العملاء</span>
+    <span class="chip"><i class="ti ti-plus" style="font-size:12px;"></i>إضافة</span>
+  </div>
+
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 40px;"></th>
+          <th>الشكوى</th>
+          <th>العميل</th>
+          <th>الفرع</th>
+          <th>الأولوية</th>
+          <th>الحالة</th>
+          <th>المسؤول</th>
+          <th>الوقت</th>
+          <th style="width: 40px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox" /></td>
+          <td>
+            <div style="font-weight: 500;">#1048 — تأخير الطلب</div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 2px; max-width: 250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">انتظرت 45 دقيقة ولم يصل الطلب…</div>
+          </td>
+          <td>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="avatar">أم</div>
+              <div>
+                <div style="font-size: 13px;">أحمد المالكي</div>
+                <div style="font-size: 11.5px; color: var(--text-3);" class="num">+966 50 ••• 4321</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge badge-neutral">الخبر</span></td>
+          <td><span class="prio-dot" style="background: var(--bad);"></span><span style="font-size:12.5px;">عاجلة</span></td>
+          <td><span class="badge badge-bad">جديدة</span></td>
+          <td><span style="font-size: 12.5px; color: var(--text-3);">— غير مُعيّن</span></td>
+          <td style="font-size: 12px; color: var(--text-3);" class="num">12 دق</td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" /></td>
+          <td>
+            <div style="font-weight: 500;">#1047 — جودة الطعام</div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 2px;">البرجر كان بارد لما وصل…</div>
+          </td>
+          <td>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="avatar" style="background:#FCE7F3; color:#BE185D;">سع</div>
+              <div>
+                <div style="font-size: 13px;">سارة العمري</div>
+                <div style="font-size: 11.5px; color: var(--text-3);" class="num">+966 55 ••• 7890</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge badge-neutral">الرياض</span></td>
+          <td><span class="prio-dot" style="background: var(--warn);"></span><span style="font-size:12.5px;">متوسطة</span></td>
+          <td><span class="badge badge-info">قيد المعالجة</span></td>
+          <td>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div class="avatar" style="width:22px; height:22px; font-size:10px; background:#DDD6FE; color:#6D28D9;">سع</div>
+              <span style="font-size:12.5px;">سعد</span>
+            </div>
+          </td>
+          <td style="font-size: 12px; color: var(--text-3);" class="num">1 س</td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" /></td>
+          <td>
+            <div style="font-weight: 500;">#1046 — موظف الكاشير</div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 2px;">تعامل غير لائق من الموظف…</div>
+          </td>
+          <td>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="avatar" style="background:#FEF3C7; color:#92400E;">خف</div>
+              <div>
+                <div style="font-size: 13px;">خالد الفايز</div>
+                <div style="font-size: 11.5px; color: var(--text-3);" class="num">+966 53 ••• 2211</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge badge-neutral">جدة</span></td>
+          <td><span class="prio-dot" style="background: var(--warn);"></span><span style="font-size:12.5px;">متوسطة</span></td>
+          <td><span class="badge badge-info">قيد المعالجة</span></td>
+          <td>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div class="avatar" style="width:22px; height:22px; font-size:10px;">من</div>
+              <span style="font-size:12.5px;">منى</span>
+            </div>
+          </td>
+          <td style="font-size: 12px; color: var(--text-3);" class="num">3 س</td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" /></td>
+          <td>
+            <div style="font-weight: 500;">#1045 — نظافة الفرع</div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 2px;">الطاولات لم تكن نظيفة…</div>
+          </td>
+          <td>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="avatar" style="background:#D1FAE5; color:#047857;">فد</div>
+              <div>
+                <div style="font-size: 13px;">فاطمة الدوسري</div>
+                <div style="font-size: 11.5px; color: var(--text-3);" class="num">+966 56 ••• 8844</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge badge-neutral">الخبر</span></td>
+          <td><span class="prio-dot" style="background: var(--text-3);"></span><span style="font-size:12.5px;">منخفضة</span></td>
+          <td><span class="badge badge-good">حُلّت</span></td>
+          <td>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div class="avatar" style="width:22px; height:22px; font-size:10px;">سع</div>
+              <span style="font-size:12.5px;">سعد</span>
+            </div>
+          </td>
+          <td style="font-size: 12px; color: var(--text-3);" class="num">5 س</td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" /></td>
+          <td>
+            <div style="font-weight: 500;">#1044 — انتظار طويل</div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 2px;">طابور الانتظار كان طويلاً جداً…</div>
+          </td>
+          <td>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="avatar" style="background:#DBEAFE; color:#1E40AF;">عس</div>
+              <div>
+                <div style="font-size: 13px;">عبدالله السالم</div>
+                <div style="font-size: 11.5px; color: var(--text-3);" class="num">+966 50 ••• 1199</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge badge-neutral">الرياض</span></td>
+          <td><span class="prio-dot" style="background: var(--warn);"></span><span style="font-size:12.5px;">متوسطة</span></td>
+          <td><span class="badge badge-good">حُلّت</span></td>
+          <td>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div class="avatar" style="width:22px; height:22px; font-size:10px;">حم</div>
+              <span style="font-size:12.5px;">حامد</span>
+            </div>
+          </td>
+          <td style="font-size: 12px; color: var(--text-3);" class="num">8 س</td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" /></td>
+          <td>
+            <div style="font-weight: 500;">#1043 — طلب خاطئ</div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 2px;">وصلني طلب مختلف عما طلبت…</div>
+          </td>
+          <td>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="avatar">نح</div>
+              <div>
+                <div style="font-size: 13px;">نورا الحربي</div>
+                <div style="font-size: 11.5px; color: var(--text-3);" class="num">+966 55 ••• 3322</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge badge-neutral">مكة</span></td>
+          <td><span class="prio-dot" style="background: var(--warn);"></span><span style="font-size:12.5px;">متوسطة</span></td>
+          <td><span class="badge badge-good">حُلّت</span></td>
+          <td>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div class="avatar" style="width:22px; height:22px; font-size:10px;">طع</div>
+              <span style="font-size:12.5px;">طارق</span>
+            </div>
+          </td>
+          <td style="font-size: 12px; color: var(--text-3);" class="num">12 س</td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
+    <div style="font-size: 12.5px; color: var(--text-3);">عرض 1–6 من 42 شكوى</div>
+    <div style="display:flex; gap:4px;">
+      <button class="btn btn-secondary" style="padding: 5px 10px;"><i class="ti ti-chevron-right" style="font-size:14px;"></i></button>
+      <button class="btn btn-secondary" style="padding: 5px 10px; min-width: 28px;">1</button>
+      <button class="btn btn-primary" style="padding: 5px 10px; min-width: 28px;">2</button>
+      <button class="btn btn-secondary" style="padding: 5px 10px; min-width: 28px;">3</button>
+      <button class="btn btn-secondary" style="padding: 5px 10px;"><i class="ti ti-chevron-left" style="font-size:14px;"></i></button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ============== PAGE: REVIEWS ============== -->
+<div id="page-reviews" class="page">
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">التقييمات</h1>
+      <p class="page-subtitle">142 تقييم من جميع الفروع · متوسط 4.6 من 5</p>
+    </div>
+    <button class="btn btn-primary"><i class="ti ti-send" style="font-size:14px;"></i>إرسال طلب تقييم</button>
+  </div>
+
+  <!-- Rating overview -->
+  <div style="display:grid; grid-template-columns: 320px 1fr; gap: 14px; margin-bottom: 24px;">
+    <div class="card" style="padding: 24px; text-align:center;">
+      <div style="font-size: 64px; font-weight: 600; color: var(--text-1); line-height: 1;" class="num">4.6</div>
+      <div style="display:flex; justify-content:center; gap: 2px; margin: 8px 0;">
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 18px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 18px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 18px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 18px;"></i>
+        <i class="ti ti-star-half-filled" style="color: #F59E0B; font-size: 18px;"></i>
+      </div>
+      <div style="font-size: 13px; color: var(--text-3);">من 142 تقييم</div>
+    </div>
+    <div class="card" style="padding: 24px;">
+      <div style="display:flex; flex-direction:column; gap: 10px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size: 12px; width: 30px;">5 ★</span>
+          <div style="flex:1; height: 6px; background: #F1F3F5; border-radius: 3px; overflow: hidden;">
+            <div style="height: 100%; width: 68%; background: var(--good);"></div>
+          </div>
+          <span style="font-size: 12.5px; color: var(--text-2); width: 36px; text-align: left;" class="num">96</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size: 12px; width: 30px;">4 ★</span>
+          <div style="flex:1; height: 6px; background: #F1F3F5; border-radius: 3px; overflow: hidden;">
+            <div style="height: 100%; width: 18%; background: #84CC16;"></div>
+          </div>
+          <span style="font-size: 12.5px; color: var(--text-2); width: 36px; text-align: left;" class="num">26</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size: 12px; width: 30px;">3 ★</span>
+          <div style="flex:1; height: 6px; background: #F1F3F5; border-radius: 3px; overflow: hidden;">
+            <div style="height: 100%; width: 8%; background: var(--warn);"></div>
+          </div>
+          <span style="font-size: 12.5px; color: var(--text-2); width: 36px; text-align: left;" class="num">12</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size: 12px; width: 30px;">2 ★</span>
+          <div style="flex:1; height: 6px; background: #F1F3F5; border-radius: 3px; overflow: hidden;">
+            <div style="height: 100%; width: 4%; background: #FB923C;"></div>
+          </div>
+          <span style="font-size: 12.5px; color: var(--text-2); width: 36px; text-align: left;" class="num">5</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size: 12px; width: 30px;">1 ★</span>
+          <div style="flex:1; height: 6px; background: #F1F3F5; border-radius: 3px; overflow: hidden;">
+            <div style="height: 100%; width: 2%; background: var(--bad);"></div>
+          </div>
+          <span style="font-size: 12.5px; color: var(--text-2); width: 36px; text-align: left;" class="num">3</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active">الكل (142)</div>
+    <div class="tab">5 نجوم (96)</div>
+    <div class="tab">منخفضة (8)</div>
+    <div class="tab">على جوجل (47)</div>
+    <div class="tab">داخلية (95)</div>
+  </div>
+
+  <!-- Reviews grid -->
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+    <div class="card" style="padding: 18px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 8px;">
+        <div style="display:flex; align-items:center; gap: 10px;">
+          <div class="avatar" style="width: 36px; height: 36px; font-size: 13px;">من</div>
+          <div>
+            <div style="font-size: 13.5px; font-weight: 500;">منى الشمري</div>
+            <div style="font-size: 11.5px; color: var(--text-3);">فرع الرياض - العليا · منذ ساعتين</div>
+          </div>
+        </div>
+        <i class="ti ti-brand-google" style="font-size: 16px; color: var(--text-3);" title="Google Maps"></i>
+      </div>
+      <div style="display:flex; gap: 1px; margin-bottom: 8px;">
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+      </div>
+      <div style="font-size: 13px; color: var(--text-2); line-height: 1.6;">
+        خدمة ممتازة وطعام لذيذ، الموظفون متعاونون جداً والمكان نظيف ومريح. سأعود مرة ثانية بكل تأكيد.
+      </div>
+    </div>
+
+    <div class="card" style="padding: 18px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 8px;">
+        <div style="display:flex; align-items:center; gap: 10px;">
+          <div class="avatar" style="width: 36px; height: 36px; font-size: 13px; background:#FCE7F3; color:#BE185D;">رل</div>
+          <div>
+            <div style="font-size: 13.5px; font-weight: 500;">ريم اللحيدان</div>
+            <div style="font-size: 11.5px; color: var(--text-3);">فرع جدة - الحمراء · منذ 4 ساعات</div>
+          </div>
+        </div>
+        <i class="ti ti-wifi" style="font-size: 16px; color: var(--primary);" title="من NFC"></i>
+      </div>
+      <div style="display:flex; gap: 1px; margin-bottom: 8px;">
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star" style="color: #E4E7EB; font-size: 14px;"></i>
+      </div>
+      <div style="font-size: 13px; color: var(--text-2); line-height: 1.6;">
+        المكان جميل والطعام طيب، بس الانتظار كان طويل شوي. ممكن تطورو هذا الجانب.
+      </div>
+    </div>
+
+    <div class="card" style="padding: 18px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 8px;">
+        <div style="display:flex; align-items:center; gap: 10px;">
+          <div class="avatar" style="width: 36px; height: 36px; font-size: 13px; background:#DBEAFE; color:#1E40AF;">يا</div>
+          <div>
+            <div style="font-size: 13.5px; font-weight: 500;">ياسر الأحمد</div>
+            <div style="font-size: 11.5px; color: var(--text-3);">فرع الرياض - العليا · أمس</div>
+          </div>
+        </div>
+        <i class="ti ti-brand-google" style="font-size: 16px; color: var(--text-3);"></i>
+      </div>
+      <div style="display:flex; gap: 1px; margin-bottom: 8px;">
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+      </div>
+      <div style="font-size: 13px; color: var(--text-2); line-height: 1.6;">
+        أفضل برجر في المدينة بدون منازع، الجودة ثابتة من 3 سنين. شكراً للفريق.
+      </div>
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display:flex; gap: 8px;">
+        <i class="ti ti-corner-down-left" style="color: var(--text-3); font-size: 14px;"></i>
+        <div style="flex:1;">
+          <div style="font-size: 12px; font-weight: 500; color: var(--text-1);">ردك:</div>
+          <div style="font-size: 12.5px; color: var(--text-2); line-height: 1.5;">شكراً ياسر! نسعد بثقتك المتواصلة.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 18px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 8px;">
+        <div style="display:flex; align-items:center; gap: 10px;">
+          <div class="avatar" style="width: 36px; height: 36px; font-size: 13px; background: var(--bad-light); color: var(--bad);">عش</div>
+          <div>
+            <div style="font-size: 13.5px; font-weight: 500;">عمر الشهري</div>
+            <div style="font-size: 11.5px; color: var(--text-3);">فرع الخبر - الظهران · أمس</div>
+          </div>
+        </div>
+        <span class="badge badge-bad">يحتاج رد</span>
+      </div>
+      <div style="display:flex; gap: 1px; margin-bottom: 8px;">
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star-filled" style="color: #F59E0B; font-size: 14px;"></i>
+        <i class="ti ti-star" style="color: #E4E7EB; font-size: 14px;"></i>
+        <i class="ti ti-star" style="color: #E4E7EB; font-size: 14px;"></i>
+        <i class="ti ti-star" style="color: #E4E7EB; font-size: 14px;"></i>
+      </div>
+      <div style="font-size: 13px; color: var(--text-2); line-height: 1.6;">
+        الخدمة كانت بطيئة جداً، انتظرت وقت طويل ولا أحد يرد. تحتاجون تحسين.
+      </div>
+      <div style="margin-top: 10px; display:flex; gap: 8px;">
+        <button class="btn btn-primary" style="padding: 5px 12px; font-size: 12px;">الرد على التقييم</button>
+        <button class="btn btn-secondary" style="padding: 5px 12px; font-size: 12px;">تحويل لشكوى</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ============== PAGE: BRANCHES ============== -->
+<div id="page-branches" class="page">
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">الفروع</h1>
+      <p class="page-subtitle">4 فروع نشطة · أداء حي بالوقت الفعلي</p>
+    </div>
+    <button class="btn btn-primary"><i class="ti ti-plus" style="font-size:14px;"></i>إضافة فرع</button>
+  </div>
+
+  <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
+    <!-- Branch 1 -->
+    <div class="branch-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 16px;">
+        <div>
+          <div style="display:flex; align-items:center; gap: 8px;">
+            <h3 style="font-size: 15px; font-weight: 600; margin: 0;">فرع الرياض — العليا</h3>
+            <span class="badge badge-good">ممتاز</span>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-3); margin-top: 4px;">طريق العليا العام · يعمل الآن</div>
+        </div>
+        <i class="ti ti-dots-vertical" style="color: var(--text-3); cursor:pointer;"></i>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border);">
+        <div>
+          <div style="font-size: 11.5px; color: var(--text-3); font-weight: 500;">التقييم</div>
+          <div style="font-size: 19px; font-weight: 600; margin-top: 2px;" class="num">4.9 <span style="font-size: 13px; color: var(--text-3); font-weight: 400;">/5</span></div>
+        </div>
+        <div>
+          <div style="font-size: 11.5px; color: var(--text-3); font-weight: 500;">الاستجابة</div>
+          <div style="font-size: 19px; font-weight: 600; margin-top: 2px;" class="num">22<span style="font-size: 13px; color: var(--text-3); font-weight: 400;">د</span></div>
+        </div>
+        <div>
+          <div style="font-size: 11.5px; color: var(--text-3); font-weight: 500;">الحل</div>
+          <div style="font-size: 19px; font-weight: 600; margin-top: 2px;" class="num">98<span style="font-size: 13px; color: var(--text-3); font-weight: 400;">٪</span></div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 12px; font-size: 12.5px;">
+        <div style="color: var(--text-3);">42 تقييم · 3 شكاوى نشطة</div>
+        <a style="color: var(--primary); cursor:pointer; font-weight: 500;">عرض التفاصيل ←</a>
+      </div>
+    </div>
+
+    <!-- Branch 2 -->
+    <div class="branch-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 16px;">
+        <div>
+          <div style="display:flex; align-items:center; gap: 8px;">
+            <h3 style="font-size: 15px; font-weight: 600; margin: 0;">فرع جدة — الحمراء</h3>
+            <span class="badge badge-good">جيد جداً</span>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-3); margin-top: 4px;">شارع التحلية · يعمل الآن</div>
+        </div>
+        <i class="ti ti-dots-vertical" style="color: var(--text-3); cursor:pointer;"></i>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border);">
+        <div>
+          <div style="font-size: 11.5px; color: var(--text-3); font-weight: 500;">التقييم</div>
+          <div style="font-size: 19px; font-weight: 600; margin-top: 2px;" class="num">4.6 <span style="font-size: 13px; color: var(--text-3); font-weight: 400;">/5</span></div>
+        </div>
+        <div>
+          <div style="font-size: 11.5px; color: var(--text-3); font-weight: 500;">الاستجابة</div>
+          <div style="font-size: 19px; font-weight: 600; margin-top: 2px;" class="num">45<span style="font-size: 13px; color: var(--text-3); font-weight: 400;">د</span></div>
+        </div>
+        <div>
+          <div style="font-size: 11.5px; color: var(--text-3); font-weight: 500;">الحل</div>
+          <div style="font-size: 19px; font-weight: 600; margin-top: 2px;" class="num">92<span style="font-size: 13px; color: var(--text-3); font-weight: 400;">٪</span></div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 12px; font-size: 12.5px;">
+        <div style="color: var(--text-3);">38 تقييم · 1 شكوى نشطة</div>
+        <a style="color: var(--primary); cursor:pointer; font-weight: 500;">عرض التفاصيل ←</a>
+      </div>
+    </div>
+
+    <!-- Branch 3 -->
+    <div class="branch-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 16px;">
+        <div>
+          <div style="display:flex; align-items:center; gap: 8px;">
+            <h3 style="font-size: 15px; font-weight: 600; margin: 0;">فرع مكة — العزيزية</h3>
+            <span class="badge badge-warn">متوسط</span>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-3); margin-top: 4px;">طريق إبراهيم الخليل · يعمل الآن</div>
+        </div>
+        <i class="ti ti-dots-vertical" style="color: var(--text-3); cursor:pointer;"></i>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border);">
+        <div>
+          <div style="font-size: 11.5px; color: var(--text-3); font-weight: 500;">التقييم</div>
+          <div style="font-size: 19px; font-weight: 600; margin-top: 2px;" class="num">4.1 <span style="font-size: 13px; color: var(--text-3); font-weight: 400;">/5</span></div>
+        </div>
+        <div>
+          <div style="font-size: 11.5px; color: var(--text-3); font-weight: 500;">الاستجابة</div>
+          <div style="font-size: 19px; font-weight: 600; margin-top: 2px;" class="num">1.5<span style="font-size: 13px; color: var(--text-3); font-weight: 400;">س</span></div>
+        </div>
+        <div>
+          <div style="font-size: 11.5px; color: var(--text-3); font-weight: 500;">الحل</div>
+          <div style="font-size: 19px; font-weight: 600; margin-top: 2px;" class="num">85<span style="font-size: 13px; color: var(--text-3); font-weight: 400;">٪</span></div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 12px; font-size: 12.5px;">
+        <div style="color: var(--text-3);">22 تقييم · 4 شكاوى نشطة</div>
+        <a style="color: var(--primary); cursor:pointer; font-weight: 500;">عرض التفاصيل ←</a>
+      </div>
+    </div>
+
+    <!-- Branch 4 - Needs attention -->
+    <div class="branch-card" style="border-color: var(--bad); border-width: 1.5px; background: linear-gradient(180deg, #FEF8F8 0%, white 60%);">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 16px;">
+        <div>
+          <div style="display:flex; align-items:center; gap: 8px;">
+            <h3 style="font-size: 15px; font-weight: 600; margin: 0;">فرع الخبر — الظهران</h3>
+            <span class="badge badge-bad"><i class="ti ti-alert-triangle" style="font-size:11px;"></i>يحتاج تدخل</span>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-3); margin-top: 4px;">شارع الملك فهد · يعمل الآن</div>
+        </div>
+        <i class="ti ti-dots-vertical" style="color: var(--text-3); cursor:pointer;"></i>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border);">
+        <div>
+          <div style="font-size: 11.5px; color: var(--text-3); font-weight: 500;">التقييم</div>
+          <div style="font-size: 19px; font-weight: 600; margin-top: 2px; color: var(--bad);" class="num">3.4 <span style="font-size: 13px; color: var(--text-3); font-weight: 400;">/5</span></div>
+        </div>
+        <div>
+          <div style="font-size: 11.5px; color: var(--text-3); font-weight: 500;">الاستجابة</div>
+          <div style="font-size: 19px; font-weight: 600; margin-top: 2px; color: var(--bad);" class="num">5.2<span style="font-size: 13px; color: var(--text-3); font-weight: 400;">س</span></div>
+        </div>
+        <div>
+          <div style="font-size: 11.5px; color: var(--text-3); font-weight: 500;">الحل</div>
+          <div style="font-size: 19px; font-weight: 600; margin-top: 2px;" class="num">71<span style="font-size: 13px; color: var(--text-3); font-weight: 400;">٪</span></div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 12px; font-size: 12.5px;">
+        <div style="color: var(--text-3);">18 تقييم · 7 شكاوى نشطة</div>
+        <a style="color: var(--bad); cursor:pointer; font-weight: 500;">معالجة فورية ←</a>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ============== PAGE: ANALYTICS ============== -->
+<div id="page-analytics" class="page">
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">التحليلات</h1>
+      <p class="page-subtitle">رؤى تفصيلية حول أداء جميع الفروع</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-secondary"><i class="ti ti-calendar" style="font-size:14px;"></i>آخر 90 يوم</button>
+      <button class="btn btn-secondary"><i class="ti ti-download" style="font-size:14px;"></i>تصدير</button>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px;">
+    <div class="kpi-card">
+      <div class="stat-label">إجمالي التقييمات</div>
+      <div class="stat-value num">142</div>
+      <div class="stat-change up"><i class="ti ti-trending-up" style="font-size:13px;"></i><span class="num">+24%</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="stat-label">إجمالي الشكاوى</div>
+      <div class="stat-value num">87</div>
+      <div class="stat-change down"><i class="ti ti-trending-down" style="font-size:13px;"></i><span class="num">-12%</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="stat-label">معدل الرد على جوجل</div>
+      <div class="stat-value num">96<span style="font-size:18px; color:var(--text-3); font-weight:500;">٪</span></div>
+      <div class="stat-change up"><i class="ti ti-trending-up" style="font-size:13px;"></i><span class="num">+8%</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="stat-label">لمسات NFC</div>
+      <div class="stat-value num">1,247</div>
+      <div class="stat-change up"><i class="ti ti-trending-up" style="font-size:13px;"></i><span class="num">+38%</span></div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+    <div class="card" style="padding: 20px;">
+      <div class="section-h">
+        <div>مقارنة أداء الفروع</div>
+        <span style="font-size:11.5px; color:var(--text-3); font-weight:400;">مؤشر الرضا %</span>
+      </div>
+      <div style="height: 280px; position: relative;">
+        <canvas id="branchChart"></canvas>
+      </div>
+    </div>
+    <div class="card" style="padding: 20px;">
+      <div class="section-h">
+        <div>توزيع أسباب الشكاوى</div>
+        <span style="font-size:11.5px; color:var(--text-3); font-weight:400;">آخر 30 يوم</span>
+      </div>
+      <div style="height: 280px; position: relative;">
+        <canvas id="reasonChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="padding: 20px;">
+    <div class="section-h">
+      <div>اتجاه مؤشر NPS بمرور الوقت</div>
+      <div style="display:flex; gap:4px;">
+        <span class="chip">3 أشهر</span>
+        <span class="chip active">6 أشهر</span>
+        <span class="chip">سنة</span>
+      </div>
+    </div>
+    <div style="height: 280px; position: relative;">
+      <canvas id="npsTrendChart"></canvas>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ============== PAGE: REPORTS ============== -->
+<div id="page-reports" class="page">
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">التقارير</h1>
+      <p class="page-subtitle">تقارير دورية قابلة للتصدير والمشاركة</p>
+    </div>
+    <button class="btn btn-primary"><i class="ti ti-plus" style="font-size:14px;"></i>تقرير جديد</button>
+  </div>
+
+  <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 14px;">
+    <div class="card" style="padding: 20px;">
+      <div style="width:40px; height:40px; background:var(--primary-light); color:var(--primary); border-radius:10px; display:flex; align-items:center; justify-content:center; margin-bottom: 14px;">
+        <i class="ti ti-mood-smile" style="font-size: 22px;"></i>
+      </div>
+      <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 4px;">تقرير رضا العملاء</h3>
+      <p style="font-size: 12.5px; color: var(--text-2); line-height: 1.6; margin: 0;">متابعة مؤشر NPS وتوزيع التقييمات عبر جميع الفروع</p>
+      <div style="margin-top:14px; padding-top: 14px; border-top: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <span class="badge badge-info">شهري</span>
+        <a style="font-size:12.5px; color: var(--primary); cursor:pointer; font-weight: 500;">عرض ←</a>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 20px;">
+      <div style="width:40px; height:40px; background:var(--warn-light); color:var(--warn); border-radius:10px; display:flex; align-items:center; justify-content:center; margin-bottom: 14px;">
+        <i class="ti ti-message-2-exclamation" style="font-size: 22px;"></i>
+      </div>
+      <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 4px;">تحليل أسباب الشكاوى</h3>
+      <p style="font-size: 12.5px; color: var(--text-2); line-height: 1.6; margin: 0;">تصنيف الشكاوى حسب الفئة والفرع والتوقيت</p>
+      <div style="margin-top:14px; padding-top: 14px; border-top: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <span class="badge badge-info">أسبوعي</span>
+        <a style="font-size:12.5px; color: var(--primary); cursor:pointer; font-weight: 500;">عرض ←</a>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 20px;">
+      <div style="width:40px; height:40px; background:#F5F3FF; color:var(--purple); border-radius:10px; display:flex; align-items:center; justify-content:center; margin-bottom: 14px;">
+        <i class="ti ti-chart-histogram" style="font-size: 22px;"></i>
+      </div>
+      <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 4px;">مؤشر الولاء NPS</h3>
+      <p style="font-size: 12.5px; color: var(--text-2); line-height: 1.6; margin: 0;">قياس مدى توصية العملاء بخدماتك</p>
+      <div style="margin-top:14px; padding-top: 14px; border-top: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <span class="badge badge-info">ربع سنوي</span>
+        <a style="font-size:12.5px; color: var(--primary); cursor:pointer; font-weight: 500;">عرض ←</a>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 20px;">
+      <div style="width:40px; height:40px; background:#FFFBEB; color:#F59E0B; border-radius:10px; display:flex; align-items:center; justify-content:center; margin-bottom: 14px;">
+        <i class="ti ti-star" style="font-size: 22px;"></i>
+      </div>
+      <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 4px;">تقرير التقييمات</h3>
+      <p style="font-size: 12.5px; color: var(--text-2); line-height: 1.6; margin: 0;">جميع التقييمات على جوجل والداخلية مع معدل الرد</p>
+      <div style="margin-top:14px; padding-top: 14px; border-top: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <span class="badge badge-info">أسبوعي</span>
+        <a style="font-size:12.5px; color: var(--primary); cursor:pointer; font-weight: 500;">عرض ←</a>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 20px;">
+      <div style="width:40px; height:40px; background:var(--good-light); color:var(--good); border-radius:10px; display:flex; align-items:center; justify-content:center; margin-bottom: 14px;">
+        <i class="ti ti-building-store" style="font-size: 22px;"></i>
+      </div>
+      <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 4px;">أداء الفروع</h3>
+      <p style="font-size: 12.5px; color: var(--text-2); line-height: 1.6; margin: 0;">مقارنة شاملة بين جميع الفروع على كل المؤشرات</p>
+      <div style="margin-top:14px; padding-top: 14px; border-top: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <span class="badge badge-info">شهري</span>
+        <a style="font-size:12.5px; color: var(--primary); cursor:pointer; font-weight: 500;">عرض ←</a>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 20px;">
+      <div style="width:40px; height:40px; background:var(--bad-light); color:var(--bad); border-radius:10px; display:flex; align-items:center; justify-content:center; margin-bottom: 14px;">
+        <i class="ti ti-alert-triangle" style="font-size: 22px;"></i>
+      </div>
+      <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 4px;">تنبيهات الأداء الحرج</h3>
+      <p style="font-size: 12.5px; color: var(--text-2); line-height: 1.6; margin: 0;">إشعارات فورية عند انخفاض أي مؤشر</p>
+      <div style="margin-top:14px; padding-top: 14px; border-top: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <span class="badge badge-info">فوري</span>
+        <a style="font-size:12.5px; color: var(--primary); cursor:pointer; font-weight: 500;">إعداد ←</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:24px; padding: 20px; background: linear-gradient(135deg, var(--primary-50) 0%, var(--surface) 100%); border-color: var(--primary-light);">
+    <div style="display:flex; align-items:flex-start; gap: 14px;">
+      <div style="width:40px; height:40px; background: var(--primary); color: white; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+        <i class="ti ti-mail-fast" style="font-size: 20px;"></i>
+      </div>
+      <div style="flex: 1;">
+        <h3 style="font-size: 14.5px; font-weight: 600; margin: 0 0 4px;">جدولة التقارير التلقائية</h3>
+        <p style="font-size: 12.5px; color: var(--text-2); margin: 0;">احصل على تقاريرك دورياً عبر البريد الإلكتروني بصيغة PDF أو Excel</p>
+      </div>
+      <button class="btn btn-primary">إعداد الجدولة</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ============== PAGE: NFC CARDS ============== -->
+<div id="page-nfc" class="page">
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">بطاقات NFC</h1>
+      <p class="page-subtitle">إدارة البطاقات الذكية الموزعة في الفروع</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-secondary"><i class="ti ti-qrcode" style="font-size:14px;"></i>إنشاء QR</button>
+      <button class="btn btn-primary"><i class="ti ti-plus" style="font-size:14px;"></i>بطاقة جديدة</button>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px;">
+    <div class="kpi-card">
+      <div class="stat-label">إجمالي البطاقات</div>
+      <div class="stat-value num">36</div>
+    </div>
+    <div class="kpi-card">
+      <div class="stat-label">نشطة</div>
+      <div class="stat-value num" style="color: var(--good);">34</div>
+    </div>
+    <div class="kpi-card">
+      <div class="stat-label">لمسات اليوم</div>
+      <div class="stat-value num">127</div>
+    </div>
+    <div class="kpi-card">
+      <div class="stat-label">معدل التحويل</div>
+      <div class="stat-value num">68<span style="font-size:18px; color:var(--text-3); font-weight:500;">٪</span></div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+    <!-- NFC card visual -->
+    <div class="nfc-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 24px; position: relative; z-index: 1;">
+        <div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 1px;">RepuSystem</div>
+          <div style="font-size: 18px; font-weight: 600; margin-top: 2px;">طاولة 12</div>
+        </div>
+        <i class="ti ti-wifi" style="font-size: 24px; color: var(--primary);"></i>
+      </div>
+      <div style="position: relative; z-index: 1;">
+        <div style="font-size: 11.5px; color: rgba(255,255,255,0.6);">الفرع</div>
+        <div style="font-size: 13.5px; font-weight: 500; margin-top: 2px;">الرياض — العليا</div>
+      </div>
+      <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; font-size: 11.5px; position: relative; z-index: 1;">
+        <span style="color: rgba(255,255,255,0.6);">42 لمسة هذا الأسبوع</span>
+        <span style="color: var(--good); display:flex; align-items:center; gap:4px;"><span style="width:6px; height:6px; background:var(--good); border-radius:50%;"></span>نشطة</span>
+      </div>
+    </div>
+
+    <div class="nfc-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 24px; position: relative; z-index: 1;">
+        <div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 1px;">RepuSystem</div>
+          <div style="font-size: 18px; font-weight: 600; margin-top: 2px;">الكاشير 1</div>
+        </div>
+        <i class="ti ti-wifi" style="font-size: 24px; color: var(--primary);"></i>
+      </div>
+      <div style="position: relative; z-index: 1;">
+        <div style="font-size: 11.5px; color: rgba(255,255,255,0.6);">الفرع</div>
+        <div style="font-size: 13.5px; font-weight: 500; margin-top: 2px;">جدة — الحمراء</div>
+      </div>
+      <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; font-size: 11.5px; position: relative; z-index: 1;">
+        <span style="color: rgba(255,255,255,0.6);">28 لمسة هذا الأسبوع</span>
+        <span style="color: var(--good); display:flex; align-items:center; gap:4px;"><span style="width:6px; height:6px; background:var(--good); border-radius:50%;"></span>نشطة</span>
+      </div>
+    </div>
+
+    <div class="nfc-card" style="opacity: 0.7;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 24px; position: relative; z-index: 1;">
+        <div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 1px;">RepuSystem</div>
+          <div style="font-size: 18px; font-weight: 600; margin-top: 2px;">المدخل</div>
+        </div>
+        <i class="ti ti-wifi-off" style="font-size: 24px; color: var(--text-3);"></i>
+      </div>
+      <div style="position: relative; z-index: 1;">
+        <div style="font-size: 11.5px; color: rgba(255,255,255,0.6);">الفرع</div>
+        <div style="font-size: 13.5px; font-weight: 500; margin-top: 2px;">مكة — العزيزية</div>
+      </div>
+      <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; font-size: 11.5px; position: relative; z-index: 1;">
+        <span style="color: rgba(255,255,255,0.6);">0 لمسة هذا الأسبوع</span>
+        <span style="color: var(--text-3); display:flex; align-items:center; gap:4px;"><span style="width:6px; height:6px; background:var(--text-3); border-radius:50%;"></span>خاملة</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 24px; padding: 0;">
+    <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+      <h3 style="font-size: 15px; font-weight: 600; margin: 0;">جميع البطاقات</h3>
+      <div class="search-wrap" style="width: 220px;">
+        <input class="search-input" placeholder="بحث…" style="width: 100%;"/>
+        <i class="ti ti-search"></i>
+      </div>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>الاسم</th>
+          <th>الفرع</th>
+          <th>المعرّف</th>
+          <th>اللمسات</th>
+          <th>التحويل</th>
+          <th>الحالة</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>طاولة 12</td>
+          <td>الرياض - العليا</td>
+          <td style="font-family: 'Inter', monospace; font-size: 12px; color: var(--text-3);">NFC-RYD-T12</td>
+          <td class="num">42</td>
+          <td class="num">71%</td>
+          <td><span class="badge badge-good">نشطة</span></td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+        <tr>
+          <td>الكاشير 1</td>
+          <td>جدة - الحمراء</td>
+          <td style="font-family: 'Inter', monospace; font-size: 12px; color: var(--text-3);">NFC-JED-C01</td>
+          <td class="num">28</td>
+          <td class="num">64%</td>
+          <td><span class="badge badge-good">نشطة</span></td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+        <tr>
+          <td>المدخل</td>
+          <td>مكة - العزيزية</td>
+          <td style="font-family: 'Inter', monospace; font-size: 12px; color: var(--text-3);">NFC-MKK-E01</td>
+          <td class="num">0</td>
+          <td class="num">—</td>
+          <td><span class="badge badge-bad">خاملة</span></td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ============== PAGE: CAMPAIGNS (Send review request) ============== -->
+<div id="page-campaigns" class="page">
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">إرسال طلب تقييم</h1>
+      <p class="page-subtitle">أرسل لعميل أو اطلب من النظام إرسال تلقائي</p>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <div class="card" style="padding: 24px;">
+      <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 4px;">إرسال فردي</h3>
+      <p style="font-size: 12.5px; color: var(--text-3); margin: 0 0 20px;">أرسل طلب تقييم لعميل واحد عبر واتساب</p>
+
+      <div style="display:flex; flex-direction:column; gap: 14px;">
+        <div>
+          <label style="font-size: 12.5px; font-weight: 500; color: var(--text-2); display:block; margin-bottom: 6px;">اسم العميل</label>
+          <input class="input" placeholder="مثال: أحمد المالكي" value="نورا الحربي" />
+        </div>
+        <div>
+          <label style="font-size: 12.5px; font-weight: 500; color: var(--text-2); display:block; margin-bottom: 6px;">رقم الجوال</label>
+          <input class="input num" placeholder="+966 5X XXX XXXX" value="+966 55 234 7891" dir="ltr" style="text-align: right;" />
+        </div>
+        <div>
+          <label style="font-size: 12.5px; font-weight: 500; color: var(--text-2); display:block; margin-bottom: 6px;">الفرع</label>
+          <select class="input">
+            <option>فرع الرياض — العليا</option>
+            <option>فرع جدة — الحمراء</option>
+            <option>فرع مكة — العزيزية</option>
+            <option>فرع الخبر — الظهران</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size: 12.5px; font-weight: 500; color: var(--text-2); display:block; margin-bottom: 6px;">رسالة (اختياري)</label>
+          <textarea class="input" rows="3" style="resize: vertical;">شكراً لزيارتك! نتمنى لو تشاركنا رأيك بتقييم سريع 🙏</textarea>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top: 8px;">
+          <button class="btn btn-primary" style="flex: 1;"><i class="ti ti-brand-whatsapp" style="font-size:15px;"></i>إرسال عبر واتساب</button>
+          <button class="btn btn-secondary"><i class="ti ti-copy" style="font-size:14px;"></i>نسخ الرابط</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap: 14px;">
+      <!-- Channel options -->
+      <div class="card" style="padding: 20px;">
+        <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 14px;">قنوات التوصيل</h3>
+        <div style="display:flex; flex-direction:column; gap: 10px;">
+          <div style="display:flex; align-items:center; gap: 12px; padding: 10px; background: var(--primary-50); border-radius: 8px; border: 1px solid var(--primary-light);">
+            <div style="width:32px; height:32px; background: var(--primary); color:white; border-radius:8px; display:flex; align-items:center; justify-content:center;"><i class="ti ti-wifi" style="font-size: 17px;"></i></div>
+            <div style="flex:1;">
+              <div style="font-size: 13.5px; font-weight: 500;">بطاقة NFC</div>
+              <div style="font-size: 11.5px; color: var(--text-3);">الوسيلة الأساسية داخل الفرع</div>
+            </div>
+            <span class="badge badge-good">مُفعّل</span>
+          </div>
+          <div style="display:flex; align-items:center; gap: 12px; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+            <div style="width:32px; height:32px; background:#DCFCE7; color:#15803D; border-radius:8px; display:flex; align-items:center; justify-content:center;"><i class="ti ti-brand-whatsapp" style="font-size: 17px;"></i></div>
+            <div style="flex:1;">
+              <div style="font-size: 13.5px; font-weight: 500;">واتساب</div>
+              <div style="font-size: 11.5px; color: var(--text-3);">إرسال مباشر للعميل</div>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap: 12px; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+            <div style="width:32px; height:32px; background:#F1F3F5; color:var(--text-2); border-radius:8px; display:flex; align-items:center; justify-content:center;"><i class="ti ti-link" style="font-size: 17px;"></i></div>
+            <div style="flex:1;">
+              <div style="font-size: 13.5px; font-weight: 500;">رابط مباشر</div>
+              <div style="font-size: 11.5px; color: var(--text-3);">يمكن مشاركته في أي قناة</div>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap: 12px; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+            <div style="width:32px; height:32px; background:#F1F3F5; color:var(--text-2); border-radius:8px; display:flex; align-items:center; justify-content:center;"><i class="ti ti-qrcode" style="font-size: 17px;"></i></div>
+            <div style="flex:1;">
+              <div style="font-size: 13.5px; font-weight: 500;">QR Code</div>
+              <div style="font-size: 11.5px; color: var(--text-3);">عند الحاجة كخيار إضافي</div>
+            </div>
+            <div class="toggle" onclick="this.classList.toggle('on')"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent sent -->
+      <div class="card" style="padding: 20px;">
+        <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 12px;">آخر الإرسالات</h3>
+        <div style="display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:center; gap:10px; padding: 8px 0; border-bottom:1px solid var(--border);">
+            <div class="avatar">عس</div>
+            <div style="flex:1;">
+              <div style="font-size: 13px; font-weight: 500;">عبدالله السالم</div>
+              <div style="font-size: 11.5px; color: var(--text-3);">منذ 5 دقائق</div>
+            </div>
+            <span class="badge badge-good"><i class="ti ti-check" style="font-size:11px;"></i>تم التقييم</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px; padding: 8px 0; border-bottom:1px solid var(--border);">
+            <div class="avatar" style="background:#FCE7F3; color:#BE185D;">رل</div>
+            <div style="flex:1;">
+              <div style="font-size: 13px; font-weight: 500;">ريم اللحيدان</div>
+              <div style="font-size: 11.5px; color: var(--text-3);">منذ 20 دقيقة</div>
+            </div>
+            <span class="badge badge-warn">في الانتظار</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px; padding: 8px 0;">
+            <div class="avatar" style="background:#DBEAFE; color:#1E40AF;">سع</div>
+            <div style="flex:1;">
+              <div style="font-size: 13px; font-weight: 500;">سعد القحطاني</div>
+              <div style="font-size: 11.5px; color: var(--text-3);">منذ ساعة</div>
+            </div>
+            <span class="badge badge-info">مفتوحة</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ============== PAGE: CUSTOMER (Mobile preview) ============== -->
+<div id="page-customer" class="page">
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">صفحة العميل</h1>
+      <p class="page-subtitle">معاينة تجربة العميل على الجوال — مما يراه فعلياً</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-secondary"><i class="ti ti-eye" style="font-size:14px;"></i>معاينة مباشرة</button>
+      <button class="btn btn-secondary"><i class="ti ti-palette" style="font-size:14px;"></i>تخصيص</button>
+    </div>
+  </div>
+
+  <div style="background: linear-gradient(180deg, #F1F3F5 0%, var(--bg) 100%); border-radius: 16px; padding: 40px 24px; display:flex; gap: 32px; justify-content:center; align-items:flex-start; border: 1px solid var(--border);">
+
+    <!-- Phone 1: Star rating -->
+    <div>
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen" dir="rtl">
+          <div style="background: var(--primary); padding: 24px 20px 20px; color:white;">
+            <div style="display:flex; align-items:center; gap: 8px; margin-top: 18px;">
+              <div style="width:24px; height:24px; background: white; color: var(--primary); border-radius: 5px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 13px;">R</div>
+              <div style="font-size: 13px; font-weight: 600;">مطعم الفرسان</div>
+            </div>
+            <div style="font-size: 11.5px; opacity: 0.85; margin-top: 2px;">فرع الرياض - العليا</div>
+          </div>
+          <div style="padding: 28px 20px; text-align: center;">
+            <div style="font-size: 14.5px; font-weight: 500; color: var(--text-1);">كيف كانت تجربتك معنا اليوم؟</div>
+            <div style="font-size: 11.5px; color: var(--text-3); margin-top: 4px;">قيّمنا من 1 إلى 5 نجوم</div>
+            <div style="display:flex; justify-content:center; gap: 4px; margin-top: 20px;">
+              <span class="star filled">★</span>
+              <span class="star filled">★</span>
+              <span class="star filled">★</span>
+              <span class="star filled">★</span>
+              <span class="star">★</span>
+            </div>
+            <div style="font-size: 13px; color: var(--text-2); margin-top: 12px;">4 من 5 — جيد جداً</div>
+          </div>
+          <div style="padding: 0 20px;">
+            <button class="btn btn-primary" style="width: 100%; padding: 11px; font-size: 14px; justify-content: center;">متابعة</button>
+          </div>
+          <div style="position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; font-size: 10.5px; color: var(--text-4);">
+            مدعوم بواسطة RepuSystem
+          </div>
+        </div>
+      </div>
+      <div style="text-align: center; margin-top: 14px; font-size: 12.5px; color: var(--text-2); font-weight: 500;">1. التقييم</div>
+    </div>
+
+    <!-- Phone 2: Feedback form -->
+    <div>
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen" dir="rtl">
+          <div style="background: var(--primary); padding: 24px 20px 20px; color:white;">
+            <div style="display:flex; align-items:center; gap: 8px; margin-top: 18px;">
+              <div style="width:24px; height:24px; background: white; color: var(--primary); border-radius: 5px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 13px;">R</div>
+              <div style="font-size: 13px; font-weight: 600;">مطعم الفرسان</div>
+            </div>
+            <div style="font-size: 11.5px; opacity: 0.85; margin-top: 2px;">فرع الخبر - الظهران</div>
+          </div>
+          <div style="padding: 24px 20px;">
+            <div style="font-size: 14px; font-weight: 500; color: var(--text-1); margin-bottom: 4px;">نأسف أن التجربة لم تكن مثالية</div>
+            <div style="font-size: 11.5px; color: var(--text-3); margin-bottom: 18px;">أخبرنا ماذا حدث وسنتواصل معك خلال ساعة</div>
+
+            <div style="font-size: 12px; color: var(--text-2); margin-bottom: 6px; font-weight: 500;">ما المشكلة؟</div>
+            <div style="display:flex; flex-direction: column; gap: 6px; margin-bottom: 14px;">
+              <div style="padding: 8px 12px; border: 1px solid var(--primary); background: var(--primary-50); border-radius: 7px; font-size: 12px; color: var(--primary); display:flex; align-items:center; gap:6px;"><i class="ti ti-check" style="font-size:13px;"></i>تأخير الطلب</div>
+              <div style="padding: 8px 12px; border: 1px solid var(--border); background: white; border-radius: 7px; font-size: 12px; color: var(--text-2);">جودة الطعام</div>
+              <div style="padding: 8px 12px; border: 1px solid var(--border); background: white; border-radius: 7px; font-size: 12px; color: var(--text-2);">خدمة العملاء</div>
+            </div>
+
+            <textarea placeholder="تفاصيل إضافية (اختياري)…" style="width:100%; padding: 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 7px; font-family: inherit; resize: none; height: 70px;"></textarea>
+          </div>
+          <div style="padding: 0 20px;">
+            <button class="btn btn-primary" style="width: 100%; padding: 11px; font-size: 13.5px; justify-content: center;">إرسال للإدارة</button>
+          </div>
+        </div>
+      </div>
+      <div style="text-align: center; margin-top: 14px; font-size: 12.5px; color: var(--text-2); font-weight: 500;">2. ملاحظة خاصة (تقييم منخفض)</div>
+    </div>
+
+    <!-- Phone 3: Thank you -->
+    <div>
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen" dir="rtl">
+          <div style="background: var(--primary); padding: 24px 20px 20px; color:white;">
+            <div style="display:flex; align-items:center; gap: 8px; margin-top: 18px;">
+              <div style="width:24px; height:24px; background: white; color: var(--primary); border-radius: 5px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 13px;">R</div>
+              <div style="font-size: 13px; font-weight: 600;">مطعم الفرسان</div>
+            </div>
+          </div>
+          <div style="padding: 40px 24px; text-align: center;">
+            <div style="width: 80px; height: 80px; background: var(--good-light); border-radius: 50%; display:flex; align-items:center; justify-content:center; margin: 0 auto 18px;">
+              <i class="ti ti-check" style="font-size: 40px; color: var(--good);"></i>
+            </div>
+            <div style="font-size: 18px; font-weight: 600; color: var(--text-1);">شكراً لك! 🙏</div>
+            <div style="font-size: 12.5px; color: var(--text-2); margin-top: 8px; line-height: 1.6;">تم استلام تقييمك. نقدّر وقتك في مساعدتنا على تقديم تجربة أفضل.</div>
+
+            <div style="margin-top: 24px; padding: 14px; background: var(--good-light); border-radius: 10px; border: 1px dashed var(--good);">
+              <div style="font-size: 11.5px; color: #047857; font-weight: 500;">هدية شكرنا لك</div>
+              <div style="font-family: 'Inter', monospace; font-size: 17px; font-weight: 600; color: #047857; margin-top: 4px; letter-spacing: 1px;">SHUKRAN20</div>
+              <div style="font-size: 11px; color: #047857; margin-top: 4px;">خصم 20% على زيارتك القادمة</div>
+            </div>
+          </div>
+          <div style="position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; font-size: 10.5px; color: var(--text-4);">
+            مدعوم بواسطة RepuSystem
+          </div>
+        </div>
+      </div>
+      <div style="text-align: center; margin-top: 14px; font-size: 12.5px; color: var(--text-2); font-weight: 500;">3. الشكر والمكافأة</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 24px; padding: 20px;">
+    <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 14px;">تدفق التجربة</h3>
+    <div style="display:flex; align-items:center; gap: 0; flex-wrap: wrap;">
+      <div style="display:flex; flex-direction:column; align-items:center; flex: 1; min-width: 130px;">
+        <div style="width:36px; height:36px; background: var(--primary-light); color: var(--primary); border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom: 8px;"><i class="ti ti-wifi" style="font-size: 18px;"></i></div>
+        <div style="font-size: 12.5px; font-weight: 500;">لمسة NFC</div>
+        <div style="font-size: 11px; color: var(--text-3); margin-top:2px;">في الفرع</div>
+      </div>
+      <i class="ti ti-arrow-left" style="color: var(--text-3); font-size: 18px;"></i>
+      <div style="display:flex; flex-direction:column; align-items:center; flex: 1; min-width: 130px;">
+        <div style="width:36px; height:36px; background: var(--primary-light); color: var(--primary); border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom: 8px;"><i class="ti ti-star" style="font-size: 18px;"></i></div>
+        <div style="font-size: 12.5px; font-weight: 500;">تقييم النجوم</div>
+        <div style="font-size: 11px; color: var(--text-3); margin-top:2px;">3 ثوانٍ</div>
+      </div>
+      <i class="ti ti-arrow-left" style="color: var(--text-3); font-size: 18px;"></i>
+      <div style="display:flex; flex-direction:column; align-items:center; flex: 1; min-width: 130px;">
+        <div style="width:36px; height:36px; background: var(--good-light); color: var(--good); border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom: 8px;"><i class="ti ti-brand-google" style="font-size: 18px;"></i></div>
+        <div style="font-size: 12.5px; font-weight: 500;">راضٍ ← Google</div>
+        <div style="font-size: 11px; color: var(--text-3); margin-top:2px;">4-5 نجوم</div>
+      </div>
+      <i class="ti ti-arrow-left" style="color: var(--text-3); font-size: 18px;"></i>
+      <div style="display:flex; flex-direction:column; align-items:center; flex: 1; min-width: 130px;">
+        <div style="width:36px; height:36px; background: var(--warn-light); color: var(--warn); border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom: 8px;"><i class="ti ti-message-circle" style="font-size: 18px;"></i></div>
+        <div style="font-size: 12.5px; font-weight: 500;">غير راضٍ ← خاص</div>
+        <div style="font-size: 11px; color: var(--text-3); margin-top:2px;">1-3 نجوم</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ============== PAGE: TEAM ============== -->
+<div id="page-team" class="page">
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">الفريق والصلاحيات</h1>
+      <p class="page-subtitle">إدارة المستخدمين والصلاحيات لكل دور</p>
+    </div>
+    <button class="btn btn-primary"><i class="ti ti-user-plus" style="font-size:14px;"></i>دعوة عضو</button>
+  </div>
+
+  <div class="card" style="padding: 0;">
+    <table class="data-table">
+      <thead>
+        <tr><th>العضو</th><th>الدور</th><th>الفروع</th><th>آخر نشاط</th><th>الحالة</th><th></th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div style="display:flex; align-items:center; gap:10px;"><div class="avatar" style="background: var(--purple-light); color: var(--purple);">حم</div><div><div style="font-size:13px; font-weight:500;">حامد العتيبي</div><div style="font-size:11.5px; color:var(--text-3);">hamed@alforsan.sa</div></div></div></td>
+          <td><span class="badge badge-info">مدير عام</span></td>
+          <td style="font-size:13px;">جميع الفروع</td>
+          <td style="font-size:12.5px; color:var(--text-3);">الآن</td>
+          <td><span class="badge badge-good">نشط</span></td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+        <tr>
+          <td><div style="display:flex; align-items:center; gap:10px;"><div class="avatar" style="background:#DDD6FE; color:#6D28D9;">سع</div><div><div style="font-size:13px; font-weight:500;">سعد القحطاني</div><div style="font-size:11.5px; color:var(--text-3);">saad@alforsan.sa</div></div></div></td>
+          <td><span class="badge badge-neutral">مدير فرع</span></td>
+          <td style="font-size:13px;">الرياض - العليا</td>
+          <td style="font-size:12.5px; color:var(--text-3);">منذ 5 دقائق</td>
+          <td><span class="badge badge-good">نشط</span></td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+        <tr>
+          <td><div style="display:flex; align-items:center; gap:10px;"><div class="avatar" style="background:#FCE7F3; color:#BE185D;">من</div><div><div style="font-size:13px; font-weight:500;">منى الزهراني</div><div style="font-size:11.5px; color:var(--text-3);">muna@alforsan.sa</div></div></div></td>
+          <td><span class="badge badge-neutral">مدير فرع</span></td>
+          <td style="font-size:13px;">جدة - الحمراء</td>
+          <td style="font-size:12.5px; color:var(--text-3);">منذ ساعة</td>
+          <td><span class="badge badge-good">نشط</span></td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+        <tr>
+          <td><div style="display:flex; align-items:center; gap:10px;"><div class="avatar" style="background:#FEF3C7; color:#92400E;">طع</div><div><div style="font-size:13px; font-weight:500;">طارق العنزي</div><div style="font-size:11.5px; color:var(--text-3);">tareq@alforsan.sa</div></div></div></td>
+          <td><span class="badge badge-neutral">موظف خدمة</span></td>
+          <td style="font-size:13px;">مكة - العزيزية</td>
+          <td style="font-size:12.5px; color:var(--text-3);">منذ يومين</td>
+          <td><span class="badge badge-warn">في الانتظار</span></td>
+          <td><i class="ti ti-dots-vertical" style="color:var(--text-3); cursor:pointer;"></i></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ============== PAGE: SETTINGS ============== -->
+<div id="page-settings" class="page">
+<div class="content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">إعدادات الحساب</h1>
+      <p class="page-subtitle">إدارة الإعدادات العامة والتكاملات</p>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns: 220px 1fr; gap: 24px;">
+    <div>
+      <a class="nav-item active"><i class="ti ti-building"></i>المؤسسة</a>
+      <a class="nav-item"><i class="ti ti-brand-google"></i>تكامل Google</a>
+      <a class="nav-item"><i class="ti ti-brand-whatsapp"></i>تكامل واتساب</a>
+      <a class="nav-item"><i class="ti ti-bell-ringing"></i>الإشعارات</a>
+      <a class="nav-item"><i class="ti ti-credit-card"></i>الفوترة</a>
+      <a class="nav-item"><i class="ti ti-key"></i>API ومفاتيح</a>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap: 14px;">
+      <div class="card" style="padding: 24px;">
+        <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 4px;">معلومات المؤسسة</h3>
+        <p style="font-size: 12.5px; color: var(--text-3); margin: 0 0 18px;">هذه المعلومات تظهر للعميل في صفحة التقييم</p>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <div>
+            <label style="font-size: 12.5px; font-weight: 500; color: var(--text-2); display:block; margin-bottom: 6px;">اسم المؤسسة</label>
+            <input class="input" value="مطاعم الفرسان" />
+          </div>
+          <div>
+            <label style="font-size: 12.5px; font-weight: 500; color: var(--text-2); display:block; margin-bottom: 6px;">القطاع</label>
+            <select class="input"><option>مطاعم وكافيهات</option></select>
+          </div>
+          <div>
+            <label style="font-size: 12.5px; font-weight: 500; color: var(--text-2); display:block; margin-bottom: 6px;">الموقع الرئيسي</label>
+            <select class="input"><option>الرياض، المملكة العربية السعودية</option></select>
+          </div>
+          <div>
+            <label style="font-size: 12.5px; font-weight: 500; color: var(--text-2); display:block; margin-bottom: 6px;">المنطقة الزمنية</label>
+            <select class="input"><option>Asia/Riyadh (GMT+3)</option></select>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top: 20px;">
+          <button class="btn btn-primary">حفظ التغييرات</button>
+          <button class="btn btn-ghost">إلغاء</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding: 24px;">
+        <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 4px;">شعار الفرع</h3>
+        <p style="font-size: 12.5px; color: var(--text-3); margin: 0 0 18px;">يظهر في أعلى صفحة العميل</p>
+
+        <div style="display:flex; align-items:center; gap: 16px;">
+          <div style="width: 64px; height: 64px; background: var(--primary); color:white; border-radius: 12px; display:flex; align-items:center; justify-content:center; font-weight: 700; font-size: 24px; font-family: 'Inter', sans-serif;">R</div>
+          <div>
+            <button class="btn btn-secondary"><i class="ti ti-upload" style="font-size:14px;"></i>رفع شعار</button>
+            <div style="font-size: 11.5px; color: var(--text-3); margin-top: 6px;">PNG أو SVG · حد أقصى 2MB</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+</main>
+
+<script>
+function showPage(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + pageId).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  event.target.closest('.nav-item').classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+// Charts
+Chart.defaults.font.family = "'IBM Plex Sans Arabic', 'Inter', sans-serif";
+Chart.defaults.color = '#4A5163';
+Chart.defaults.borderColor = '#E6E8EB';
+
+window.addEventListener('load', () => {
+  // Main chart on overview
+  const mainCtx = document.getElementById('mainChart');
+  if (mainCtx) {
+    new Chart(mainCtx, {
+      type: 'line',
+      data: {
+        labels: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو'],
+        datasets: [
+          {
+            label: 'الشكاوى',
+            data: [120, 155, 132, 180, 145, 87],
+            borderColor: '#0052FF',
+            backgroundColor: 'rgba(0,82,255,0.06)',
+            tension: 0.35,
+            fill: true,
+            borderWidth: 2.5,
+            pointRadius: 0,
+            pointHoverRadius: 5
+          },
+          {
+            label: 'التقييمات',
+            data: [80, 95, 110, 124, 132, 142],
+            borderColor: '#10B981',
+            backgroundColor: 'rgba(16,185,129,0.06)',
+            tension: 0.35,
+            fill: true,
+            borderWidth: 2.5,
+            pointRadius: 0,
+            pointHoverRadius: 5
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, padding: 14, font: { size: 12 } } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+          y: { grid: { color: '#F1F3F5' }, border: { display: false }, ticks: { font: { size: 11 } }, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  // Branch comparison chart
+  const branchCtx = document.getElementById('branchChart');
+  if (branchCtx) {
+    new Chart(branchCtx, {
+      type: 'bar',
+      data: {
+        labels: ['الرياض', 'جدة', 'مكة', 'الخبر'],
+        datasets: [{
+          data: [94, 88, 79, 68],
+          backgroundColor: ['#0052FF', '#0052FF', '#F59E0B', '#EF4444'],
+          borderRadius: 6,
+          maxBarThickness: 50
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: '#F1F3F5' }, border: { display: false }, beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } }
+        }
+      }
+    });
+  }
+
+  // Complaint reasons donut
+  const reasonCtx = document.getElementById('reasonChart');
+  if (reasonCtx) {
+    new Chart(reasonCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['تأخير الطلب', 'جودة الطعام', 'خدمة العملاء', 'النظافة', 'أخرى'],
+        datasets: [{
+          data: [38, 24, 18, 12, 8],
+          backgroundColor: ['#0052FF', '#8B5CF6', '#F59E0B', '#10B981', '#94A3B8'],
+          borderWidth: 0,
+          spacing: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: { position: 'right', labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, padding: 12, font: { size: 12 } } }
+        }
+      }
+    });
+  }
+
+  // NPS trend
+  const npsCtx = document.getElementById('npsTrendChart');
+  if (npsCtx) {
+    new Chart(npsCtx, {
+      type: 'line',
+      data: {
+        labels: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو'],
+        datasets: [{
+          label: 'NPS',
+          data: [72, 76, 74, 81, 84, 87],
+          borderColor: '#0052FF',
+          backgroundColor: 'rgba(0,82,255,0.08)',
+          tension: 0.4,
+          fill: true,
+          borderWidth: 3,
+          pointBackgroundColor: '#0052FF',
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: '#F1F3F5' }, border: { display: false }, beginAtZero: false, min: 60, max: 100, ticks: { callback: v => v + '%' } }
+        }
+      }
+    });
+  }
+});
+</script>
+
+</body>
+</html>

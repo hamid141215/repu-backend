@@ -1,10 +1,15 @@
 require('dotenv').config();
-const express = require('express');
-const cors    = require('cors');
-const { Pool }  = require('pg');
-const axios     = require('axios');
-const path      = require('path');
-const QRCode    = require('qrcode');
+const express  = require('express');
+const cors     = require('cors');
+const { rateLimit } = require('express-rate-limit');
+const archiver = require('archiver');
+const { Pool } = require('pg');
+const axios    = require('axios');
+const path     = require('path');
+const QRCode   = require('qrcode');
+const bcrypt   = require('bcryptjs');
+const crypto   = require('crypto');
+const nodemailer = require('nodemailer');
 
 const app = express();
 
@@ -13,8 +18,10 @@ const app = express();
 // localhost:3000 (dev). Same-origin requests from the legacy admin.html
 // dashboard skip the cors middleware entirely, so this change is non-breaking.
 const CORS_ALLOWLIST = [
-    'https://app.repu.mawjatalsamt.com',
-    'http://localhost:3000'
+    'https://repu.mawjatalsamt.com',          // SPA + assets served from same origin
+    'https://app.repu.mawjatalsamt.com',      // legacy planned subdomain (Phase 3)
+    'http://localhost:3000',                  // Next.js dev (legacy)
+    'http://localhost:5173'                   // Vite dev
 ];
 app.use(cors({
     origin: (origin, cb) => {
@@ -28,8 +35,43 @@ app.use(cors({
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '2mb' })); // CSV imports can be ~500KB for 200 branches
 app.use(express.urlencoded({ extended: true }));
+
+// ─── Rate limiting (Phase D — for 190-branch enterprise launch) ─────────────
+// Strategy: layered limits — generous for authenticated dashboard, tighter for
+// public touch-points, near-unlimited for webhook (controlled by WhatsApp).
+// All limiters key on the api_key (when present) or client IP.
+const authKeyOrIp = (req) => req.headers['x-api-key'] || req.ip;
+const rateLimitOpts = {
+    standardHeaders: 'draft-7',  // RateLimit-* headers
+    legacyHeaders: false,
+    skip: (req) => process.env.DISABLE_RATE_LIMIT === 'true'
+};
+const limitAuth = rateLimit({
+    ...rateLimitOpts,
+    windowMs: 60 * 1000,
+    max: 300,
+    keyGenerator: authKeyOrIp,
+    message: { error: 'تجاوزت الحد المسموح من الطلبات. حاول بعد دقيقة.' }
+});
+const limitPublic = rateLimit({
+    ...rateLimitOpts,
+    windowMs: 60 * 1000,
+    max: 60,
+    message: { error: 'Too many requests. Please slow down.' }
+});
+const limitWebhook = rateLimit({
+    ...rateLimitOpts,
+    windowMs: 60 * 1000,
+    max: 600
+});
+// Apply path-specific limiters (Express resolves them in order — auth wins over public for /api/*)
+app.use('/webhook',         limitWebhook);
+app.use('/api/public',      limitPublic);
+app.use('/api/qr',          limitPublic);
+app.use('/api',             limitAuth);
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Phone normalization ───────────────────────────────────────────────────
@@ -216,6 +258,63 @@ const initDB = async (retries = 10) => {
         await pool.query('CREATE INDEX IF NOT EXISTS idx_evaluations_client_status ON evaluations (client_id, status, sent_at DESC)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_evaluations_client_rating ON evaluations (client_id, rating, sent_at DESC)');
 
+        // ─── Phase E: Multi-user (team + roles) ─────────────────────────
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id            SERIAL PRIMARY KEY,
+                client_id     INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                email         VARCHAR(255) NOT NULL,
+                name          VARCHAR(255) NOT NULL,
+                password_hash TEXT,
+                role          VARCHAR(20) NOT NULL DEFAULT 'viewer',
+                is_active     BOOLEAN     NOT NULL DEFAULT true,
+                created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                last_login_at TIMESTAMPTZ
+            )
+        `);
+        // Add role check, but tolerate existing rows
+        await pool.query(`
+            DO $$ BEGIN
+                ALTER TABLE users ADD CONSTRAINT users_role_chk
+                    CHECK (role IN ('owner', 'manager', 'viewer'));
+            EXCEPTION WHEN duplicate_object THEN NULL;
+            WHEN duplicate_table THEN NULL;
+            END $$;
+        `);
+        await pool.query(`
+            DO $$ BEGIN
+                ALTER TABLE users ADD CONSTRAINT users_client_email_uniq
+                    UNIQUE (client_id, email);
+            EXCEPTION WHEN duplicate_object THEN NULL;
+            WHEN duplicate_table THEN NULL;
+            END $$;
+        `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                id          SERIAL PRIMARY KEY,
+                user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token_hash  VARCHAR(128) NOT NULL UNIQUE,
+                expires_at  TIMESTAMPTZ NOT NULL,
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                ip          VARCHAR(50),
+                user_agent  TEXT
+            )
+        `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id          SERIAL PRIMARY KEY,
+                user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token_hash  VARCHAR(128) NOT NULL UNIQUE,
+                expires_at  TIMESTAMPTZ NOT NULL,
+                used_at     TIMESTAMPTZ,
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        `);
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_users_client_email ON users (client_id, lower(email))');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON user_sessions (token_hash)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_sessions_expires ON user_sessions (expires_at)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_resets_token_hash ON password_resets (token_hash)');
+
         // Unique (client_id, name) on branches — guards the text-match join
         // used by branch aggregations. Fails loudly if existing data violates,
         // which is intentional: fix manually before retrying.
@@ -239,17 +338,72 @@ const initDB = async (retries = 10) => {
     }
 };
 
+// ─── Auth helpers (Phase E) ───────────────────────────────────────────────
+const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
+const generateToken = () => crypto.randomBytes(32).toString('hex');
+const hashPassword = (pw) => bcrypt.hash(String(pw), 10);
+const verifyPassword = (pw, hash) => bcrypt.compare(String(pw), String(hash || ''));
+
+const SESSION_TTL_DAYS = 30;
+const RESET_TTL_MIN = 60;
+
 // ─── Auth middleware ───────────────────────────────────────────────────────
+// Accepts EITHER:
+//   - x-api-key (legacy / owner master key) → req.role = 'owner', req.user = null
+//   - Authorization: Bearer <session_token> → req.role = user's role, req.user = {...}
+// Both populate req.clientData with the client row.
 const authenticate = async (req, res, next) => {
-    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
-    if (!apiKey) return res.status(401).json({ error: 'Missing API Key' });
-    const { rows } = await pool.query(
-        'SELECT * FROM clients WHERE api_key = $1',
-        [apiKey.trim()]
-    );
-    if (rows.length === 0) return res.status(403).json({ error: 'Invalid API Key' });
-    req.clientData = rows[0];
-    next();
+    try {
+        const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+        const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+
+        if (apiKey) {
+            const { rows } = await pool.query(
+                'SELECT * FROM clients WHERE api_key = $1',
+                [String(apiKey).trim()]
+            );
+            if (rows.length === 0) return res.status(403).json({ error: 'Invalid API Key' });
+            req.clientData = rows[0];
+            req.user = null;
+            req.role = 'owner';
+            return next();
+        }
+
+        if (bearer) {
+            const { rows: sessions } = await pool.query(
+                `SELECT s.user_id, s.expires_at,
+                        u.client_id, u.email, u.name, u.role, u.is_active
+                 FROM user_sessions s
+                 JOIN users u ON u.id = s.user_id
+                 WHERE s.token_hash = $1 AND s.expires_at > NOW()`,
+                [hashToken(bearer)]
+            );
+            const session = sessions[0];
+            if (!session) return res.status(401).json({ error: 'انتهت الجلسة، يرجى تسجيل الدخول من جديد' });
+            if (!session.is_active) return res.status(403).json({ error: 'تم تعطيل هذا المستخدم' });
+            const { rows: clients } = await pool.query(
+                'SELECT * FROM clients WHERE id = $1',
+                [session.client_id]
+            );
+            if (!clients[0]) return res.status(404).json({ error: 'Client not found' });
+            req.clientData = clients[0];
+            req.user = { id: session.user_id, email: session.email, name: session.name };
+            req.role = session.role;
+            return next();
+        }
+
+        return res.status(401).json({ error: 'Missing API Key or session token' });
+    } catch (e) {
+        console.error('authenticate error:', e.message);
+        return res.status(500).json({ error: 'Auth error' });
+    }
+};
+
+// Role-based access — pass allowed roles, fail with 403 otherwise.
+const requireRole = (...allowed) => (req, res, next) => {
+    if (!req.role) return res.status(401).json({ error: 'Unauthorized' });
+    if (allowed.includes(req.role)) return next();
+    return res.status(403).json({ error: 'ليس لديك الصلاحية للقيام بهذا الإجراء' });
 };
 
 const superAdminAuth = (req, res, next) => {
@@ -257,6 +411,124 @@ const superAdminAuth = (req, res, next) => {
     if (adminPass !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
     next();
 };
+
+// ─── Email transport (Phase F) ─────────────────────────────────────────────
+// Activates when SMTP_HOST is set. Required env vars:
+//   SMTP_HOST       smtp.example.com  (e.g. email-smtp.eu-north-1.amazonaws.com)
+//   SMTP_PORT       587
+//   SMTP_USER       <iam-smtp-username or app-password>
+//   SMTP_PASS       <smtp-password>
+//   EMAIL_FROM      "RepuSystem <no-reply@mawjatalsamt.com>"
+// Optional:
+//   SMTP_SECURE     'true' for port 465; default is false (STARTTLS on 587)
+let mailTransport = null;
+function getMailTransport() {
+    if (!process.env.SMTP_HOST) return null;
+    if (mailTransport) return mailTransport;
+    mailTransport = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587', 10),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: process.env.SMTP_USER ? {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS
+        } : undefined
+    });
+    return mailTransport;
+}
+const isEmailEnabled = () => !!process.env.SMTP_HOST;
+
+function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
+// Minimal Arabic-first HTML email template
+function wrapHtml(title, contentHtml) {
+    return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="UTF-8"><title>${escapeHtml(title)}</title></head>
+<body style="margin:0;padding:0;background:#FAFBFC;font-family:'IBM Plex Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;color:#0A0E1A;">
+  <div style="max-width:560px;margin:32px auto;padding:0 16px;">
+    <div style="background:#fff;border:1px solid #E6E8EB;border-radius:10px;padding:28px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
+        <div style="width:32px;height:32px;background:#0052FF;color:white;font-weight:700;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;font-family:Inter,sans-serif;">R</div>
+        <div style="font-size:16px;font-weight:600;">RepuSystem</div>
+      </div>
+      ${contentHtml}
+    </div>
+    <div style="text-align:center;color:#8B92A3;font-size:11.5px;margin-top:16px;">
+      هذه رسالة آلية من RepuSystem. إذا لم تتوقع هذا الإيميل، تجاهله.
+    </div>
+  </div>
+</body></html>`;
+}
+
+async function sendInviteEmail({ to, name, inviterName, clientName, role, inviteUrl }) {
+    const transport = getMailTransport();
+    if (!transport) return { sent: false, reason: 'email_not_configured' };
+
+    const subject = `دعوة للانضمام إلى ${clientName} على RepuSystem`;
+    const roleLabel = role === 'manager' ? 'مدير' : 'مشاهد';
+    const safeUrl = escapeHtml(inviteUrl);
+    const html = wrapHtml(subject, `
+      <h1 style="font-size:18px;margin:0 0 14px;">مرحباً ${escapeHtml(name)} 👋</h1>
+      <p style="font-size:14px;line-height:1.7;color:#4A5163;margin:0 0 16px;">
+        ${escapeHtml(inviterName || 'المسؤول')} دعاك للانضمام إلى لوحة <strong>${escapeHtml(clientName)}</strong>
+        على RepuSystem كـ <strong>${roleLabel}</strong>.
+      </p>
+      <p style="font-size:13.5px;line-height:1.7;color:#4A5163;margin:0 0 18px;">
+        اضغط الزر التالي لتفعيل حسابك واختيار كلمة المرور:
+      </p>
+      <p style="text-align:center;margin:24px 0;">
+        <a href="${safeUrl}" style="background:#0052FF;color:white;text-decoration:none;padding:11px 22px;border-radius:7px;font-size:14px;font-weight:600;display:inline-block;">تفعيل الحساب</a>
+      </p>
+      <p style="font-size:12px;color:#8B92A3;margin:18px 0 0;">
+        لا يمكنك الضغط على الزر؟ انسخ الرابط التالي والصقه في المتصفح:
+      </p>
+      <p style="font-family:monospace;font-size:11.5px;color:#4A5163;word-break:break-all;direction:ltr;text-align:left;background:#F4F5F7;padding:8px 10px;border-radius:6px;margin:6px 0 0;">${safeUrl}</p>
+      <p style="font-size:11.5px;color:#8B92A3;margin:18px 0 0;">الرابط صالح لمدة 7 أيام.</p>
+    `);
+    const text = `مرحباً ${name},\n\n${inviterName || 'المسؤول'} دعاك للانضمام إلى ${clientName} على RepuSystem كـ ${roleLabel}.\nلتفعيل حسابك واختيار كلمة المرور:\n${inviteUrl}\n\nالرابط صالح لمدة 7 أيام.\n— RepuSystem`;
+
+    await transport.sendMail({
+        from: process.env.EMAIL_FROM || 'no-reply@repusystem.local',
+        to, subject, html, text
+    });
+    return { sent: true };
+}
+
+async function sendPasswordResetEmail({ to, resetUrl }) {
+    const transport = getMailTransport();
+    if (!transport) return { sent: false, reason: 'email_not_configured' };
+
+    const subject = 'إعادة تعيين كلمة المرور — RepuSystem';
+    const safeUrl = escapeHtml(resetUrl);
+    const html = wrapHtml(subject, `
+      <h1 style="font-size:18px;margin:0 0 14px;">إعادة تعيين كلمة المرور</h1>
+      <p style="font-size:14px;line-height:1.7;color:#4A5163;margin:0 0 16px;">
+        طلبت إعادة تعيين كلمة المرور لحسابك على RepuSystem.
+      </p>
+      <p style="text-align:center;margin:24px 0;">
+        <a href="${safeUrl}" style="background:#0052FF;color:white;text-decoration:none;padding:11px 22px;border-radius:7px;font-size:14px;font-weight:600;display:inline-block;">تعيين كلمة مرور جديدة</a>
+      </p>
+      <p style="font-size:12px;color:#8B92A3;margin:18px 0 0;">
+        أو الصق الرابط في المتصفح:
+      </p>
+      <p style="font-family:monospace;font-size:11.5px;color:#4A5163;word-break:break-all;direction:ltr;text-align:left;background:#F4F5F7;padding:8px 10px;border-radius:6px;margin:6px 0 0;">${safeUrl}</p>
+      <p style="font-size:11.5px;color:#8B92A3;margin:18px 0 0;">
+        الرابط صالح لمدة 60 دقيقة. إذا لم تطلب هذا، تجاهل الرسالة وكلمة مرورك ستبقى كما هي.
+      </p>
+    `);
+    const text = `إعادة تعيين كلمة المرور — RepuSystem\n\nلتعيين كلمة مرور جديدة:\n${resetUrl}\n\nالرابط صالح لمدة 60 دقيقة. إذا لم تطلب هذا، تجاهل الرسالة.`;
+
+    await transport.sendMail({
+        from: process.env.EMAIL_FROM || 'no-reply@repusystem.local',
+        to, subject, html, text
+    });
+    return { sent: true };
+}
 
 // ─── Health check ──────────────────────────────────────────────────────────
 app.get('/health', async (req, res) => {
@@ -991,7 +1263,7 @@ app.get('/api/dashboard-summary', authenticate, async (req, res) => {
     }
 });
 
-app.patch('/api/client/complaints/:id/status', authenticate, async (req, res) => {
+app.patch('/api/client/complaints/:id/status', authenticate, requireRole('owner', 'manager'), async (req, res) => {
     const id = parseInt(req.params.id, 10);
     const complaintStatus = normalizeComplaintStatus(req.body.complaint_status);
     const complaintNote = String(req.body.complaint_note || '').trim() || null;
@@ -1070,7 +1342,7 @@ app.get('/api/client-recent', async (req, res) => {
     }
 });
 
-app.post('/api/send', authenticate, async (req, res) => {
+app.post('/api/send', authenticate, requireRole('owner', 'manager'), async (req, res) => {
     const { phone, name, branch } = req.body;
     const cleanPhone = normalizePhone(phone);
     try {
@@ -1265,7 +1537,7 @@ app.get('/api/branches/:id', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/branches', authenticate, async (req, res) => {
+app.post('/api/branches', authenticate, requireRole('owner', 'manager'), async (req, res) => {
     const name = String(req.body.name || '').trim();
     const city = String(req.body.city || '').trim() || null;
     const area = String(req.body.area || '').trim() || null;
@@ -1303,7 +1575,7 @@ app.post('/api/branches', authenticate, async (req, res) => {
     }
 });
 
-app.patch('/api/branches/:id', authenticate, async (req, res) => {
+app.patch('/api/branches/:id', authenticate, requireRole('owner', 'manager'), async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid branch ID' });
     try {
@@ -1353,7 +1625,7 @@ app.patch('/api/branches/:id', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/branches/:id', authenticate, async (req, res) => {
+app.delete('/api/branches/:id', authenticate, requireRole('owner', 'manager'), async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid branch ID' });
     try {
@@ -1366,6 +1638,297 @@ app.delete('/api/branches/:id', authenticate, async (req, res) => {
     } catch (e) {
         console.error('DELETE /api/branches/:id:', e.message);
         res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── Phase D — Enterprise bulk operations (CSV import, batch QR ZIP) ──────
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Minimal CSV parser — handles RFC-4180 quotes + commas. No external dep.
+function parseCsv(text) {
+    const rows = [];
+    let row = [], field = '', inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQuotes) {
+            if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+            else if (c === '"') inQuotes = false;
+            else field += c;
+        } else {
+            if (c === '"') inQuotes = true;
+            else if (c === ',') { row.push(field); field = ''; }
+            else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+            else if (c === '\r') { /* skip */ }
+            else field += c;
+        }
+    }
+    if (field !== '' || row.length > 0) { row.push(field); rows.push(row); }
+    return rows.filter(r => r.length > 0 && r.some(v => v.trim() !== ''));
+}
+
+// Strip BOM and common spreadsheet artifacts
+function cleanCell(s) {
+    return String(s || '').replace(/^﻿/, '').trim();
+}
+
+// Find next sequential NFC ID for a client: {client_id}-001, -002, ...
+async function nextSequentialNfcIds(clientId, count) {
+    // Look at all existing nfc_ids matching the pattern, find the highest number.
+    const { rows } = await pool.query(
+        `SELECT nfc_id FROM branches
+         WHERE client_id = $1 AND nfc_id ~ ('^' || $1::text || '-[0-9]+$')`,
+        [clientId]
+    );
+    let maxN = 0;
+    for (const r of rows) {
+        const m = String(r.nfc_id).match(/-(\d+)$/);
+        if (m) {
+            const n = parseInt(m[1], 10);
+            if (n > maxN) maxN = n;
+        }
+    }
+    const ids = [];
+    for (let i = 1; i <= count; i++) {
+        ids.push(`${clientId}-${String(maxN + i).padStart(3, '0')}`);
+    }
+    return ids;
+}
+
+/**
+ * POST /api/branches/import
+ *
+ * Body:
+ *   { csv_text: string,        // CSV with header: branch_name,city,area,google_link
+ *     dry_run?: boolean,       // if true, validate only — nothing committed
+ *     skip_invalid?: boolean   // if true and not dry_run, import valid rows, skip invalid
+ *   }
+ *
+ * Response:
+ *   { total_rows, valid_rows, invalid_rows,
+ *     errors: [{ row, column?, message }, ...],
+ *     preview: [{ branch_name, city, area, google_link, nfc_id }, ...],
+ *     imported_count, imported_branches: [...] }
+ */
+app.post('/api/branches/import', authenticate, requireRole('owner', 'manager'), async (req, res) => {
+    const csvText = String(req.body.csv_text || '');
+    const dryRun = req.body.dry_run === true;
+    const skipInvalid = req.body.skip_invalid === true;
+    if (!csvText.trim()) return res.status(400).json({ error: 'csv_text is required' });
+
+    try {
+        const rows = parseCsv(csvText);
+        if (rows.length === 0) return res.status(400).json({ error: 'الملف فارغ' });
+
+        // Header — accept Arabic or English, normalize to known keys
+        const header = rows[0].map(c => cleanCell(c).toLowerCase());
+        const COL_MAP = {
+            'branch_name': 'name', 'name': 'name', 'اسم الفرع': 'name', 'الاسم': 'name',
+            'city': 'city', 'المدينة': 'city',
+            'area': 'area', 'الحي': 'area', 'المنطقة': 'area',
+            'google_link': 'google_link', 'google': 'google_link', 'رابط جوجل': 'google_link'
+        };
+        const colIndex = {};
+        header.forEach((h, i) => { if (COL_MAP[h]) colIndex[COL_MAP[h]] = i; });
+        if (colIndex.name === undefined) {
+            return res.status(400).json({ error: 'العمود branch_name مطلوب في رأس الملف' });
+        }
+
+        // Pre-fetch existing branch names + NFC IDs for this client to detect dupes.
+        const { rows: existing } = await pool.query(
+            'SELECT name, nfc_id FROM branches WHERE client_id = $1',
+            [req.clientData.id]
+        );
+        const existingNames = new Set(existing.map(b => b.name));
+        const existingNfcIds = new Set(existing.map(b => b.nfc_id).filter(Boolean));
+        const { rows: existingClientNfc } = await pool.query(
+            'SELECT nfc_id FROM clients WHERE nfc_id IS NOT NULL'
+        );
+        const allClientNfc = new Set(existingClientNfc.map(c => c.nfc_id));
+
+        // Validate each data row
+        const dataRows = rows.slice(1);
+        const errors = [];
+        const valid = [];
+        const seenNames = new Set();
+
+        for (let i = 0; i < dataRows.length; i++) {
+            const rowNum = i + 2; // 1-indexed + header offset
+            const r = dataRows[i];
+            const name = cleanCell(r[colIndex.name]);
+            const city = colIndex.city  !== undefined ? cleanCell(r[colIndex.city])  : '';
+            const area = colIndex.area  !== undefined ? cleanCell(r[colIndex.area])  : '';
+            const link = colIndex.google_link !== undefined ? cleanCell(r[colIndex.google_link]) : '';
+
+            const rowErrors = [];
+            if (!name) rowErrors.push({ row: rowNum, column: 'branch_name', message: 'اسم الفرع مطلوب' });
+            if (name && name.length > 255) rowErrors.push({ row: rowNum, column: 'branch_name', message: 'اسم الفرع طويل جداً (>255 حرف)' });
+            if (existingNames.has(name)) rowErrors.push({ row: rowNum, column: 'branch_name', message: `فرع باسم "${name}" موجود بالفعل` });
+            if (seenNames.has(name)) rowErrors.push({ row: rowNum, column: 'branch_name', message: `اسم "${name}" مكرّر داخل الملف` });
+            if (link && !/^https?:\/\//i.test(link)) rowErrors.push({ row: rowNum, column: 'google_link', message: 'الرابط يجب أن يبدأ بـ http:// أو https://' });
+
+            if (rowErrors.length > 0) {
+                errors.push(...rowErrors);
+                if (!name) continue; // truly unrecoverable
+            } else {
+                seenNames.add(name);
+            }
+            valid.push({ row: rowNum, name, city: city || null, area: area || null, google_link: link || null });
+        }
+
+        // Generate sequential NFC IDs for the valid (or all if skip_invalid lets some through later)
+        const targetForIds = errors.length === 0 || skipInvalid
+            ? valid.filter(v => !errors.some(e => e.row === v.row))
+            : valid;
+        const nfcIds = await nextSequentialNfcIds(req.clientData.id, targetForIds.length);
+        // Verify no collision with existing/global
+        for (const id of nfcIds) {
+            if (existingNfcIds.has(id) || allClientNfc.has(id)) {
+                return res.status(409).json({
+                    error: `تعارض في توليد NFC ID: ${id} موجود مسبقاً. يرجى المحاولة مرة أخرى.`
+                });
+            }
+        }
+        targetForIds.forEach((v, idx) => { v.nfc_id = nfcIds[idx]; });
+
+        // Reject all if there are errors and skip_invalid is false (and not dry_run)
+        if (!dryRun && !skipInvalid && errors.length > 0) {
+            return res.status(400).json({
+                total_rows: dataRows.length,
+                valid_rows: valid.filter(v => !errors.some(e => e.row === v.row)).length,
+                invalid_rows: errors.length,
+                errors,
+                imported_count: 0,
+                message: 'يحتوي الملف على أخطاء. صحّحها ثم أعد المحاولة أو استخدم skip_invalid لتجاوز الأسطر الفاسدة.'
+            });
+        }
+
+        // Dry-run: report only
+        if (dryRun) {
+            return res.json({
+                total_rows: dataRows.length,
+                valid_rows: targetForIds.length,
+                invalid_rows: errors.length,
+                errors,
+                preview: targetForIds.slice(0, 20),
+                imported_count: 0
+            });
+        }
+
+        // Real import — single transaction
+        const client = await pool.connect();
+        const importedBranches = [];
+        try {
+            await client.query('BEGIN');
+            for (const v of targetForIds) {
+                const { rows: inserted } = await client.query(
+                    `INSERT INTO branches (client_id, name, city, area, nfc_id, google_link)
+                     VALUES ($1, $2, $3, $4, $5, $6)
+                     RETURNING id, client_id, name, city, area, nfc_id, google_link, is_active, created_at`,
+                    [req.clientData.id, v.name, v.city, v.area, v.nfc_id, v.google_link]
+                );
+                importedBranches.push(inserted[0]);
+            }
+            await client.query('COMMIT');
+        } catch (e) {
+            await client.query('ROLLBACK');
+            console.error('POST /api/branches/import (txn):', e.message);
+            return res.status(500).json({ error: 'فشل الاستيراد. لم يتم حفظ أي فرع.' });
+        } finally {
+            client.release();
+        }
+
+        res.json({
+            total_rows: dataRows.length,
+            valid_rows: targetForIds.length,
+            invalid_rows: errors.length,
+            errors,
+            imported_count: importedBranches.length,
+            imported_branches: importedBranches
+        });
+    } catch (e) {
+        console.error('POST /api/branches/import:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+/**
+ * GET /api/branches/qr-zip
+ *
+ * Generates QR codes for every active branch of the authenticated client
+ * and streams them as a ZIP file. Filename pattern:
+ *   QR-{nfc_id}-{safe_branch_name}.png
+ *
+ * Each QR encodes: {PUBLIC_BASE_URL}/r/{nfc_id}
+ * For 190 branches this typically takes 5-15 seconds.
+ */
+app.get('/api/branches/qr-zip', async (req, res) => {
+    // Accept apiKey via query for direct browser <a download> links
+    const apiKey = String(req.query.apiKey || req.headers['x-api-key'] || '').trim();
+    if (!apiKey) return res.status(401).json({ error: 'Missing API Key' });
+
+    let clientRow;
+    try {
+        const { rows } = await pool.query('SELECT id, name FROM clients WHERE api_key = $1', [apiKey]);
+        clientRow = rows[0];
+        if (!clientRow) return res.status(403).json({ error: 'Invalid API Key' });
+    } catch (e) {
+        console.error('qr-zip auth:', e.message);
+        return res.status(500).json({ error: 'Database Error' });
+    }
+
+    let branches;
+    try {
+        const { rows } = await pool.query(
+            `SELECT id, name, nfc_id FROM branches
+             WHERE client_id = $1 AND is_active = true AND nfc_id IS NOT NULL
+             ORDER BY name`,
+            [clientRow.id]
+        );
+        branches = rows;
+    } catch (e) {
+        console.error('qr-zip query:', e.message);
+        return res.status(500).json({ error: 'Database Error' });
+    }
+    if (branches.length === 0) {
+        return res.status(404).json({ error: 'لا توجد فروع نشطة لها NFC ID' });
+    }
+
+    const baseUrl = (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    const safeClient = String(clientRow.name || 'client').replace(/[^؀-ۿA-Za-z0-9_-]/g, '_').slice(0, 40) || 'client';
+    const zipFilename = `RepuSystem-QRs-${safeClient}-${branches.length}branches.zip`;
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    archive.on('error', (err) => {
+        console.error('archiver error:', err.message);
+        if (!res.headersSent) res.status(500).json({ error: 'ZIP generation failed' });
+    });
+    archive.pipe(res);
+
+    try {
+        for (const b of branches) {
+            const reviewUrl = `${baseUrl}/r/${encodeURIComponent(b.nfc_id)}`;
+            const png = await QRCode.toBuffer(reviewUrl, { type: 'png', width: 1024, margin: 2 });
+            const safeName = String(b.name).replace(/[^؀-ۿA-Za-z0-9_-]/g, '_').slice(0, 60) || 'branch';
+            archive.append(png, { name: `QR-${b.nfc_id}-${safeName}.png` });
+        }
+        archive.append(
+            `RepuSystem QR Batch\n` +
+            `Client: ${clientRow.name}\n` +
+            `Branches: ${branches.length}\n` +
+            `Generated: ${new Date().toISOString()}\n` +
+            `Base URL: ${baseUrl}\n\n` +
+            `Each QR resolves to: ${baseUrl}/r/{nfc_id}\n`,
+            { name: 'README.txt' }
+        );
+        await archive.finalize();
+    } catch (e) {
+        console.error('qr-zip generation:', e.message);
+        // Don't try to send a JSON response here — archive may have started streaming
+        try { archive.abort(); } catch {}
     }
 });
 
@@ -1383,7 +1946,18 @@ app.get('/api/complaints', authenticate, async (req, res) => {
         const conds = ['client_id = $1', '(status = $2 OR answer = $3)'];
         const params = [req.clientData.id, 'complaint', '2'];
         if (branch)  { params.push(branch); conds.push(`branch = $${params.length}`); }
-        if (status)  { params.push(status); conds.push(`complaint_status = $${params.length}`); }
+        if (status)  {
+            // Accept comma-separated list so tabs can map to multiple DB statuses
+            // (e.g. "in_progress,contacted" → both rows; "resolved,closed" → both).
+            const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
+            if (statuses.length === 1) {
+                params.push(statuses[0]);
+                conds.push(`complaint_status = $${params.length}`);
+            } else if (statuses.length > 1) {
+                const placeholders = statuses.map(s => { params.push(s); return `$${params.length}`; }).join(',');
+                conds.push(`complaint_status IN (${placeholders})`);
+            }
+        }
         if (from)    { params.push(from);   conds.push(`sent_at >= $${params.length}`); }
         if (to)      { params.push(to);     conds.push(`sent_at <= $${params.length}`); }
         if (q)       { params.push(q);      conds.push(`(name ILIKE '%' || $${params.length} || '%' OR phone ILIKE '%' || $${params.length} || '%' OR branch ILIKE '%' || $${params.length} || '%' OR feedback ILIKE '%' || $${params.length} || '%')`); }
@@ -1492,7 +2066,7 @@ app.get('/api/reviews', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/reviews/:id/reply', authenticate, async (req, res) => {
+app.post('/api/reviews/:id/reply', authenticate, requireRole('owner', 'manager'), async (req, res) => {
     const id = parseInt(req.params.id, 10);
     const text = String(req.body.text || '').trim();
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid review ID' });
@@ -1629,7 +2203,7 @@ app.get('/api/activity', authenticate, async (req, res) => {
 });
 
 // ─── Client-scoped complaint settings (replaces super-admin route for client use) ──
-app.patch('/api/client/complaint-settings', authenticate, async (req, res) => {
+app.patch('/api/client/complaint-settings', authenticate, requireRole('owner', 'manager'), async (req, res) => {
     const complaintAction = String(req.body.complaint_action || '').trim();
     const discountCode = String(req.body.discount_code || '').trim();
     const complaintMessage = String(req.body.complaint_message || '').trim()
@@ -1651,6 +2225,346 @@ app.patch('/api/client/complaint-settings', authenticate, async (req, res) => {
         res.json({ success: true, settings: rows[0] });
     } catch (e) {
         console.error('PATCH /api/client/complaint-settings:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── Phase E — User auth (email/password) + team management ───────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// Roles: 'owner' (everything), 'manager' (everything except user mgmt and
+// billing settings), 'viewer' (read-only).
+// The x-api-key path is unchanged — it maps to role='owner' so legacy clients
+// (admin.html, super-admin.html, scripts) keep working without modification.
+
+const validateEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(e || '').trim());
+const validatePassword = (p) => typeof p === 'string' && p.length >= 8 && p.length <= 200;
+
+// POST /api/auth/user-login — body { email, password } → { token, user }
+app.post('/api/auth/user-login', async (req, res) => {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    if (!validateEmail(email) || !password) {
+        return res.status(400).json({ error: 'البريد الإلكتروني أو كلمة المرور غير صالحة' });
+    }
+    try {
+        const { rows } = await pool.query(
+            `SELECT u.id, u.client_id, u.email, u.name, u.password_hash, u.role, u.is_active,
+                    c.name AS client_name, c.api_key AS client_api_key
+             FROM users u
+             JOIN clients c ON c.id = u.client_id
+             WHERE lower(u.email) = $1
+             LIMIT 1`,
+            [email]
+        );
+        const user = rows[0];
+        if (!user || !user.password_hash) {
+            return res.status(401).json({ error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
+        }
+        if (!user.is_active) return res.status(403).json({ error: 'تم تعطيل هذا الحساب' });
+        const ok = await verifyPassword(password, user.password_hash);
+        if (!ok) return res.status(401).json({ error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
+
+        const token = generateToken();
+        const expires = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 3600 * 1000);
+        await pool.query(
+            `INSERT INTO user_sessions (user_id, token_hash, expires_at, ip, user_agent)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [user.id, hashToken(token), expires,
+             String(req.ip || '').slice(0, 50),
+             String(req.headers['user-agent'] || '').slice(0, 1000)]
+        );
+        await pool.query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
+        await pool.query('DELETE FROM user_sessions WHERE expires_at < NOW()').catch(() => {});
+
+        res.json({
+            success: true,
+            token,
+            expires_at: expires.toISOString(),
+            user: { id: user.id, email: user.email, name: user.name, role: user.role,
+                    client_id: user.client_id, client_name: user.client_name }
+        });
+    } catch (e) {
+        console.error('POST /api/auth/user-login:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+// POST /api/auth/user-logout — invalidates current session
+app.post('/api/auth/user-logout', async (req, res) => {
+    const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+    if (!bearer) return res.json({ success: true });
+    try {
+        await pool.query('DELETE FROM user_sessions WHERE token_hash = $1', [hashToken(bearer)]);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('POST /api/auth/user-logout:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+// GET /api/auth/me — current identity (works with x-api-key OR session token)
+app.get('/api/auth/me', authenticate, async (req, res) => {
+    if (req.user) {
+        return res.json({
+            authenticated_as: 'user',
+            user: { ...req.user, role: req.role },
+            client: { id: req.clientData.id, name: req.clientData.name }
+        });
+    }
+    res.json({
+        authenticated_as: 'api_key',
+        user: null,
+        role: 'owner',
+        client: { id: req.clientData.id, name: req.clientData.name }
+    });
+});
+
+// POST /api/auth/forgot-password — body { email } → always 200 (no enumeration)
+// If EMAIL_PROVIDER env is not configured, returns reset_url in the response
+// so the owner can hand-deliver the link. Production: configure SES/SMTP and
+// remove the reset_url from response.
+app.post('/api/auth/forgot-password', async (req, res) => {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    if (!validateEmail(email)) return res.status(400).json({ error: 'البريد الإلكتروني غير صالح' });
+
+    try {
+        const { rows } = await pool.query(
+            'SELECT id FROM users WHERE lower(email) = $1 AND is_active = true LIMIT 1',
+            [email]
+        );
+        const user = rows[0];
+
+        // Always respond success to prevent email enumeration
+        const baseUrl = (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+        const responseBody = { success: true, message: 'إذا كان الإيميل مسجلاً، تم إرسال رابط إعادة التعيين' };
+
+        if (user) {
+            const token = generateToken();
+            const expires = new Date(Date.now() + RESET_TTL_MIN * 60 * 1000);
+            await pool.query(
+                `INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+                [user.id, hashToken(token), expires]
+            );
+            const resetUrl = `${baseUrl}/admin.html#/reset-password?token=${token}`;
+
+            if (isEmailEnabled()) {
+                try {
+                    await sendPasswordResetEmail({ to: email, resetUrl });
+                } catch (e) {
+                    console.error('forgot-password email send failed:', e.message);
+                    // Fallback: surface URL so the request isn't lost
+                    responseBody.reset_url = resetUrl;
+                    responseBody.note = 'تعذر إرسال البريد. انسخ الرابط وأرسله يدوياً.';
+                }
+            } else {
+                // No SMTP configured — return URL for manual sharing
+                responseBody.reset_url = resetUrl;
+                responseBody.note = 'لا يوجد مزوّد بريد مفعّل — انسخ الرابط وأرسله يدوياً.';
+            }
+        }
+        res.json(responseBody);
+    } catch (e) {
+        console.error('POST /api/auth/forgot-password:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+// POST /api/auth/reset-password — body { token, password }
+app.post('/api/auth/reset-password', async (req, res) => {
+    const token = String(req.body.token || '').trim();
+    const password = String(req.body.password || '');
+    if (!token) return res.status(400).json({ error: 'الرابط غير صالح' });
+    if (!validatePassword(password)) {
+        return res.status(400).json({ error: 'كلمة المرور يجب أن تكون بين 8 و 200 حرف' });
+    }
+    try {
+        const { rows } = await pool.query(
+            `SELECT id, user_id FROM password_resets
+             WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
+             LIMIT 1`,
+            [hashToken(token)]
+        );
+        const reset = rows[0];
+        if (!reset) return res.status(400).json({ error: 'الرابط غير صالح أو منتهي الصلاحية' });
+
+        const hash = await hashPassword(password);
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, reset.user_id]);
+            await client.query('UPDATE password_resets SET used_at = NOW() WHERE id = $1', [reset.id]);
+            // Invalidate all existing sessions for this user as a safety measure
+            await client.query('DELETE FROM user_sessions WHERE user_id = $1', [reset.user_id]);
+            await client.query('COMMIT');
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
+        res.json({ success: true, message: 'تم تحديث كلمة المرور. سجّل دخولك من جديد.' });
+    } catch (e) {
+        console.error('POST /api/auth/reset-password:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+// ─── Team management (owner only) ─────────────────────────────────────────
+
+app.get('/api/users', authenticate, async (req, res) => {
+    try {
+        const { rows } = await pool.query(
+            `SELECT id, email, name, role, is_active, created_at, last_login_at
+             FROM users
+             WHERE client_id = $1
+             ORDER BY created_at DESC`,
+            [req.clientData.id]
+        );
+        res.json({ items: rows });
+    } catch (e) {
+        console.error('GET /api/users:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.post('/api/users', authenticate, requireRole('owner'), async (req, res) => {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const name = String(req.body.name || '').trim();
+    const role = String(req.body.role || '').trim();
+    if (!validateEmail(email)) return res.status(400).json({ error: 'البريد الإلكتروني غير صالح' });
+    if (!name) return res.status(400).json({ error: 'الاسم مطلوب' });
+    if (!['manager', 'viewer'].includes(role)) {
+        return res.status(400).json({ error: 'الصلاحية يجب أن تكون manager أو viewer' });
+    }
+    try {
+        const { rows: existing } = await pool.query(
+            'SELECT id FROM users WHERE client_id = $1 AND lower(email) = $2',
+            [req.clientData.id, email]
+        );
+        if (existing[0]) return res.status(400).json({ error: 'هذا البريد مستخدم بالفعل في فريقك' });
+
+        const { rows: inserted } = await pool.query(
+            `INSERT INTO users (client_id, email, name, role, is_active)
+             VALUES ($1, $2, $3, $4, true)
+             RETURNING id, email, name, role, is_active, created_at, last_login_at`,
+            [req.clientData.id, email, name, role]
+        );
+        const user = inserted[0];
+
+        // Issue a one-time password reset token (acts as the invite link)
+        const token = generateToken();
+        const expires = new Date(Date.now() + 7 * 24 * 3600 * 1000); // 7 days for invites
+        await pool.query(
+            'INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+            [user.id, hashToken(token), expires]
+        );
+        const baseUrl = (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+        const inviteUrl = `${baseUrl}/admin.html#/reset-password?token=${token}&invite=1`;
+
+        let emailSent = false;
+        let emailError = null;
+        if (isEmailEnabled()) {
+            try {
+                await sendInviteEmail({
+                    to: email,
+                    name,
+                    inviterName: req.user?.name || null,
+                    clientName: req.clientData.name,
+                    role,
+                    inviteUrl
+                });
+                emailSent = true;
+            } catch (e) {
+                console.error('invite email send failed:', e.message);
+                emailError = e.message;
+            }
+        }
+
+        const response = {
+            success: true,
+            user,
+            invite_expires_at: expires.toISOString(),
+            email_sent: emailSent
+        };
+        if (emailSent) {
+            response.note = `تم إرسال دعوة بالبريد إلى ${email}`;
+            // Don't expose invite_url when email succeeded — encourages email-only flow
+        } else {
+            response.invite_url = inviteUrl;
+            response.note = emailError
+                ? `تعذر إرسال البريد (${emailError}). انسخ رابط الدعوة وأرسله يدوياً.`
+                : 'انسخ رابط الدعوة وأرسله إلى المستخدم — لم يُفعّل بريد إلكتروني تلقائي بعد.';
+        }
+        res.json(response);
+    } catch (e) {
+        console.error('POST /api/users:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.patch('/api/users/:id', authenticate, requireRole('owner'), async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid user ID' });
+    try {
+        const { rows: existing } = await pool.query(
+            'SELECT id, role, is_active FROM users WHERE id = $1 AND client_id = $2',
+            [id, req.clientData.id]
+        );
+        const user = existing[0];
+        if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
+
+        const updates = [];
+        const params = [];
+        let i = 1;
+        if (req.body.role !== undefined) {
+            const role = String(req.body.role).trim();
+            if (!['manager', 'viewer'].includes(role)) {
+                return res.status(400).json({ error: 'الصلاحية يجب أن تكون manager أو viewer' });
+            }
+            updates.push(`role = $${i++}`); params.push(role);
+        }
+        if (req.body.is_active !== undefined) {
+            const active = req.body.is_active === true || req.body.is_active === 'true';
+            updates.push(`is_active = $${i++}`); params.push(active);
+        }
+        if (req.body.name !== undefined) {
+            const name = String(req.body.name).trim();
+            if (!name) return res.status(400).json({ error: 'الاسم مطلوب' });
+            updates.push(`name = $${i++}`); params.push(name);
+        }
+        if (updates.length === 0) return res.status(400).json({ error: 'لا يوجد ما يُحدّث' });
+        params.push(id, req.clientData.id);
+
+        const { rows } = await pool.query(
+            `UPDATE users SET ${updates.join(', ')}
+             WHERE id = $${i++} AND client_id = $${i}
+             RETURNING id, email, name, role, is_active, created_at, last_login_at`,
+            params
+        );
+        // If disabled, kill their sessions
+        if (req.body.is_active === false || req.body.is_active === 'false') {
+            await pool.query('DELETE FROM user_sessions WHERE user_id = $1', [id]);
+        }
+        res.json({ success: true, user: rows[0] });
+    } catch (e) {
+        console.error('PATCH /api/users/:id:', e.message);
+        res.status(500).json({ error: 'Database Error' });
+    }
+});
+
+app.delete('/api/users/:id', authenticate, requireRole('owner'), async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid user ID' });
+    try {
+        const { rowCount } = await pool.query(
+            'DELETE FROM users WHERE id = $1 AND client_id = $2',
+            [id, req.clientData.id]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'المستخدم غير موجود' });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('DELETE /api/users/:id:', e.message);
         res.status(500).json({ error: 'Database Error' });
     }
 });

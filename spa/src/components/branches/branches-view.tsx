@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { IconPlus, IconSearch } from '@tabler/icons-react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
+import { IconPlus, IconSearch, IconFileUpload, IconQrcode } from '@tabler/icons-react';
 import { BranchCard } from './branch-card';
 import { BranchFormModal } from './branch-form-modal';
+import { CsvImportModal } from './csv-import-modal';
 import { EmptyState } from '@/components/empty-state';
 import { useBranches } from '@/lib/queries';
+import { getApiKey } from '@/lib/auth';
 import type { BranchesResponse, BranchRow } from '@/types/api';
 
 interface Props {
@@ -17,6 +20,18 @@ export function BranchesView({ initialBranches }: Props) {
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<BranchRow | null>(null);
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  // Auto-open import modal when navigated with ?import=1 (from "إنشاء" menu)
+  const [sp, setSp] = useSearchParams();
+  useEffect(() => {
+    if (sp.get('import') === '1') {
+      setImporting(true);
+      const next = new URLSearchParams(sp);
+      next.delete('import');
+      setSp(next, { replace: true });
+    }
+  }, [sp, setSp]);
 
   const items = data?.items ?? [];
   const filtered = search.trim()
@@ -42,12 +57,26 @@ export function BranchesView({ initialBranches }: Props) {
               : `${activeCount} ${activeCount === 1 ? 'فرع نشط' : 'فروع نشطة'} · أداء حي بالوقت الفعلي`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="flex items-center gap-1.5 rounded-[7px] px-3.5 py-1.5 text-[13px] font-medium text-white"
-          style={{ background: 'var(--color-primary)' }}
-        ><IconPlus size={14} />إضافة فرع</button>
+        <div className="flex items-center gap-2">
+          <a
+            href={`/api/branches/qr-zip?apiKey=${encodeURIComponent(getApiKey() || '')}`}
+            className="flex items-center gap-1.5 rounded-[7px] border px-3 py-1.5 text-[13px] font-medium"
+            style={{ borderColor: 'var(--color-border-strong)', color: 'var(--color-text-1)', background: 'var(--color-surface)' }}
+            title="تنزيل QR لكل الفروع في ملف ZIP"
+          ><IconQrcode size={14} />تنزيل كل QR</a>
+          <button
+            type="button"
+            onClick={() => setImporting(true)}
+            className="flex items-center gap-1.5 rounded-[7px] border px-3 py-1.5 text-[13px] font-medium"
+            style={{ borderColor: 'var(--color-border-strong)', color: 'var(--color-text-1)', background: 'var(--color-surface)' }}
+          ><IconFileUpload size={14} />استيراد CSV</button>
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-1.5 rounded-[7px] px-3.5 py-1.5 text-[13px] font-medium text-white"
+            style={{ background: 'var(--color-primary)' }}
+          ><IconPlus size={14} />إضافة فرع</button>
+        </div>
       </div>
 
       {/* Search */}
@@ -122,6 +151,7 @@ export function BranchesView({ initialBranches }: Props) {
           onClose={() => setEditing(null)}
         />
       ) : null}
+      {importing ? <CsvImportModal onClose={() => setImporting(false)} /> : null}
     </div>
   );
 }

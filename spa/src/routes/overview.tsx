@@ -107,7 +107,7 @@ export default function OverviewPage() {
           value={<span className="text-[var(--color-text-3)] text-[15px]">—</span>}
           icon={<IconClock size={18} className="text-[var(--color-text-3)]" />}
           hint="لا توجد بيانات متاحة حالياً" />
-        <KpiCard label="الشكاوى المُحلّت"
+        <KpiCard label="الشكاوى التي حُلّت"
           value={<>{resolvedRate}<span className="text-[18px] text-[var(--color-text-3)] font-medium">٪</span></>}
           icon={<IconCircleCheck size={18} className="text-[var(--color-text-3)]" />} />
         <KpiCard label="متوسط التقييم"

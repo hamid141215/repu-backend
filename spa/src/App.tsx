@@ -4,6 +4,8 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router';
 import { Protected } from './routes/_protected';
 import { AppLayout } from './routes/_app-layout';
 import LoginPage          from './routes/login';
+import ForgotPasswordPage from './routes/forgot-password';
+import ResetPasswordPage  from './routes/reset-password';
 import OverviewPage       from './routes/overview';
 import ReviewsPage        from './routes/reviews';
 import ComplaintsPage     from './routes/complaints';
@@ -27,7 +29,9 @@ export function App() {
     <QueryClientProvider client={client}>
       <HashRouter>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/login"            element={<LoginPage />} />
+          <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
+          <Route path="/reset-password"   element={<ResetPasswordPage />} />
           <Route element={<Protected><AppLayout /></Protected>}>
             <Route path="/"                  element={<OverviewPage />} />
             <Route path="/reviews"           element={<ReviewsPage />} />

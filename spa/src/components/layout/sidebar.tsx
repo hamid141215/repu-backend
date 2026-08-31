@@ -8,6 +8,8 @@ import {
   IconSettings, IconDots, IconSelector, IconUsers
 } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
+import { clearApiKey, clearSession } from '@/lib/auth';
+import { serverLogout } from '@/lib/api-client';
 
 interface NavItem {
   href: string;
@@ -211,8 +213,11 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function LogoutButton() {
   async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    window.location.href = '/login';
+    try { await serverLogout(); } catch { /* ignore */ }
+    clearSession();
+    clearApiKey();
+    window.location.hash = '#/login';
+    window.location.reload();
   }
   return (
     <button
