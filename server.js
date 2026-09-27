@@ -10,6 +10,12 @@ const QRCode   = require('qrcode');
 const bcrypt   = require('bcryptjs');
 const crypto   = require('crypto');
 const nodemailer = require('nodemailer');
+const { initIntelligenceSchema } = require('./db/intelligence-schema');
+const { classifyFeedback } = require('./intelligence/signal-engine');
+const { buildIssueCandidates } = require('./intelligence/issue-engine');
+const { upsertIssueCandidate } = require('./intelligence/issue-persistence');
+const { runIntelligencePipeline } = require('./intelligence/pipeline');
+const { enrichIssue } = require('./intelligence/enrichment-service');
 
 const app = express();
 
@@ -2584,9 +2590,610 @@ app.delete('/api/users/:id', authenticate, requireRole('owner'), async (req, res
 });
 
 // ─── Start ─────────────────────────────────────────────────────────────────
+app.get('/api/internal/intelligence/dry-run', authenticate, requireRole('owner'), async (req, res) => {
+    try {
+        const requestedLimit = Number.parseInt(req.query.limit, 10);
+        const limit = Number.isInteger(requestedLimit)
+            ? Math.max(1, Math.min(requestedLimit, 100))
+            : 50;
+
+        const { rows } = await pool.query(
+            `SELECT
+                id,
+                branch,
+                rating,
+                source,
+                feedback,
+                sent_at
+             FROM evaluations
+             WHERE client_id = $1
+               AND feedback IS NOT NULL
+               AND BTRIM(feedback) <> ''
+             ORDER BY sent_at DESC, id DESC
+             LIMIT $2`,
+            [req.clientData.id, limit]
+        );
+
+        const results = rows.map((row) => ({
+            evaluation_id: row.id,
+            branch: row.branch,
+            rating: row.rating,
+            source: row.source,
+            sent_at: row.sent_at,
+            feedback: row.feedback,
+            intelligence: classifyFeedback(
+                row.feedback,
+                { rating: row.rating }
+            )
+        }));
+
+        const summary = {
+            evaluations: results.length,
+            usable: results.filter(
+                (item) => item.intelligence.usable
+            ).length,
+            unclear: results.filter(
+                (item) =>
+                    item.intelligence.classification === 'UNCLEAR'
+            ).length,
+            noise: results.filter(
+                (item) =>
+                    item.intelligence.classification === 'NOISE'
+            ).length,
+            signals: results.reduce(
+                (sum, item) =>
+                    sum + item.intelligence.signals.length,
+                0
+            )
+        };
+
+        res.json({
+            dry_run: true,
+            writes_performed: 0,
+            summary,
+            results
+        });
+    } catch (e) {
+        console.error(
+            'GET /api/internal/intelligence/dry-run:',
+            e.message
+        );
+
+        res.status(500).json({
+            error: 'Database Error'
+        });
+    }
+});
+
+app.get('/api/internal/intelligence/issues-dry-run', authenticate, requireRole('owner'), async (req, res) => {
+    try {
+        const requestedDays = Number.parseInt(req.query.days, 10);
+
+        const days = Number.isInteger(requestedDays)
+            ? Math.max(1, Math.min(requestedDays, 365))
+            : 30;
+
+        const now = new Date();
+
+        const windowStart = new Date(
+            now.getTime() -
+            (days * 24 * 60 * 60 * 1000)
+        );
+
+        const { rows } = await pool.query(
+            `SELECT
+                id,
+                client_id,
+                branch,
+                rating,
+                feedback,
+                sent_at
+             FROM evaluations
+             WHERE client_id = $1
+               AND feedback IS NOT NULL
+               AND BTRIM(feedback) <> ''
+               AND sent_at >= $2
+             ORDER BY sent_at ASC, id ASC`,
+            [
+                req.clientData.id,
+                windowStart.toISOString()
+            ]
+        );
+
+        const signals = [];
+
+        for (const row of rows) {
+            const classified = classifyFeedback(
+                row.feedback,
+                {
+                    rating: row.rating
+                }
+            );
+
+            for (const signal of classified.signals) {
+                signals.push({
+                    evaluation_id: row.id,
+                    client_id: row.client_id,
+                    branch_name: row.branch || null,
+                    dimension: signal.dimension,
+                    sentiment: signal.sentiment,
+                    confidence: signal.confidence,
+                    evidence_text: signal.evidence_text,
+                    occurred_at: row.sent_at
+                });
+            }
+        }
+
+        const issues = buildIssueCandidates(
+            signals,
+            {
+                clientId: req.clientData.id,
+                windowStart: windowStart.toISOString(),
+                windowEnd: now.toISOString(),
+                now
+            }
+        );
+
+        res.json({
+            dry_run: true,
+            writes_performed: 0,
+
+            window: {
+                days,
+                start: windowStart.toISOString(),
+                end: now.toISOString()
+            },
+
+            summary: {
+                evaluations: rows.length,
+                signals: signals.length,
+                issue_candidates: issues.length
+            },
+
+            issues
+        });
+    } catch (e) {
+        console.error(
+            'GET /api/internal/intelligence/issues-dry-run:',
+            e.message
+        );
+
+        res.status(500).json({
+            error: 'Database Error'
+        });
+    }
+});
+
+
+app.post('/api/internal/intelligence/run-pipeline', authenticate, requireRole('owner'), async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+        const requestedDays = Number.parseInt(req.body?.days, 10);
+
+        const days = Number.isInteger(requestedDays)
+            ? Math.max(1, Math.min(requestedDays, 365))
+            : 365;
+
+        await client.query('BEGIN');
+
+        const result =
+            await runIntelligencePipeline(
+                client,
+                {
+                    clientId: req.clientData.id,
+                    days
+                }
+            );
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            writes_performed: {
+                signals: result.signals_written,
+                issues: result.issues_persisted
+            },
+            result
+        });
+    } catch (e) {
+        try {
+            await client.query('ROLLBACK');
+        } catch (_) {}
+
+        console.error(
+            'POST /api/internal/intelligence/run-pipeline:',
+            e.message
+        );
+
+        res.status(500).json({
+            error: 'Intelligence Pipeline Error'
+        });
+    } finally {
+        client.release();
+    }
+});
+
+
+app.post('/api/internal/intelligence/enrich-issue/:issueId', authenticate, requireRole('owner'), async (req, res) => {
+    try {
+        const issueId =
+            Number.parseInt(
+                req.params.issueId,
+                10
+            );
+
+        if (!Number.isInteger(issueId)) {
+            return res.status(400).json({
+                error: 'Invalid issue ID'
+            });
+        }
+
+        const result =
+            await enrichIssue(
+                pool,
+                {
+                    clientId:
+                        req.clientData.id,
+
+                    issueId
+                }
+            );
+
+        res.json({
+            success: true,
+
+            issue: {
+                id:
+                    result.issue.id,
+
+                dimension:
+                    result.issue.dimension,
+
+                scope_type:
+                    result.issue.scope_type,
+
+                status:
+                    result.issue.status,
+
+                severity:
+                    result.issue.severity,
+
+                priority:
+                    result.issue.priority
+            },
+
+            evidence: {
+                negative_signal_count:
+                    result.evidence
+                        .negative_signal_count,
+
+                unique_evidence_count:
+                    result.evidence
+                        .unique_evidence_count,
+
+                items:
+                    result.evidence
+                        .evidence
+            },
+
+            enrichment:
+                result.enrichment
+        });
+
+    } catch (error) {
+
+        console.error(
+            'POST /api/internal/intelligence/enrich-issue:',
+            error.code || error.name,
+            error.message
+        );
+
+        if (
+            error.code ===
+            'ISSUE_NOT_FOUND'
+        ) {
+            return res.status(404).json({
+                error:
+                    'Issue not found'
+            });
+        }
+
+        if (
+            error.code ===
+            'ENRICHMENT_EVIDENCE_INSUFFICIENT'
+        ) {
+            return res.status(422).json({
+                error:
+                    'Insufficient evidence'
+            });
+        }
+
+        const responseBody = {
+            error:
+                'Issue enrichment failed',
+
+            code:
+                error.code ||
+                'ENRICHMENT_ERROR'
+        };
+
+        if (
+            error.code ===
+            'HUMAIN_INVALID_RESPONSE' &&
+            error.details
+        ) {
+            responseBody.details =
+                error.details;
+        }
+
+        res.status(500).json(
+            responseBody
+        );
+    }
+});
+
+app.get('/api/internal/intelligence/humain-health', authenticate, requireRole('owner'), async (req, res) => {
+    const baseUrl =
+        String(
+            process.env.HUMAIN_BASE_URL || ''
+        )
+            .trim()
+            .replace(/\/+$/, '');
+
+    const model =
+        String(
+            process.env.HUMAIN_MODEL || ''
+        ).trim();
+
+    const apiKey =
+        String(
+            process.env.HUMAIN_NODE_API_KEY ||
+            process.env.HUMAIN_API_KEY ||
+            ''
+        ).trim();
+
+    if (
+        !baseUrl ||
+        !model ||
+        !apiKey
+    ) {
+        return res.status(500).json({
+            success: false,
+            inference_performed: false,
+            config: {
+                key_present:
+                    Boolean(apiKey),
+
+                base_url:
+                    baseUrl || null,
+
+                model:
+                    model || null
+            },
+
+            error:
+                'HUMAIN_CONFIG_INCOMPLETE'
+        });
+    }
+
+    const controller =
+        new AbortController();
+
+    const timeout =
+        setTimeout(
+            () =>
+                controller.abort(),
+            15000
+        );
+
+    try {
+        const response =
+            await fetch(
+                `${baseUrl}/models`,
+                {
+                    method:
+                        'GET',
+
+                    redirect:
+                        'manual',
+
+                    headers: {
+                        Accept:
+                            'application/json',
+
+                        'x-api-key':
+                            apiKey,
+
+                    },
+
+                    signal:
+                        controller.signal
+                }
+            );
+
+        const contentType =
+            response.headers.get(
+                'content-type'
+            );
+
+        const raw =
+            await response.text();
+
+        const cleaned =
+            String(raw || '')
+                .replace(
+                    /^\uFEFF/,
+                    ''
+                )
+                .trim();
+
+        let payload = null;
+        let jsonParsed = false;
+
+        if (cleaned) {
+            try {
+                payload =
+                    JSON.parse(
+                        cleaned
+                    );
+
+                jsonParsed =
+                    true;
+            } catch (_) {}
+        }
+
+        const modelRows =
+            Array.isArray(
+                payload?.data
+            )
+                ? payload.data
+                : [];
+
+        const modelIds =
+            modelRows
+                .map(
+                    (item) =>
+                        item?.id
+                )
+                .filter(
+                    (id) =>
+                        typeof id ===
+                        'string'
+                );
+
+        return res.status(
+            response.ok
+                ? 200
+                : 502
+        ).json({
+            success:
+                response.ok &&
+                jsonParsed,
+
+            inference_performed:
+                false,
+
+            config: {
+                key_present:
+                    true,
+
+                base_url:
+                    baseUrl,
+
+                model
+            },
+
+            upstream: {
+                http_status:
+                    response.status,
+
+                redirect_location:
+                    response.headers.get(
+                        'location'
+                    ),
+
+                response_url:
+                    response.url,
+
+                ok:
+                    response.ok,
+
+                content_type:
+                    contentType,
+
+                body_length:
+                    cleaned.length,
+
+                json_parsed:
+                    jsonParsed,
+
+                payload_type:
+                    payload === null
+                        ? null
+                        : Array.isArray(
+                            payload
+                        )
+                            ? 'array'
+                            : typeof payload,
+
+                top_level_keys:
+                    payload &&
+                    typeof payload ===
+                        'object' &&
+                    !Array.isArray(
+                        payload
+                    )
+                        ? Object.keys(
+                            payload
+                        )
+                        : [],
+
+                model_count:
+                    modelIds.length,
+
+                requested_model_found:
+                    modelIds.includes(
+                        model
+                    ),
+
+                humain_models:
+                    modelIds.filter(
+                        (id) =>
+                            id.includes(
+                                'humain-m3'
+                            )
+                    ),
+
+                looks_like_html:
+                    /^<!doctype html|^<html/i
+                        .test(
+                            cleaned
+                        )
+            }
+        });
+
+    } catch (error) {
+
+        const timedOut =
+            error?.name ===
+            'AbortError';
+
+        return res.status(502).json({
+            success: false,
+            inference_performed: false,
+
+            config: {
+                key_present:
+                    true,
+
+                base_url:
+                    baseUrl,
+
+                model
+            },
+
+            error:
+                timedOut
+                    ? 'HUMAIN_MODELS_TIMEOUT'
+                    : 'HUMAIN_MODELS_NETWORK_ERROR',
+
+            message:
+                error?.message ||
+                null
+        });
+
+    } finally {
+        clearTimeout(
+            timeout
+        );
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 
 (async () => {
     await initDB();
+    await initIntelligenceSchema(pool);
     app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 })();
