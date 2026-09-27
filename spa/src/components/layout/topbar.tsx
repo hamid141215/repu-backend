@@ -26,7 +26,7 @@ export function Topbar({ hasAlerts = false }: Props) {
 
   return (
     <header
-      className="sticky top-0 z-10 flex items-center justify-between"
+      className="app-topbar sticky top-0 z-10 flex items-center justify-between"
       style={{
         height: 56,
         background: 'var(--color-surface)',
@@ -37,7 +37,7 @@ export function Topbar({ hasAlerts = false }: Props) {
       <div className="flex items-center gap-3.5">
         <div className="relative">
           <input
-            placeholder="بحث عن شكوى، عميل، فرع…"
+            placeholder="بحث في الإشارات والفروع…"
             disabled
             aria-label="بحث (قريباً)"
             title="البحث الموحّد قريباً"
@@ -56,7 +56,7 @@ export function Topbar({ hasAlerts = false }: Props) {
           <IconHelp size={16} />
         </button>
 
-        <button type="button" aria-label="النشاط الأخير" title="النشاط الأخير"
+        <button type="button" aria-label="أحدث الإشارات" title="أحدث الإشارات"
           onClick={() => setBellOpen(true)}
           className="relative rounded-[7px] p-2 transition hover:bg-[#F4F5F7]" style={{ color: 'var(--color-text-2)' }}>
           <IconBell size={16} />
@@ -208,23 +208,18 @@ function ActivityPanel({ onClose }: { onClose: () => void }) {
                 </Section>
               ) : null}
               {recent.length > 0 ? (
-                <Section title="نشاط حديث" count={recent.length} accent="neutral">
+                <Section title="أحدث الإشارات" count={recent.length} accent="neutral">
                   {recent.map(it => <ActivityRow key={it.id} it={it} onClose={onClose} />)}
                 </Section>
               ) : null}
             </>
           )}
         </div>
-        <div className="px-5 py-3 grid grid-cols-2 gap-2" style={{ borderTop: '1px solid var(--color-border)' }}>
-          <Link to="/complaints" onClick={onClose}
+        <div className="px-5 py-3" style={{ borderTop: '1px solid var(--color-border)' }}>
+          <Link to="/signals" onClick={onClose}
             className="rounded-[7px] px-3 py-1.5 text-center text-[12.5px] font-medium"
-            style={{ background: 'var(--color-bad-light)', color: 'var(--color-bad)' }}>
-            الشكاوى ({urgent.length})
-          </Link>
-          <Link to="/reviews" onClick={onClose}
-            className="rounded-[7px] px-3 py-1.5 text-center text-[12.5px] font-medium"
-            style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
-            كل التقييمات ←
+            style={{ display: 'block', background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+            عرض كل الإشارات ←
           </Link>
         </div>
       </div>
@@ -256,10 +251,10 @@ function ActivityRow({ it, onClose }: { it: ActivityItem; onClose: () => void })
   const isLowRating = it.rating != null && it.rating <= 3 && !isComplaint;
 
   const target = isComplaint
-    ? `/complaints?q=${encodeURIComponent(String(it.id))}`
+    ? `/signals?type=complaints&q=${encodeURIComponent(String(it.id))}`
     : it.rating != null
-      ? `/reviews?q=${encodeURIComponent(String(it.id))}`
-      : '/reviews';
+      ? `/signals?type=reviews&q=${encodeURIComponent(String(it.id))}`
+      : '/signals';
 
   const icon = isComplaint
     ? <IconAlertTriangle size={14} />
@@ -362,7 +357,7 @@ function HelpPanel({ onClose }: { onClose: () => void }) {
           <div className="rounded-[7px] p-3 mt-2" style={{ background: '#F4F5F7' }}>
             <div className="text-[12px] font-medium text-[var(--color-text-2)] mb-1">معلومات الإصدار</div>
             <div className="text-[11.5px] text-[var(--color-text-3)]" dir="ltr">
-              RepuSystem v52 · {new Date().getFullYear()}
+              Repu v52 · {new Date().getFullYear()}
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { IconPlus, IconSearch, IconFileUpload, IconQrcode } from '@tabler/icons-react';
+import { IconAlertTriangle, IconPlus, IconSearch, IconFileUpload, IconQrcode } from '@tabler/icons-react';
 import { BranchCard } from './branch-card';
 import { BranchFormModal } from './branch-form-modal';
 import { CsvImportModal } from './csv-import-modal';
@@ -17,16 +17,15 @@ interface Props {
 
 export function BranchesView({ initialBranches }: Props) {
   const { data, isFetching, isError, refetch } = useBranches(initialBranches);
+  const [sp, setSp] = useSearchParams();
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<BranchRow | null>(null);
   const [creating, setCreating] = useState(false);
-  const [importing, setImporting] = useState(false);
+  const [importing, setImporting] = useState(() => sp.get('import') === '1');
 
   // Auto-open import modal when navigated with ?import=1 (from "إنشاء" menu)
-  const [sp, setSp] = useSearchParams();
   useEffect(() => {
     if (sp.get('import') === '1') {
-      setImporting(true);
       const next = new URLSearchParams(sp);
       next.delete('import');
       setSp(next, { replace: true });
@@ -44,20 +43,70 @@ export function BranchesView({ initialBranches }: Props) {
     : items;
 
   const activeCount = items.filter(b => b.is_active).length;
+  const ratingVolume = items.reduce((sum, branch) => sum + Number(branch.rating_count || 0), 0);
+  const companyAverage = ratingVolume > 0
+    ? items.reduce((sum, branch) => sum + normalizedRating(branch) * Number(branch.rating_count || 0), 0) / ratingVolume
+    : 0;
+  const attentionBranches = [...items]
+    .filter(branch => normalizedRating(branch) > 0 && normalizedRating(branch) < companyAverage)
+    .sort((a, b) => normalizedRating(a) - normalizedRating(b));
 
   return (
-    <div className="p-7" style={{ maxWidth: 1400 }}>
+    <div className="p-7 page-shell" style={{ maxWidth: 1400 }}>
       {/* Header */}
       <div className="mb-5 flex items-start justify-between">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-[-0.3px] text-[var(--color-text-1)] m-0">الفروع</h1>
+          <h1 className="text-[22px] font-semibold tracking-[-0.3px] text-[var(--color-text-1)] m-0">ذكاء الفروع</h1>
           <p className="mt-1 text-[13.5px] text-[var(--color-text-2)]">
             {items.length === 0
               ? 'لم يتم إضافة أي فرع بعد'
-              : `${activeCount} ${activeCount === 1 ? 'فرع نشط' : 'فروع نشطة'} · أداء حي بالوقت الفعلي`}
+              : `${activeCount} ${activeCount === 1 ? 'فرع نشط' : 'فروع نشطة'} · مقارنة بالمؤشرات الحالية للمنشأة`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+      </div>
+
+      {items.length > 0 ? (
+        <section className="mb-5">
+          <div className="mb-3">
+            <h2 className="m-0 text-[16px] font-semibold">المؤشرات التي تحتاج انتباهًا</h2>
+            <p className="m-0 mt-1 text-[12.5px] text-[var(--color-text-3)]">مقارنة مباشرة بمتوسط التقييم الحالي للمنشأة، دون مؤشر صحة إضافي</p>
+          </div>
+          <div className="grid gap-3 branch-summary-grid">
+            <div className="rounded-[10px] border border-[var(--color-border)] bg-white p-4">
+              <div className="text-[12px] text-[var(--color-text-3)]">متوسط المنشأة</div>
+              <div className="num mt-1 text-[25px] font-semibold">{companyAverage ? companyAverage.toFixed(1) : '—'}<span className="text-[13px] font-normal text-[var(--color-text-3)]">/5</span></div>
+            </div>
+            <div className="rounded-[10px] border border-[var(--color-border)] bg-white p-4">
+              <div className="text-[12px] text-[var(--color-text-3)]">فروع دون المتوسط الحالي</div>
+              <div className="num mt-1 text-[25px] font-semibold">{attentionBranches.length}</div>
+            </div>
+            <div className="rounded-[10px] border border-[var(--color-border)] bg-white p-4">
+              <div className="text-[12px] text-[var(--color-text-3)]">الشكاوى المسجلة عبر الفروع</div>
+              <div className="num mt-1 text-[25px] font-semibold">{items.reduce((sum, branch) => sum + Number(branch.complaint_count || 0), 0)}</div>
+            </div>
+          </div>
+          {attentionBranches.length > 0 ? (
+            <div className="mt-3 overflow-hidden rounded-[10px] border border-[var(--color-border)] bg-white">
+              {attentionBranches.slice(0, 4).map((branch, index) => (
+                <div key={branch.id} className="flex items-center gap-3 px-4 py-3" style={index ? { borderTop: '1px solid var(--color-border)' } : undefined}>
+                  <IconAlertTriangle size={15} className="shrink-0 text-[var(--color-warn)]" />
+                  <div className="min-w-0 flex-1 truncate text-[13px] font-medium">{branch.name}</div>
+                  <div className="text-[12px] text-[var(--color-text-3)]">{branch.complaint_count} شكوى</div>
+                  <div className="num text-[13px] font-semibold">{normalizedRating(branch).toFixed(1)}/5</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      <section>
+        <div className="mb-3 flex items-end justify-between gap-3 page-header">
+          <div>
+            <h2 className="m-0 text-[16px] font-semibold">مقارنة الفروع</h2>
+            <p className="m-0 mt-1 text-[12.5px] text-[var(--color-text-3)]">التقييمات وحجم الإشارات والشكاوى الحالية لكل فرع</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 secondary-actions">
           <a
             href={`/api/branches/qr-zip?apiKey=${encodeURIComponent(getApiKey() || '')}`}
             className="flex items-center gap-1.5 rounded-[7px] border px-3 py-1.5 text-[13px] font-medium"
@@ -107,7 +156,7 @@ export function BranchesView({ initialBranches }: Props) {
           >إعادة المحاولة</button>
         </div>
       ) : isFetching && items.length === 0 ? (
-        <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+        <div className="grid gap-3.5 branch-cards-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
@@ -125,7 +174,7 @@ export function BranchesView({ initialBranches }: Props) {
           } />
         </div>
       ) : (
-        <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+        <div className="grid gap-3.5 branch-cards-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
           {filtered.map(b => (
             <BranchCard
               key={b.id}
@@ -152,6 +201,13 @@ export function BranchesView({ initialBranches }: Props) {
         />
       ) : null}
       {importing ? <CsvImportModal onClose={() => setImporting(false)} /> : null}
+      </section>
     </div>
   );
+}
+
+function normalizedRating(branch: BranchRow) {
+  const rating = Number(branch.average_rating || 0);
+  const count = Number(branch.rating_count || 0);
+  return rating > 5 && count > 0 ? rating / count : rating;
 }

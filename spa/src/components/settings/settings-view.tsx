@@ -14,7 +14,7 @@ import type { ClientInfo } from '@/types/api';
 type SectionKey = 'organization' | 'google' | 'whatsapp' | 'notifications' | 'billing' | 'api';
 
 const SECTIONS: Array<{ key: SectionKey; label: string; icon: React.ReactNode }> = [
-  { key: 'organization',  label: 'المؤسسة والشكاوى',  icon: <IconBuilding size={16} /> },
+  { key: 'organization',  label: 'المؤسسة ومعالجة الإشارات',  icon: <IconBuilding size={16} /> },
   { key: 'google',        label: 'تكامل Google',     icon: <IconBrandGoogle size={16} /> },
   { key: 'whatsapp',      label: 'تكامل واتساب',     icon: <IconBrandWhatsapp size={16} /> },
   { key: 'notifications', label: 'الإشعارات',        icon: <IconBellRinging size={16} /> },
@@ -43,7 +43,7 @@ export function SettingsView({ initialClient, initialSection }: Props) {
     <div className="p-7" style={{ maxWidth: 1400 }}>
       <div className="mb-6">
         <h1 className="text-[22px] font-semibold tracking-[-0.3px] text-[var(--color-text-1)] m-0">إعدادات الحساب</h1>
-        <p className="mt-1 text-[13.5px] text-[var(--color-text-2)]">إدارة الإعدادات العامة وقواعد تعامل الشكاوى</p>
+        <p className="mt-1 text-[13.5px] text-[var(--color-text-2)]">إدارة إعدادات المؤسسة وقنوات جمع الإشارات</p>
       </div>
 
       <div className="grid gap-6" style={{ gridTemplateColumns: '220px 1fr' }}>
@@ -302,7 +302,7 @@ function WhatsappSection({ client }: { client: ClientInfo | null }) {
         <ReadOnly label="رقم التواصل للعميل" value={client?.whatsapp_contact || '—'} dir="ltr" />
       </div>
       <div className="mt-3 text-[12px]" style={{ color: 'var(--color-text-3)' }}>
-        لتغيير رقم الأعمال، تواصل مع الدعم. رقم التواصل يُعدّل من قسم "المؤسسة والشكاوى".
+        لتغيير رقم الأعمال، تواصل مع الدعم. رقم التواصل يُعدّل من قسم "المؤسسة ومعالجة الإشارات".
       </div>
     </Card>
   );
@@ -312,7 +312,7 @@ function WhatsappSection({ client }: { client: ClientInfo | null }) {
 function ApiKeysSection({ client }: { client: ClientInfo | null }) {
   return (
     <Card>
-      <SectionHead title="مفتاح API" subtitle="مفتاح الوصول لـ RepuSystem API" />
+      <SectionHead title="مفتاح API" subtitle="مفتاح الوصول لـ Repu API" />
       <div className="rounded-[8px] p-3" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
         <div className="text-[12px] mb-1" style={{ color: 'var(--color-text-3)' }}>
           المفتاح محفوظ في كوكي آمن ولا يُعرض هنا لأسباب أمنية.

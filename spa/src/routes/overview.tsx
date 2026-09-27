@@ -1,48 +1,31 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import {
-  IconMoodSmile, IconClock, IconCircleCheck, IconStar,
-  IconBuildingStore, IconArrowLeft, IconMinus,
-  IconCalendar, IconChevronDown, IconDownload
+  IconAlertTriangle, IconArrowLeft, IconBuildingStore, IconCalendar,
+  IconCircleCheck, IconDownload, IconMessageCircle, IconMoodSmile, IconStar
 } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api-client';
-import { useClientInfo } from '@/lib/queries';
 import { getApiKey } from '@/lib/auth';
-import { safeNumber } from '@/lib/format';
+import { relativeTimeAr, safeNumber } from '@/lib/format';
 import { TimeAgo } from '@/components/time-ago';
 import { OverviewChart } from '@/components/overview-chart';
-import { ActivityFeed } from '@/components/activity-feed';
 import { EmptyState } from '@/components/empty-state';
 import { PageSpinner } from '@/components/page-spinner';
-import type {
-  DashboardSummary, ActivityResponse, ActivityItem,
-  BranchPerformance, ComplaintRow
-} from '@/types/api';
+import type { BranchPerformance, ComplaintRow, DashboardSummary } from '@/types/api';
 
 export default function OverviewPage() {
-  const clientQ = useClientInfo();
   const summaryQ = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: () => apiClient<DashboardSummary>('/api/dashboard-summary'),
     staleTime: 30_000
   });
-  const activityQ = useQuery({
-    queryKey: ['activity', 5],
-    queryFn: () => apiClient<ActivityResponse>('/api/activity?limit=5'),
-    refetchInterval: 30_000,
-    staleTime: 15_000
-  });
 
-  if (clientQ.isLoading || summaryQ.isLoading) return <PageSpinner />;
-
-  const client = clientQ.data ?? null;
+  if (summaryQ.isLoading) return <PageSpinner />;
   const summary = summaryQ.data ?? null;
-  const activity: ActivityResponse = activityQ.data ?? { items: [] as ActivityItem[] };
-
   if (!summary) {
     return (
-      <div className="p-7 max-w-[1400px]">
-        <h1 className="text-[22px] font-semibold tracking-[-0.3px]">الرئيسية</h1>
+      <div className="p-7 page-shell max-w-[1400px]">
+        <h1 className="text-[22px] font-semibold">ملخص الذكاء التشغيلي لتجربة العميل</h1>
         <div className="mt-6 rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
           <EmptyState message="تعذر تحميل البيانات. تأكد من اتصال الخادم وحاول مرة أخرى." />
         </div>
@@ -50,222 +33,120 @@ export default function OverviewPage() {
     );
   }
 
-  const satisfaction = safeNumber(summary.satisfaction_rate);
-  const avgRating    = safeNumber(summary.average_rating);
-  const workflow     = summary.complaint_workflow_summary || {
-    new_count: 0, in_progress_count: 0, contacted_count: 0,
-    resolved_count: 0, closed_count: 0, overdue_count: 0
-  };
+  const workflow = summary.complaint_workflow_summary;
+  const urgent = (summary.urgent_complaints ?? []).slice(0, 4);
+  const branches = (summary.weak_branches ?? []).slice(0, 4);
   const totalComplaints = safeNumber(summary.complaint_count);
-  const resolvedRate = totalComplaints === 0
-    ? 100
-    : Math.round(((workflow.resolved_count + workflow.closed_count) / totalComplaints) * 100);
-
-  const monthly = summary.monthly_counts ?? [];
-  const branches = summary.branch_performance ?? [];
-  const urgent = (summary.urgent_complaints ?? []).slice(0, 3);
-
-  const greetingName = client?.name?.split(' ')?.[0] || '';
+  const resolvedCount = safeNumber(workflow?.resolved_count) + safeNumber(workflow?.closed_count);
+  const resolvedRate = totalComplaints ? Math.round((resolvedCount / totalComplaints) * 100) : 100;
   const apiKey = getApiKey() || '';
 
   return (
-    <div className="p-7" style={{ maxWidth: 1400 }}>
-      <div className="mb-6 flex items-start justify-between">
+    <div className="p-7 page-shell" style={{ maxWidth: 1400 }}>
+      <header className="mb-6 flex items-start justify-between gap-4 page-header">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-[-0.3px] text-[var(--color-text-1)] m-0">
-            {greetingName ? `مرحباً، ${greetingName} 👋` : 'الرئيسية'}
-          </h1>
-          <p className="mt-1 text-[13.5px] text-[var(--color-text-2)]">
-            هذه نظرة سريعة على أداء منشأتك خلال آخر 30 يوم
-          </p>
+          <h1 className="m-0 text-[22px] font-semibold tracking-[-0.3px] text-[var(--color-text-1)]">ملخص الذكاء التشغيلي لتجربة العميل</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[var(--color-text-2)]">
+            <span className="inline-flex items-center gap-1"><IconCalendar size={13} />آخر 30 يوم</span>
+            {summaryQ.dataUpdatedAt ? <span>آخر تحديث {relativeTimeAr(summaryQ.dataUpdatedAt)}</span> : null}
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            disabled
-            title="نطاق زمني — قريباً"
-            className="flex items-center gap-1.5 rounded-[7px] border px-3 py-1.5 text-[13px] font-medium opacity-80"
-            style={{ borderColor: 'var(--color-border-strong)', color: 'var(--color-text-2)', background: 'var(--color-surface)' }}
-          >
-            <IconCalendar size={14} />
-            آخر 30 يوم
-            <IconChevronDown size={12} />
-          </button>
-          <a
-            href={`/api/export-excel?apiKey=${encodeURIComponent(apiKey)}`}
-            className="flex items-center gap-1.5 rounded-[7px] border px-3 py-1.5 text-[13px] font-medium"
-            style={{ borderColor: 'var(--color-border-strong)', color: 'var(--color-text-2)', background: 'var(--color-surface)' }}
-          ><IconDownload size={14} />تصدير</a>
-        </div>
-      </div>
+        <a href={`/api/export-excel?apiKey=${encodeURIComponent(apiKey)}`}
+          className="flex items-center gap-1.5 rounded-[7px] border px-3 py-1.5 text-[13px] font-medium"
+          style={{ borderColor: 'var(--color-border-strong)', color: 'var(--color-text-2)', background: 'var(--color-surface)' }}>
+          <IconDownload size={14} />تصدير
+        </a>
+      </header>
 
-      <div className="mb-6 grid gap-3.5" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-        <KpiCard label="مؤشر الرضا"
-          value={<>{satisfaction.toFixed(0)}<span className="text-[18px] text-[var(--color-text-3)] font-medium">٪</span></>}
-          icon={<IconMoodSmile size={18} className="text-[var(--color-text-3)]" />} />
-        <KpiCard label="معدل الاستجابة"
-          value={<span className="text-[var(--color-text-3)] text-[15px]">—</span>}
-          icon={<IconClock size={18} className="text-[var(--color-text-3)]" />}
-          hint="لا توجد بيانات متاحة حالياً" />
-        <KpiCard label="الشكاوى التي حُلّت"
-          value={<>{resolvedRate}<span className="text-[18px] text-[var(--color-text-3)] font-medium">٪</span></>}
-          icon={<IconCircleCheck size={18} className="text-[var(--color-text-3)]" />} />
-        <KpiCard label="متوسط التقييم"
-          value={<>{avgRating.toFixed(1)}<span className="text-[18px] text-[var(--color-text-3)] font-medium">/5</span></>}
-          icon={<IconStar size={18} className="text-[var(--color-text-3)]" />} />
-      </div>
-
-      <div className="mb-6 grid gap-3.5" style={{ gridTemplateColumns: '1.7fr 1fr' }}>
-        <Card>
-          <SectionH title="تطور الشكاوى والتقييمات"
-            subtitle="مقارنة شهرية للأداء عبر جميع الفروع"
-            right={
-              <div className="flex gap-1">
-                <Chip active>شهري</Chip>
-                <Chip>أسبوعي</Chip>
-                <Chip>يومي</Chip>
+      <section className="mb-5">
+        <SectionHead title="الإشارات التي تحتاج انتباهًا" subtitle="مبنية على الشكاوى العاجلة والتقييمات المنخفضة المسجلة حاليًا"
+          action={<Link to="/signals" className="section-link">عرض الإشارات <IconArrowLeft size={13} /></Link>} />
+        <div className="grid gap-3 overview-attention-grid">
+          <Card>
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-[13.5px] font-semibold">شكاوى تحتاج متابعة</span>
+              <span className="num rounded-full bg-[var(--color-bad-light)] px-2 py-0.5 text-[12px] font-medium text-[var(--color-bad)]">{urgent.length}</span>
+            </div>
+            {urgent.length ? urgent.map((item, index) => <AttentionRow key={item.id} item={item} last={index === urgent.length - 1} />) : <EmptyState message="لا توجد شكاوى عاجلة حاليًا" />}
+          </Card>
+          <Card>
+            <div className="flex h-full flex-col justify-between gap-5">
+              <div>
+                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-[8px] bg-[var(--color-warn-light)] text-[var(--color-warn)]"><IconStar size={17} /></div>
+                <div className="text-[13.5px] font-semibold">تقييمات منخفضة</div>
+                <div className="num mt-2 text-[30px] font-semibold">{safeNumber(summary.low_rating_count)}</div>
+                <div className="mt-1 text-[12px] text-[var(--color-text-3)]">{safeNumber(summary.low_rating_rate).toFixed(0)}٪ من التقييمات المسجلة</div>
               </div>
-            } />
-          <OverviewChart monthly={monthly} daily={summary.daily_counts_last_30_days ?? []} />
-        </Card>
-        <Card>
-          <SectionH title="النشاط اللحظي"
-            right={
-              <span className="flex items-center gap-1.5 text-[11.5px] text-[var(--color-text-3)] font-normal">
-                <span className="pulse" /> مباشر
-              </span>
-            } />
-          <ActivityFeed initial={activity?.items ?? []} />
-        </Card>
-      </div>
-
-      <div className="grid gap-3.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
-        <Card>
-          <SectionH title="أداء الفروع"
-            right={<Link to="/branches" className="text-[12.5px] font-medium" style={{ color: 'var(--color-primary)' }}>عرض الكل <IconArrowLeft size={13} className="inline -mb-0.5" /></Link>} />
-          {branches.length === 0 ? <EmptyState /> : (
-            <div className="flex flex-col">
-              {branches.slice(0, 4).map((b, i) => (
-                <BranchRow key={`${b.branch}-${i}`} branch={b} first={i === 0} />
-              ))}
+              <Link to="/signals?type=reviews&rating=2" className="section-link">مراجعة الإشارات <IconArrowLeft size={13} /></Link>
             </div>
-          )}
-        </Card>
+          </Card>
+        </div>
+      </section>
 
+      <section className="mb-5">
+        <SectionHead title="الفروع التي تحتاج متابعة" subtitle="الفروع الأضعف كما يعيدها ملخص الأداء الحالي"
+          action={<Link to="/branches" className="section-link">ذكاء الفروع <IconArrowLeft size={13} /></Link>} />
         <Card>
-          <SectionH title="شكاوى تحتاج اهتمامك"
-            right={<Link to="/complaints" className="text-[12.5px] font-medium" style={{ color: 'var(--color-primary)' }}>عرض الكل <IconArrowLeft size={13} className="inline -mb-0.5" /></Link>} />
-          {urgent.length === 0 ? <EmptyState message="لا توجد شكاوى عاجلة" /> : (
-            <div className="flex flex-col">
-              {urgent.map((c, i) => <UrgentRow key={c.id} c={c} last={i === urgent.length - 1} />)}
-            </div>
-          )}
+          {branches.length ? branches.map((branch, index) => <BranchRow key={`${branch.branch}-${index}`} branch={branch} last={index === branches.length - 1} />) : <EmptyState message="لا توجد فروع محددة للمتابعة في البيانات الحالية" />}
         </Card>
-      </div>
+      </section>
+
+      <section className="mb-5">
+        <SectionHead title="ما تغير في المؤشرات المتاحة" subtitle="الاتجاه المسجل فعليًا للتقييمات والشكاوى خلال الفترة" />
+        <Card><OverviewChart monthly={summary.monthly_counts ?? []} daily={summary.daily_counts_last_30_days ?? []} /></Card>
+      </section>
+
+      <section>
+        <SectionHead title="مؤشرات السياق" subtitle="أرقام مساندة لفهم حجم ونطاق صوت العميل" />
+        <div className="grid gap-3 context-metrics-grid">
+          <Metric label="متوسط التقييم" value={`${safeNumber(summary.average_rating).toFixed(1)}/5`} icon={<IconStar size={16} />} />
+          <Metric label="إجمالي الإشارات" value={safeNumber(summary.total_evaluations).toLocaleString('en-US')} icon={<IconMessageCircle size={16} />} />
+          <Metric label="مؤشر الرضا" value={`${safeNumber(summary.satisfaction_rate).toFixed(0)}٪`} icon={<IconMoodSmile size={16} />} />
+          <Metric label="الشكاوى التي أغلقت" value={`${resolvedRate}٪`} icon={<IconCircleCheck size={16} />} />
+        </div>
+      </section>
     </div>
   );
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-[10px]" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: 20 }}>{children}</div>
-  );
+  return <div className="rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">{children}</div>;
 }
 
-function SectionH({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
+function SectionHead({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
   return (
-    <div className="mb-4 flex items-center justify-between">
-      <div>
-        <div className="text-[15px] font-semibold text-[var(--color-text-1)]">{title}</div>
-        {subtitle ? <div className="mt-0.5 text-[12px] font-normal text-[var(--color-text-3)]">{subtitle}</div> : null}
-      </div>
-      {right}
+    <div className="mb-3 flex items-end justify-between gap-3">
+      <div><h2 className="m-0 text-[16px] font-semibold">{title}</h2>{subtitle ? <p className="m-0 mt-1 text-[12.5px] text-[var(--color-text-3)]">{subtitle}</p> : null}</div>
+      {action}
     </div>
   );
 }
 
-function Chip({ active, children }: { active?: boolean; children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11.5px] font-medium leading-[1.6]"
-      style={{ background: active ? 'var(--color-primary-light)' : '#F4F5F7', color: active ? 'var(--color-primary)' : 'var(--color-text-3)', cursor: 'default' }}>{children}</span>
-  );
-}
-
-function KpiCard({ label, value, icon, hint }: { label: string; value: React.ReactNode; icon: React.ReactNode; hint?: string }) {
-  return (
-    <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '18px 20px' }}>
-      <div className="mb-1 flex items-start justify-between">
-        <div className="text-[12.5px] font-medium text-[var(--color-text-2)]">{label}</div>
-        {icon}
-      </div>
-      <div className="num text-[28px] font-semibold tracking-[-0.5px] text-[var(--color-text-1)]">{value}</div>
-      {hint ? (
-        <div className="mt-1 text-[12px] text-[var(--color-text-3)]">{hint}</div>
-      ) : (
-        <div className="mt-1 flex items-center gap-1 text-[12px]" style={{ color: 'var(--color-text-3)' }}>
-          <IconMinus size={13} /><span>آخر 30 يوم</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function BranchRow({ branch, first }: { branch: BranchPerformance; first: boolean }) {
-  const rating = safeNumber(branch.average_rating);
-  const evalsTotal = safeNumber(branch.rating_count ?? branch.total_evaluations);
-  const displayRating = rating > 5 && evalsTotal > 0 ? rating / evalsTotal : rating;
-  const [label, badgeClass, iconBg, iconColor] = statusOf(displayRating);
-  return (
-    <div className="flex items-center gap-3 py-2" style={first ? undefined : { borderTop: '1px solid var(--color-border)' }}>
-      <div className="flex shrink-0 items-center justify-center"
-        style={{ width: 36, height: 36, borderRadius: 8, background: iconBg, color: iconColor }}>
-        <IconBuildingStore size={18} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[13.5px] font-medium text-[var(--color-text-1)] truncate">{branch.branch}</div>
-        <div className="mt-0.5 text-[11.5px] text-[var(--color-text-3)]">
-          {safeNumber(branch.total_evaluations)} تقييم · {safeNumber(branch.complaint_count)} شكوى
-        </div>
-      </div>
-      <div className="text-start">
-        <div className="num text-[14px] font-semibold">{displayRating.toFixed(1)}</div>
-        <span className="mt-0.5 inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-medium leading-[1.4]" style={badgeClass}>{label}</span>
-      </div>
-    </div>
-  );
-}
-
-function statusOf(rating: number): [string, React.CSSProperties, string, string] {
-  if (rating >= 4.5) return ['ممتاز',     { background: 'var(--color-good-light)', color: '#047857' }, 'var(--color-good-light)', 'var(--color-good)'];
-  if (rating >= 4)   return ['جيد جداً',  { background: 'var(--color-good-light)', color: '#047857' }, 'var(--color-good-light)', 'var(--color-good)'];
-  if (rating >= 3.5) return ['متوسط',     { background: 'var(--color-warn-light)', color: '#B45309' }, 'var(--color-warn-light)', 'var(--color-warn)'];
-  return ['يحتاج تدخل', { background: 'var(--color-bad-light)', color: '#B91C1C' }, 'var(--color-bad-light)', 'var(--color-bad)'];
-}
-
-function UrgentRow({ c, last }: { c: ComplaintRow; last: boolean }) {
-  const dotColor = c.is_overdue ? 'var(--color-bad)' : 'var(--color-warn)';
-  const preview = c.feedback?.trim() || 'لا يوجد نص شكوى مسجل';
+function AttentionRow({ item, last }: { item: ComplaintRow; last: boolean }) {
   return (
     <div className="flex gap-3 py-2.5" style={last ? undefined : { borderBottom: '1px solid var(--color-border)' }}>
-      <span className="prio-dot mt-1.5" style={{ background: dotColor }} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          <div className="text-[13.5px] font-medium text-[var(--color-text-1)]">
-            #{c.id}{c.name ? ` — ${c.name}` : ''}
-          </div>
-          <TimeAgo at={c.sent_at} className="text-[11.5px] text-[var(--color-text-3)]" />
-        </div>
-        <div className="mt-1 line-clamp-2 text-[12.5px] text-[var(--color-text-2)]">{preview}</div>
-        <div className="mt-1.5 flex gap-1.5">
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-medium leading-[1.4]"
-            style={c.is_overdue
-              ? { background: 'var(--color-bad-light)', color: '#B91C1C' }
-              : { background: 'var(--color-warn-light)', color: '#B45309' }}>{c.is_overdue ? 'متأخرة' : 'تحتاج متابعة'}</span>
-          {c.branch ? (
-            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-medium leading-[1.4]" style={{ background: '#F1F3F5', color: 'var(--color-text-2)' }}>{c.branch}</span>
-          ) : null}
-        </div>
+      <IconAlertTriangle size={15} className="mt-1 shrink-0 text-[var(--color-bad)]" />
+      <div className="min-w-0 flex-1">
+        <div className="line-clamp-2 text-[13px] leading-[1.6]">{item.feedback?.trim() || 'لا يوجد نص شكوى مسجل'}</div>
+        <div className="mt-1 flex gap-2 text-[11.5px] text-[var(--color-text-3)]">{item.branch ? <span>{item.branch}</span> : null}<TimeAgo at={item.sent_at} /></div>
       </div>
     </div>
   );
+}
+
+function BranchRow({ branch, last }: { branch: BranchPerformance; last: boolean }) {
+  const count = safeNumber(branch.rating_count ?? branch.total_evaluations);
+  const rawRating = safeNumber(branch.average_rating);
+  const rating = rawRating > 5 && count > 0 ? rawRating / count : rawRating;
+  return (
+    <div className="flex items-center gap-3 py-3" style={last ? undefined : { borderBottom: '1px solid var(--color-border)' }}>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-[var(--color-bad-light)] text-[var(--color-bad)]"><IconBuildingStore size={17} /></span>
+      <div className="min-w-0 flex-1"><div className="truncate text-[13.5px] font-medium">{branch.branch}</div><div className="mt-0.5 text-[11.5px] text-[var(--color-text-3)]">{safeNumber(branch.total_evaluations)} إشارة · {safeNumber(branch.complaint_count)} شكوى</div></div>
+      <div className="text-end"><div className="num text-[14px] font-semibold">{rating.toFixed(1)}/5</div><div className="text-[11px] text-[var(--color-text-3)]">متوسط التقييم</div></div>
+    </div>
+  );
+}
+
+function Metric({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+  return <div className="rounded-[10px] border border-[var(--color-border)] bg-white p-4"><div className="flex items-center justify-between text-[12px] text-[var(--color-text-3)]"><span>{label}</span>{icon}</div><div className="num mt-2 text-[23px] font-semibold">{value}</div></div>;
 }

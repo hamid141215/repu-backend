@@ -1,190 +1,96 @@
 'use client';
 
 import { Link } from 'react-router';
-import {
-  IconMoodSmile, IconMessage2Exclamation, IconChartHistogram, IconStar,
-  IconBuildingStore, IconAlertTriangle, IconMailFast, IconDownload, IconArrowLeft
-} from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowLeft, IconBuildingStore, IconDownload, IconMoodSmile, IconStar } from '@tabler/icons-react';
+import { OverviewChart } from '@/components/overview-chart';
+import { TimeAgo } from '@/components/time-ago';
 import { safeNumber } from '@/lib/format';
-import type { DashboardSummary } from '@/types/api';
+import type { BranchPerformance, DashboardSummary } from '@/types/api';
 
-interface Props {
-  summary: DashboardSummary | null;
-}
-
-interface ReportDef {
-  key: string;
-  title: string;
-  description: string;
-  badge: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  iconColor: string;
-  action:
-    | { kind: 'link'; href: string; cta: string }
-    | { kind: 'download'; cta: string }
-    | { kind: 'soon' };
-}
+interface Props { summary: DashboardSummary | null; }
 
 export function ReportsView({ summary }: Props) {
-  const reports: ReportDef[] = [
-    {
-      key: 'satisfaction',
-      title: 'تقرير رضا العملاء',
-      description: 'متابعة مؤشر الرضا وتوزيع التقييمات عبر جميع الفروع',
-      badge: 'شهري',
-      icon: <IconMoodSmile size={22} />,
-      iconBg: 'var(--color-primary-light)',
-      iconColor: 'var(--color-primary)',
-      action: { kind: 'link', href: '/analytics?range=30d', cta: 'عرض' }
-    },
-    {
-      key: 'complaint-reasons',
-      title: 'تحليل أسباب الشكاوى',
-      description: 'تصنيف الشكاوى حسب الحالة والفرع والتوقيت',
-      badge: 'أسبوعي',
-      icon: <IconMessage2Exclamation size={22} />,
-      iconBg: 'var(--color-warn-light)',
-      iconColor: 'var(--color-warn)',
-      action: { kind: 'link', href: '/analytics?range=30d', cta: 'عرض' }
-    },
-    {
-      key: 'nps',
-      title: 'مؤشر الولاء',
-      description: 'قياس مدى توصية العملاء بخدماتك بمرور الوقت',
-      badge: 'ربع سنوي',
-      icon: <IconChartHistogram size={22} />,
-      iconBg: 'var(--color-purple-light)',
-      iconColor: 'var(--color-purple)',
-      action: { kind: 'link', href: '/analytics?range=90d', cta: 'عرض' }
-    },
-    {
-      key: 'evaluations-excel',
-      title: 'تقرير التقييمات الكامل',
-      description: 'جدول Excel يضم جميع التقييمات والشكاوى مع توقيتاتها',
-      badge: 'تحميل',
-      icon: <IconStar size={22} />,
-      iconBg: '#FFFBEB',
-      iconColor: '#F59E0B',
-      action: { kind: 'download', cta: 'تحميل Excel' }
-    },
-    {
-      key: 'branches',
-      title: 'أداء الفروع',
-      description: 'مقارنة شاملة بين جميع الفروع على كل المؤشرات',
-      badge: 'شهري',
-      icon: <IconBuildingStore size={22} />,
-      iconBg: 'var(--color-good-light)',
-      iconColor: 'var(--color-good)',
-      action: { kind: 'link', href: '/branches', cta: 'عرض' }
-    },
-    {
-      key: 'alerts',
-      title: 'تنبيهات الأداء الحرج',
-      description: 'إشعارات فورية عند انخفاض أي مؤشر',
-      badge: 'قريباً',
-      icon: <IconAlertTriangle size={22} />,
-      iconBg: 'var(--color-bad-light)',
-      iconColor: 'var(--color-bad)',
-      action: { kind: 'soon' }
-    }
-  ];
-
-  const totalEvals = safeNumber(summary?.total_evaluations);
+  const branches = summary?.branch_performance ?? [];
+  const urgent = (summary?.urgent_complaints ?? []).slice(0, 5);
+  const workflow = summary?.complaint_workflow_summary;
+  const resolved = safeNumber(workflow?.resolved_count) + safeNumber(workflow?.closed_count);
 
   return (
-    <div className="p-7" style={{ maxWidth: 1400 }}>
-      <div className="mb-6 flex items-start justify-between">
+    <div className="p-7 page-shell" style={{ maxWidth: 1400 }}>
+      <header className="mb-6 flex items-start justify-between gap-3 page-header">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-[-0.3px] text-[var(--color-text-1)] m-0">التقارير</h1>
-          <p className="mt-1 text-[13.5px] text-[var(--color-text-2)]">
-            تقارير دورية قابلة للتصدير والمشاركة
-            {totalEvals > 0 ? ` · ${totalEvals.toLocaleString('en-US')} تقييم متاح` : ''}
-          </p>
+          <h1 className="m-0 text-[22px] font-semibold tracking-[-0.3px]">الملخص التنفيذي</h1>
+          <p className="m-0 mt-1 text-[13.5px] text-[var(--color-text-2)]">قراءة موجزة للبيانات التشغيلية المتاحة حاليًا</p>
         </div>
-      </div>
+        <a href={`/api/export-excel?apiKey=${encodeURIComponent(typeof window !== 'undefined' ? (window.localStorage.getItem('repu_key') || '') : '')}`}
+          download className="flex items-center gap-1.5 rounded-[7px] border px-3 py-1.5 text-[13px] font-medium"
+          style={{ borderColor: 'var(--color-border-strong)', background: 'white', color: 'var(--color-primary)' }}>
+          <IconDownload size={14} />تصدير Excel
+        </a>
+      </header>
 
-      <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        {reports.map(r => <ReportCard key={r.key} report={r} />)}
-      </div>
+      <Section title="ملخص الفترة" subtitle="آخر 30 يوم وفق بيانات الملخص الحالية">
+        <div className="grid gap-3 context-metrics-grid">
+          <Metric label="إجمالي الإشارات" value={safeNumber(summary?.total_evaluations).toLocaleString('en-US')} />
+          <Metric label="متوسط التقييم" value={`${safeNumber(summary?.average_rating).toFixed(1)}/5`} />
+          <Metric label="مؤشر الرضا" value={`${safeNumber(summary?.satisfaction_rate).toFixed(0)}٪`} />
+          <Metric label="شكاوى أغلقت أو حُلّت" value={resolved.toLocaleString('en-US')} />
+        </div>
+      </Section>
 
-      {/* Scheduled reports banner */}
-      <div
-        className="mt-6 rounded-[10px] flex items-start gap-3.5 p-5"
-        style={{
-          background: 'linear-gradient(135deg, var(--color-primary-50) 0%, var(--color-surface) 100%)',
-          border: '1px solid var(--color-primary-light)'
-        }}
-      >
-        <div
-          className="flex shrink-0 items-center justify-center text-white"
-          style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--color-primary)' }}
-        >
-          <IconMailFast size={20} />
+      <Section title="أبرز المؤشرات">
+        <div className="grid gap-3 report-highlights-grid">
+          <Highlight icon={<IconStar size={18} />} title="التقييمات المنخفضة" value={safeNumber(summary?.low_rating_count)} note={`${safeNumber(summary?.low_rating_rate).toFixed(0)}٪ من التقييمات`} tone="warn" />
+          <Highlight icon={<IconAlertTriangle size={18} />} title="الشكاوى المتأخرة" value={safeNumber(workflow?.overdue_count)} note="وفق سير عمل الشكاوى الحالي" tone="bad" />
+          <Highlight icon={<IconMoodSmile size={18} />} title="التقييمات الإيجابية" value={safeNumber(summary?.positive_count)} note="ضمن الفترة المتاحة" tone="good" />
         </div>
-        <div className="flex-1">
-          <h3 className="text-[14.5px] font-semibold m-0 text-[var(--color-text-1)]">جدولة التقارير التلقائية</h3>
-          <p className="mt-1 text-[12.5px] m-0" style={{ color: 'var(--color-text-2)' }}>
-            احصل على تقاريرك دورياً عبر البريد الإلكتروني بصيغة Excel
-          </p>
+      </Section>
+
+      <Section title="أداء الفروع" subtitle="مقارنة مباشرة بالمقاييس الحالية" action={<Link to="/branches" className="section-link">ذكاء الفروع <IconArrowLeft size={13} /></Link>}>
+        <div className="overflow-hidden rounded-[10px] border border-[var(--color-border)] bg-white">
+          {branches.length ? branches.slice(0, 8).map((branch, index) => <BranchLine key={`${branch.branch}-${index}`} branch={branch} first={index === 0} />) : <div className="p-6 text-center text-[13px] text-[var(--color-text-3)]">لا توجد بيانات فروع متاحة</div>}
         </div>
-        <button
-          type="button"
-          disabled
-          title="قريباً"
-          className="rounded-[7px] px-3.5 py-1.5 text-[13px] font-medium text-white opacity-60"
-          style={{ background: 'var(--color-primary)' }}
-        >قريباً</button>
-      </div>
+      </Section>
+
+      <Section title="إشارات تحتاج انتباهًا" subtitle="الشكاوى العاجلة المسجلة حاليًا" action={<Link to="/signals?type=complaints" className="section-link">كل الإشارات <IconArrowLeft size={13} /></Link>}>
+        <div className="overflow-hidden rounded-[10px] border border-[var(--color-border)] bg-white">
+          {urgent.length ? urgent.map((item, index) => (
+            <div key={item.id} className="flex items-start gap-3 px-4 py-3" style={index ? { borderTop: '1px solid var(--color-border)' } : undefined}>
+              <IconAlertTriangle size={15} className="mt-1 shrink-0 text-[var(--color-bad)]" />
+              <div className="min-w-0 flex-1"><div className="line-clamp-2 text-[13px]">{item.feedback?.trim() || 'لا يوجد نص شكوى مسجل'}</div><div className="mt-1 flex gap-2 text-[11.5px] text-[var(--color-text-3)]">{item.branch ? <span>{item.branch}</span> : null}<TimeAgo at={item.sent_at} /></div></div>
+            </div>
+          )) : <div className="p-6 text-center text-[13px] text-[var(--color-text-3)]">لا توجد إشارات عاجلة حاليًا</div>}
+        </div>
+      </Section>
+
+      <Section title="الاتجاهات" subtitle="الحركة الفعلية المسجلة للتقييمات والشكاوى">
+        <div className="rounded-[10px] border border-[var(--color-border)] bg-white p-5"><OverviewChart monthly={summary?.monthly_counts ?? []} daily={summary?.daily_counts_last_30_days ?? []} /></div>
+      </Section>
+
+      <Section title="التصدير" subtitle="استخدم ملف Excel الحالي للتحليل والمشاركة">
+        <a href={`/api/export-excel?apiKey=${encodeURIComponent(typeof window !== 'undefined' ? (window.localStorage.getItem('repu_key') || '') : '')}`}
+          download className="inline-flex items-center gap-1.5 rounded-[7px] bg-[var(--color-primary)] px-3.5 py-2 text-[13px] font-medium text-white"><IconDownload size={14} />تحميل Excel</a>
+      </Section>
     </div>
   );
 }
 
-function ReportCard({ report }: { report: ReportDef }) {
-  const action = report.action;
+function Section({ title, subtitle, action, children }: { title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return <section className="mb-6"><div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="m-0 text-[16px] font-semibold">{title}</h2>{subtitle ? <p className="m-0 mt-1 text-[12.5px] text-[var(--color-text-3)]">{subtitle}</p> : null}</div>{action}</div>{children}</section>;
+}
 
-  return (
-    <div
-      className="rounded-[10px]"
-      style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: 20 }}
-    >
-      <div
-        className="mb-3.5 flex items-center justify-center"
-        style={{ width: 40, height: 40, borderRadius: 10, background: report.iconBg, color: report.iconColor }}
-      >{report.icon}</div>
-      <h3 className="text-[15px] font-semibold m-0 mb-1 text-[var(--color-text-1)]">{report.title}</h3>
-      <p className="text-[12.5px] leading-[1.6] m-0" style={{ color: 'var(--color-text-2)' }}>
-        {report.description}
-      </p>
-      <div
-        className="mt-3.5 pt-3.5 flex items-center justify-between"
-        style={{ borderTop: '1px solid var(--color-border)' }}
-      >
-        <span
-          className="inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-medium leading-[1.4]"
-          style={{
-            background: action.kind === 'soon' ? '#F1F3F5' : 'var(--color-primary-light)',
-            color: action.kind === 'soon' ? 'var(--color-text-3)' : 'var(--color-primary)'
-          }}
-        >{report.badge}</span>
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-[10px] border border-[var(--color-border)] bg-white p-4"><div className="text-[12px] text-[var(--color-text-3)]">{label}</div><div className="num mt-1 text-[24px] font-semibold">{value}</div></div>;
+}
 
-        {action.kind === 'link' ? (
-          <Link
-            to={action.href}
-            className="text-[12.5px] font-medium flex items-center gap-1"
-            style={{ color: 'var(--color-primary)' }}
-          >{action.cta} <IconArrowLeft size={13} /></Link>
-        ) : action.kind === 'download' ? (
-          <a
-            href={`/api/export-excel?apiKey=${encodeURIComponent(typeof window !== 'undefined' ? (window.localStorage.getItem('repu_key') || '') : '')}`}
-            download
-            className="text-[12.5px] font-medium flex items-center gap-1"
-            style={{ color: 'var(--color-primary)' }}
-          ><IconDownload size={13} />{action.cta}</a>
-        ) : (
-          <span className="text-[12.5px] text-[var(--color-text-3)]">قريباً</span>
-        )}
-      </div>
-    </div>
-  );
+function Highlight({ icon, title, value, note, tone }: { icon: React.ReactNode; title: string; value: number; note: string; tone: 'warn' | 'bad' | 'good' }) {
+  const colors = tone === 'bad' ? ['var(--color-bad-light)', 'var(--color-bad)'] : tone === 'warn' ? ['var(--color-warn-light)', 'var(--color-warn)'] : ['var(--color-good-light)', 'var(--color-good)'];
+  return <div className="rounded-[10px] border border-[var(--color-border)] bg-white p-4"><span className="flex h-9 w-9 items-center justify-center rounded-[8px]" style={{ background: colors[0], color: colors[1] }}>{icon}</span><div className="mt-3 text-[12.5px] font-medium text-[var(--color-text-2)]">{title}</div><div className="num mt-1 text-[25px] font-semibold">{value}</div><div className="mt-1 text-[11.5px] text-[var(--color-text-3)]">{note}</div></div>;
+}
+
+function BranchLine({ branch, first }: { branch: BranchPerformance; first: boolean }) {
+  const count = safeNumber(branch.rating_count ?? branch.total_evaluations);
+  const raw = safeNumber(branch.average_rating);
+  const rating = raw > 5 && count > 0 ? raw / count : raw;
+  return <div className="flex items-center gap-3 px-4 py-3" style={first ? undefined : { borderTop: '1px solid var(--color-border)' }}><IconBuildingStore size={16} className="shrink-0 text-[var(--color-text-3)]" /><div className="min-w-0 flex-1 truncate text-[13px] font-medium">{branch.branch}</div><div className="text-[12px] text-[var(--color-text-3)]">{safeNumber(branch.total_evaluations)} إشارة · {safeNumber(branch.complaint_count)} شكوى</div><div className="num w-14 text-end text-[13px] font-semibold">{rating.toFixed(1)}/5</div></div>;
 }

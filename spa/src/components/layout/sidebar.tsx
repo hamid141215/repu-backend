@@ -3,8 +3,8 @@
 import { Link } from 'react-router';
 import { useLocation } from 'react-router';
 import {
-  IconLayoutDashboard, IconStar, IconMessage2Exclamation, IconBuildingStore,
-  IconChartHistogram, IconFileText, IconWifi, IconSend, IconDeviceMobile,
+  IconLayoutDashboard, IconMessage2Exclamation, IconBuildingStore,
+  IconFileText, IconWifi, IconSend, IconDeviceMobile,
   IconSettings, IconDots, IconSelector, IconUsers
 } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
@@ -15,27 +15,24 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
-  badge?: 'reviews' | 'complaints';
 }
 
 const NAV_MAIN: NavItem[] = [
   { href: '/',           label: 'الرئيسية',  icon: IconLayoutDashboard },
-  { href: '/reviews',    label: 'التقييمات', icon: IconStar,                badge: 'reviews' },
-  { href: '/complaints', label: 'الشكاوى',   icon: IconMessage2Exclamation, badge: 'complaints' },
+  { href: '/signals',    label: 'الإشارات',  icon: IconMessage2Exclamation },
   { href: '/branches',   label: 'الفروع',    icon: IconBuildingStore },
-  { href: '/analytics',  label: 'التحليلات', icon: IconChartHistogram },
-  { href: '/reports',    label: 'التقارير',  icon: IconFileText }
+  { href: '/reports',    label: 'الملخص التنفيذي',  icon: IconFileText }
 ];
 
 const NAV_TOOLS: NavItem[] = [
-  { href: '/nfc',              label: 'بطاقات NFC',    icon: IconWifi },
   { href: '/campaigns',        label: 'طلبات التقييم', icon: IconSend },
-  { href: '/customer-preview', label: 'صفحة العميل',   icon: IconDeviceMobile }
+  { href: '/nfc',              label: 'NFC / QR',       icon: IconWifi },
+  { href: '/customer-preview', label: 'صفحة جمع التقييم', icon: IconDeviceMobile }
 ];
 
 const NAV_SETTINGS: NavItem[] = [
   { href: '/team',     label: 'الفريق والصلاحيات', icon: IconUsers },
-  { href: '/settings', label: 'إعدادات الحساب',    icon: IconSettings }
+  { href: '/settings', label: 'إعدادات المؤسسة',    icon: IconSettings }
 ];
 
 interface Props {
@@ -44,33 +41,13 @@ interface Props {
   complaintsCount: number;
 }
 
-export function Sidebar({ clientName, reviewsCount, complaintsCount }: Props) {
+export function Sidebar({ clientName }: Props) {
   const pathname = useLocation().pathname || '/';
   const isActive = (href: string) => href === '/' ? pathname === '/' : pathname.startsWith(href);
 
-  function badgeFor(kind: NavItem['badge']) {
-    if (kind === 'reviews' && reviewsCount > 0) {
-      return (
-        <span
-          className="num me-auto inline-flex items-center rounded-[4px] px-1.5 text-[11px]"
-          style={{ background: '#F1F3F5', color: 'var(--color-text-3)' }}
-        >{reviewsCount > 999 ? '999+' : reviewsCount}</span>
-      );
-    }
-    if (kind === 'complaints' && complaintsCount > 0) {
-      return (
-        <span
-          className="num me-auto inline-flex items-center rounded-[4px] px-1.5 text-[11px]"
-          style={{ background: 'var(--color-bad-light)', color: 'var(--color-bad)' }}
-        >{complaintsCount > 999 ? '999+' : complaintsCount}</span>
-      );
-    }
-    return null;
-  }
-
   return (
     <aside
-      className="fixed top-0 right-0 z-20 flex h-screen flex-col"
+      className="app-sidebar fixed top-0 right-0 z-20 flex h-screen flex-col"
       style={{
         width: 248,
         background: 'var(--color-surface)',
@@ -80,19 +57,18 @@ export function Sidebar({ clientName, reviewsCount, complaintsCount }: Props) {
     >
       {/* Logo */}
       <div className="flex items-center gap-2 px-2 pb-3 pt-1">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/brand/logo-icon.svg"
-          alt="RepuSystem"
+          alt="Repu"
           width={26}
           height={26}
           style={{ objectFit: 'contain' }}
         />
-        <div className="text-[14.5px] font-semibold tracking-[-0.2px] text-[var(--color-text-1)]">RepuSystem</div>
+        <div className="text-[14.5px] font-semibold tracking-[-0.2px] text-[var(--color-text-1)]">Repu</div>
       </div>
 
       {/* Workspace switcher */}
-      <div className="px-2.5 mb-2">
+      <div className="workspace-switcher px-2.5 mb-2">
         <button
           type="button"
           className="flex w-full items-center justify-between rounded-[7px] px-2.5 py-1.5"
@@ -117,7 +93,7 @@ export function Sidebar({ clientName, reviewsCount, complaintsCount }: Props) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto">
-        {NAV_MAIN.map(({ href, label, icon: Icon, badge }) => (
+        {NAV_MAIN.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             to={href}
@@ -131,11 +107,10 @@ export function Sidebar({ clientName, reviewsCount, complaintsCount }: Props) {
           >
             <Icon size={17} className="opacity-90 shrink-0" />
             <span className="truncate">{label}</span>
-            {badgeFor(badge)}
           </Link>
         ))}
 
-        <SectionLabel>أدوات</SectionLabel>
+        <SectionLabel>مصادر الإشارات</SectionLabel>
         {NAV_TOOLS.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
@@ -153,7 +128,7 @@ export function Sidebar({ clientName, reviewsCount, complaintsCount }: Props) {
           </Link>
         ))}
 
-        <SectionLabel>الإعدادات</SectionLabel>
+        <SectionLabel>المؤسسة والحساب</SectionLabel>
         {NAV_SETTINGS.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
@@ -174,7 +149,7 @@ export function Sidebar({ clientName, reviewsCount, complaintsCount }: Props) {
 
       {/* User card */}
       <div
-        className="mt-2 pt-2.5"
+        className="sidebar-user mt-2 pt-2.5"
         style={{ borderTop: '1px solid var(--color-border)' }}
       >
         <div className="flex items-center gap-2.5 rounded-[7px] px-2 py-1.5 cursor-pointer hover:bg-[#F4F5F7]">

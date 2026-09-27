@@ -1937,15 +1937,29 @@ app.get('/api/complaints', authenticate, async (req, res) => {
     try {
         const { page, pageSize, offset } = parsePagination(req.query);
         const branch = String(req.query.branch || '').trim();
+        const source = String(req.query.source || '').trim();
         const status = String(req.query.status || '').trim();
         const priorityFilter = String(req.query.priority || '').trim();
         const from = String(req.query.from || '').trim();
         const to = String(req.query.to || '').trim();
         const q = String(req.query.q || '').trim();
+        const minRatingRaw = req.query.min_rating;
+        const maxRatingRaw = req.query.max_rating;
+        const minRating = minRatingRaw === undefined || String(minRatingRaw).trim() === '' ? null : Number(minRatingRaw);
+        const maxRating = maxRatingRaw === undefined || String(maxRatingRaw).trim() === '' ? null : Number(maxRatingRaw);
+
+        if ((minRating !== null && (!Number.isInteger(minRating) || minRating < 1 || minRating > 5)) ||
+            (maxRating !== null && (!Number.isInteger(maxRating) || maxRating < 1 || maxRating > 5)) ||
+            (minRating !== null && maxRating !== null && minRating > maxRating)) {
+            return res.status(400).json({ error: 'Invalid rating range' });
+        }
 
         const conds = ['client_id = $1', '(status = $2 OR answer = $3)'];
         const params = [req.clientData.id, 'complaint', '2'];
         if (branch)  { params.push(branch); conds.push(`branch = $${params.length}`); }
+        if (source)  { params.push(source); conds.push(`source = $${params.length}`); }
+        if (minRating !== null) { params.push(minRating); conds.push(`rating >= $${params.length}`); }
+        if (maxRating !== null) { params.push(maxRating); conds.push(`rating <= $${params.length}`); }
         if (status)  {
             // Accept comma-separated list so tabs can map to multiple DB statuses
             // (e.g. "in_progress,contacted" → both rows; "resolved,closed" → both).

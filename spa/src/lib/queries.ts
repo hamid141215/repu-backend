@@ -69,6 +69,7 @@ export function useReplyReview() {
 export interface ComplaintsQueryParams {
   page?: number; pageSize?: number;
   status?: string; priority?: string; branch?: string;
+  source?: string; min_rating?: number; max_rating?: number;
   from?: string; to?: string; q?: string;
 }
 
