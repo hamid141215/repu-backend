@@ -8,6 +8,7 @@ import ForgotPasswordPage from './routes/forgot-password';
 import ResetPasswordPage  from './routes/reset-password';
 import OverviewPage       from './routes/overview';
 import SignalsPage        from './routes/signals';
+import IssuesPage, { IssueDetailPage } from './routes/issues';
 import BranchesPage       from './routes/branches';
 import AnalyticsPage      from './routes/analytics';
 import ReportsPage        from './routes/reports';
@@ -34,6 +35,8 @@ export function App() {
           <Route element={<Protected><AppLayout /></Protected>}>
             <Route path="/"                  element={<OverviewPage />} />
             <Route path="/signals"            element={<SignalsPage />} />
+            <Route path="/issues"             element={<IssuesPage />} />
+            <Route path="/issues/:issueId"    element={<IssueDetailPage />} />
             <Route path="/reviews"            element={<LegacySignalsRedirect type="reviews" />} />
             <Route path="/complaints"         element={<LegacySignalsRedirect type="complaints" />} />
             <Route path="/branches"          element={<BranchesPage />} />

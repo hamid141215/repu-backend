@@ -5,7 +5,7 @@ import { useLocation } from 'react-router';
 import {
   IconLayoutDashboard, IconMessage2Exclamation, IconBuildingStore,
   IconFileText, IconWifi, IconSend, IconDeviceMobile,
-  IconSettings, IconDots, IconSelector, IconUsers
+  IconSettings, IconDots, IconSelector, IconUsers, IconAlertTriangle
 } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
 import { clearApiKey, clearSession } from '@/lib/auth';
@@ -20,6 +20,7 @@ interface NavItem {
 const NAV_MAIN: NavItem[] = [
   { href: '/',           label: 'الرئيسية',  icon: IconLayoutDashboard },
   { href: '/signals',    label: 'الإشارات',  icon: IconMessage2Exclamation },
+  { href: '/issues',     label: 'القضايا',    icon: IconAlertTriangle },
   { href: '/branches',   label: 'الفروع',    icon: IconBuildingStore },
   { href: '/reports',    label: 'الملخص التنفيذي',  icon: IconFileText }
 ];

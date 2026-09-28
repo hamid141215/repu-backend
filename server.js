@@ -16,6 +16,7 @@ const { buildIssueCandidates } = require('./intelligence/issue-engine');
 const { upsertIssueCandidate } = require('./intelligence/issue-persistence');
 const { runIntelligencePipeline } = require('./intelligence/pipeline');
 const { enrichIssue } = require('./intelligence/enrichment-service');
+const { createIssueReadHandlers } = require('./intelligence/issue-read-api');
 
 const app = express();
 
@@ -2590,6 +2591,11 @@ app.delete('/api/users/:id', authenticate, requireRole('owner'), async (req, res
 });
 
 // ─── Start ─────────────────────────────────────────────────────────────────
+// Read-only product intelligence, with the same access as dashboard/analytics.
+const issueReadHandlers = createIssueReadHandlers(pool);
+app.get('/api/intelligence/issues', authenticate, issueReadHandlers.list);
+app.get('/api/intelligence/issues/:issueId', authenticate, issueReadHandlers.detail);
+
 app.get('/api/internal/intelligence/dry-run', authenticate, requireRole('owner'), async (req, res) => {
     try {
         const requestedLimit = Number.parseInt(req.query.limit, 10);

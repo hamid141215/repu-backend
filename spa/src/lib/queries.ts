@@ -6,6 +6,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './api-client';
+import type { IssueDetailResponse, IssuesQueryParams, IssuesResponse } from '@/types/issues';
 import type {
   ActivityResponse, ReviewsResponse, ReviewRow,
   ComplaintsResponse, ComplaintListItem,
@@ -22,6 +23,21 @@ function buildQueryString(params: Record<string, unknown>): string {
   }
   const s = sp.toString();
   return s ? `?${s}` : '';
+}
+
+export function useIssues(params: IssuesQueryParams) {
+  return useQuery({
+    queryKey: ['intelligence-issues', params],
+    queryFn: () => apiClient<IssuesResponse>(`/api/intelligence/issues${buildQueryString({ ...params })}`)
+  });
+}
+
+export function useIssue(id: string | undefined) {
+  return useQuery({
+    queryKey: ['intelligence-issues', 'detail', id],
+    queryFn: () => apiClient<IssueDetailResponse>(`/api/intelligence/issues/${encodeURIComponent(id!)}`),
+    enabled: Boolean(id)
+  });
 }
 
 /* ─── Activity ─────────────────────────────────────────────────────────── */
