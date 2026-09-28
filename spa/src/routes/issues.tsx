@@ -11,7 +11,7 @@ const dimensions: Record<string, string> = {
 const statuses = { OPEN: 'مفتوحة', WATCHING: 'تحت المراقبة', RESOLVED: 'محلولة', DISMISSED: 'مستبعدة' };
 const severities = { LOW: 'منخفضة', MEDIUM: 'متوسطة', HIGH: 'عالية', CRITICAL: 'حرجة' };
 const classifications = { HYPOTHESIS_NOT_CONFIRMED: 'فرضية تحتاج تحقق', VALIDATED: 'تحليل تم التحقق منه', REJECTED: 'فرضية مرفوضة' };
-const number = (value: number) => value.toLocaleString('ar-SA', { maximumFractionDigits: 2 });
+const number = (value: number) => value === 0 ? '0' : value.toLocaleString('ar-SA', { maximumFractionDigits: 2 });
 const percent = (value: number) => `${number(value * 100)}٪`;
 function date(value: string) {
   const parsed = new Date(value);
@@ -54,6 +54,10 @@ export default function IssuesPage() {
   };
   const query = useIssues(params);
   const items = query.data?.items ?? [];
+  const priorities = items.map(item => item.priority).filter(Number.isFinite);
+  const issueGridClass = items.length === 1
+    ? 'mx-auto grid w-full max-w-4xl grid-cols-1 gap-4'
+    : 'mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 lg:grid-cols-2';
   function change(key: string, value: string) {
     const next = new URLSearchParams(search);
     if (value) next.set(key, value); else next.delete(key);
@@ -70,7 +74,7 @@ export default function IssuesPage() {
           ['القضايا المفتوحة', number(items.filter(i => i.status === 'OPEN').length)],
           ['الشدة العالية', number(items.filter(i => i.severity === 'HIGH').length)],
           ['تحت المراقبة', number(items.filter(i => i.status === 'WATCHING').length)],
-          ['متوسط الأولوية', items.length ? number(items.reduce((sum, i) => sum + i.priority, 0) / items.length) : '—']
+          ['متوسط الأولوية', priorities.length ? number(priorities.reduce((sum, priority) => sum + priority, 0) / priorities.length) : '—']
         ].map(([label, value]) => <div className="issue-panel" key={label}><p className="text-xs text-[var(--color-text-2)]">{label}</p><p className="mt-2 text-xl font-semibold">{value}</p></div>)}
       </div>
     </section>}
@@ -94,7 +98,7 @@ export default function IssuesPage() {
     </form>
     <div className="mt-6" aria-live="polite" aria-busy={query.isFetching}>
       {query.isPending ? <p>جارٍ تحميل القضايا…</p> : query.isError ? <div role="alert" className="issue-panel">تعذر تحميل القضايا. <button type="button" className="section-link" onClick={() => void query.refetch()}>إعادة المحاولة</button></div> : <>
-        {!items.length ? <p className="issue-panel">لا توجد قضايا تشغيلية مطابقة للفلاتر الحالية.</p> : <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {!items.length ? <p className="issue-panel">لا توجد قضايا تشغيلية مطابقة للفلاتر الحالية.</p> : <div className={issueGridClass}>
           {items.map(issue => <article key={issue.id} className="issue-panel">
             <IssueHeader issue={issue} /><SignalSummary issue={issue} />
             <p className="mt-3 text-xs text-[var(--color-text-3)]">الفترة: {date(issue.windowStart)} – {date(issue.windowEnd)}</p>
