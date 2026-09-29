@@ -263,11 +263,11 @@ test('database errors do not leak SQL/secrets', async () => {
     assert.deepEqual(res.body, { error: 'Database Error' });
 });
 
-test('product routes use authenticate, have no owner restriction and no mutation routes', () => {
+test('issue reads use authenticate, are not owner-only, and do not mutate issue records', () => {
     const server = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
     assert.ok(server.includes("app.get('/api/intelligence/issues', authenticate, issueReadHandlers.list)"));
     assert.ok(server.includes("app.get('/api/intelligence/issues/:issueId', authenticate, issueReadHandlers.detail)"));
-    assert.ok(!/app\.(post|patch|put|delete)\('\/api\/intelligence\/issues/.test(server));
+    assert.ok(!/app\.(post|patch|put|delete)\('\/api\/intelligence\/issues\/:issueId'/.test(server));
     const source = fs.readFileSync(path.join(__dirname, '../intelligence/issue-read-api.js'), 'utf8');
     assert.ok(!/\b(INSERT|UPDATE|DELETE)\b/.test(source));
     assert.ok(!source.includes('humain'));

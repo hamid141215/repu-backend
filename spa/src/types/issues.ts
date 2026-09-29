@@ -48,6 +48,54 @@ export interface IssueDetailResponse {
   }[];
 }
 
+export type OperationalActionStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
+
+export interface ActionPerson {
+  id: string;
+  displayName: string;
+}
+
+export interface OperationalAction {
+  id: string;
+  issueId: string;
+  title: string;
+  description: string | null;
+  status: OperationalActionStatus;
+  dueDate: string | null;
+  assignee: ActionPerson | null;
+  createdBy: ActionPerson | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  isOverdue: boolean;
+}
+
+export interface OperationalActionsResponse {
+  success: true;
+  items: OperationalAction[];
+}
+
+export interface OperationalActionResponse {
+  success: true;
+  action: OperationalAction;
+}
+
+export interface ActionAssigneesResponse {
+  success: true;
+  items: ActionPerson[];
+}
+
+export interface CreateOperationalActionInput {
+  title: string;
+  description?: string;
+  assigneeUserId?: string | null;
+  dueDate?: string | null;
+}
+
+export type UpdateOperationalActionInput = Partial<CreateOperationalActionInput> & {
+  status?: OperationalActionStatus;
+};
+
 export interface IssuesQueryParams {
   page?: number;
   pageSize?: number;

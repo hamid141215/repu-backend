@@ -6,7 +6,11 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './api-client';
-import type { IssueDetailResponse, IssuesQueryParams, IssuesResponse } from '@/types/issues';
+import type {
+  ActionAssigneesResponse, CreateOperationalActionInput, IssueDetailResponse,
+  IssuesQueryParams, IssuesResponse, OperationalActionResponse,
+  OperationalActionsResponse, UpdateOperationalActionInput
+} from '@/types/issues';
 import type {
   ActivityResponse, ReviewsResponse, ReviewRow,
   ComplaintsResponse, ComplaintListItem,
@@ -37,6 +41,44 @@ export function useIssue(id: string | undefined) {
     queryKey: ['intelligence-issues', 'detail', id],
     queryFn: () => apiClient<IssueDetailResponse>(`/api/intelligence/issues/${encodeURIComponent(id!)}`),
     enabled: Boolean(id)
+  });
+}
+
+export function useIssueActions(issueId: string | undefined) {
+  return useQuery({
+    queryKey: ['intelligence-issue-actions', issueId],
+    queryFn: () => apiClient<OperationalActionsResponse>(`/api/intelligence/issues/${encodeURIComponent(issueId!)}/actions`),
+    enabled: Boolean(issueId)
+  });
+}
+
+export function useActionAssignees(enabled = true) {
+  return useQuery({
+    queryKey: ['intelligence-action-assignees'],
+    queryFn: () => apiClient<ActionAssigneesResponse>('/api/intelligence/action-assignees'),
+    enabled
+  });
+}
+
+export function useCreateIssueAction(issueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateOperationalActionInput) => apiClient<OperationalActionResponse>(
+      `/api/intelligence/issues/${encodeURIComponent(issueId)}/actions`,
+      { method: 'POST', body: JSON.stringify(input) }
+    ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['intelligence-issue-actions', issueId] })
+  });
+}
+
+export function useUpdateIssueAction(issueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ actionId, input }: { actionId: string; input: UpdateOperationalActionInput }) => apiClient<OperationalActionResponse>(
+      `/api/intelligence/actions/${encodeURIComponent(actionId)}`,
+      { method: 'PATCH', body: JSON.stringify(input) }
+    ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['intelligence-issue-actions', issueId] })
   });
 }
 

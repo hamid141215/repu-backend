@@ -1,7 +1,8 @@
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useEffect, useRef, useState } from 'react';
-import { useIssue, useIssues } from '@/lib/queries';
-import type { Issue } from '@/types/issues';
+import { useActionAssignees, useCreateIssueAction, useIssue, useIssueActions, useIssues, useUpdateIssueAction } from '@/lib/queries';
+import { getSessionToken, getSessionUser } from '@/lib/auth';
+import type { Issue, OperationalAction, OperationalActionStatus } from '@/types/issues';
 
 const dimensions: Record<string, string> = {
   SERVICE: 'الخدمة', PRODUCT_QUALITY: 'جودة المنتج', STAFF: 'الموظفون', SPEED: 'سرعة الخدمة',
@@ -11,6 +12,9 @@ const dimensions: Record<string, string> = {
 const statuses = { OPEN: 'مفتوحة', WATCHING: 'تحت المراقبة', RESOLVED: 'محلولة', DISMISSED: 'مستبعدة' };
 const severities = { LOW: 'منخفضة', MEDIUM: 'متوسطة', HIGH: 'عالية', CRITICAL: 'حرجة' };
 const classifications = { HYPOTHESIS_NOT_CONFIRMED: 'فرضية تحتاج تحقق', VALIDATED: 'تحليل تم التحقق منه', REJECTED: 'فرضية مرفوضة' };
+const actionStatuses: Record<OperationalActionStatus, string> = {
+  OPEN: 'مفتوح', IN_PROGRESS: 'قيد التنفيذ', DONE: 'مكتمل', CANCELLED: 'ملغي'
+};
 const number = (value: number) => value === 0 ? '0' : value.toLocaleString('ar-SA', { maximumFractionDigits: 2 });
 const percent = (value: number) => `${number(value * 100)}٪`;
 function date(value: string) {
@@ -40,6 +44,125 @@ function SignalSummary({ issue }: { issue: Issue }) {
     <span>نسبة الإشارات السلبية {percent(issue.negativeRate)}</span>
   </div>;
 }
+
+function IssueActionsPanel({ issueId, recommendedAction, successMetric }: {
+  issueId: string; recommendedAction?: string | null; successMetric?: string | null;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [assigneeUserId, setAssigneeUserId] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [message, setMessage] = useState('');
+  const actions = useIssueActions(issueId);
+  const assignees = useActionAssignees(showForm);
+  const createAction = useCreateIssueAction(issueId);
+  const updateAction = useUpdateIssueAction(issueId);
+  const user = getSessionUser();
+  const canManage = Boolean(getSessionToken() && user && ['owner', 'manager'].includes(user.role));
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage('');
+    createAction.mutate({ title, description, assigneeUserId: assigneeUserId || null, dueDate: dueDate || null }, {
+      onSuccess: () => {
+        setTitle(''); setDescription(''); setAssigneeUserId(''); setDueDate(''); setShowForm(false);
+        setMessage('تم إنشاء الإجراء.');
+      },
+      onError: () => setMessage('تعذر إنشاء الإجراء. تحقق من البيانات وحاول مجددًا.')
+    });
+  }
+
+  function transition(action: OperationalAction, status: OperationalActionStatus) {
+    setMessage('');
+    updateAction.mutate({ actionId: action.id, input: { status } }, {
+      onError: () => setMessage('تعذر تحديث حالة الإجراء. أعد تحميل القضية وحاول مجددًا.')
+    });
+  }
+
+  return <section className="issue-panel mt-4">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 className="font-semibold">الإجراءات التشغيلية</h2>
+      {canManage && <button type="button" className="section-link" onClick={() => { setMessage(''); setShowForm(value => !value); }}>
+        {showForm ? 'إلغاء' : 'إنشاء إجراء'}
+      </button>}
+    </div>
+    {actions.isPending ? <p className="mt-3 text-sm">جارٍ تحميل الإجراءات…</p>
+      : actions.isError ? <p role="alert" className="mt-3 text-sm">تعذر تحميل الإجراءات التشغيلية.</p>
+        : actions.data?.items.length ? <div className="mt-3 space-y-3">
+          {actions.data.items.map(action => <ActionCard key={action.id} action={action} canManage={canManage}
+            busy={updateAction.isPending} onTransition={status => transition(action, status)} />)}
+        </div> : <p className="mt-3 text-sm text-[var(--color-text-2)]">لم يُنشأ إجراء تشغيلي لهذه القضية بعد.</p>}
+    {showForm && canManage && <form className="mt-4 space-y-3 rounded-md border border-[var(--color-border)] p-4" onSubmit={submit}>
+      <label className="block text-sm">عنوان الإجراء *
+        <input required maxLength={200} value={title} onChange={event => setTitle(event.target.value)}
+          className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2" />
+      </label>
+      {recommendedAction && <div className="rounded-md bg-[var(--color-bg)] p-3 text-sm">
+        <p className="font-medium">الإجراء المقترح من التحليل</p>
+        <p className="mt-1 whitespace-pre-wrap break-words">{recommendedAction}</p>
+        <button type="button" className="section-link mt-2" onClick={() => setDescription(recommendedAction.slice(0, 5000))}>استخدام هذا الاقتراح</button>
+      </div>}
+      <label className="block text-sm">الوصف
+        <textarea maxLength={5000} rows={3} value={description} onChange={event => setDescription(event.target.value)}
+          className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2" />
+      </label>
+      <label className="block text-sm">المسؤول
+        <select value={assigneeUserId} onChange={event => setAssigneeUserId(event.target.value)}
+          className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2">
+          <option value="">بدون مسؤول</option>
+          {(assignees.data?.items ?? []).map(person => <option key={person.id} value={person.id}>{person.displayName}</option>)}
+        </select>
+      </label>
+      {assignees.isError && <p className="text-xs text-[var(--color-bad)]">تعذر تحميل قائمة المسؤولين؛ يمكنك إنشاء الإجراء بدون مسؤول.</p>}
+      <label className="block text-sm">تاريخ الاستحقاق
+        <input type="date" dir="ltr" value={dueDate} onChange={event => setDueDate(event.target.value)}
+          className="mt-1 block rounded-md border border-[var(--color-border)] bg-white px-3 py-2" />
+      </label>
+      {successMetric && <p className="rounded-md bg-[var(--color-bg)] p-3 text-sm"><span className="font-medium">مؤشر النجاح المقترح: </span>{successMetric}</p>}
+      <button type="submit" disabled={createAction.isPending || !title.trim()}
+        className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+        {createAction.isPending ? 'جارٍ الإنشاء…' : 'إنشاء الإجراء'}
+      </button>
+    </form>}
+    {message && <p role="status" className="mt-3 text-sm text-[var(--color-text-2)]">{message}</p>}
+  </section>;
+}
+
+function ActionCard({ action, canManage, busy, onTransition }: {
+  action: OperationalAction; canManage: boolean; busy: boolean;
+  onTransition: (status: OperationalActionStatus) => void;
+}) {
+  const next = nextActionStatuses[action.status];
+  return <article className="rounded-md border border-[var(--color-border)] p-4">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <h3 className="min-w-0 break-words font-semibold">{action.title}</h3>
+      <span className="shrink-0 rounded-md bg-[var(--color-primary-light)] px-2 py-1 text-xs">{actionStatuses[action.status]}</span>
+    </div>
+    {action.description && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-[var(--color-text-2)]">{action.description}</p>}
+    <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--color-text-2)]">
+      <span>المسؤول: {action.assignee?.displayName ?? 'بدون مسؤول'}</span>
+      <span>الاستحقاق: {action.dueDate ? date(action.dueDate) : 'غير محدد'}</span>
+      {action.isOverdue && <span className="rounded bg-[var(--color-bad-light)] px-2 py-0.5 text-[var(--color-bad)]">متأخر</span>}
+      {action.status === 'DONE' && action.completedAt && <span>اكتمل: {date(action.completedAt)}</span>}
+    </div>
+    {canManage && next.length > 0 && <label className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+      تحديث الحالة
+      <select value={action.status} disabled={busy} onChange={event => onTransition(event.target.value as OperationalActionStatus)}
+        className="rounded-md border border-[var(--color-border)] bg-white px-2 py-1">
+        <option value={action.status}>{actionStatuses[action.status]}</option>
+        {next.map(status => <option key={status} value={status}>{actionStatuses[status]}</option>)}
+      </select>
+    </label>}
+  </article>;
+}
+
+const nextActionStatuses: Record<OperationalActionStatus, OperationalActionStatus[]> = {
+  OPEN: ['IN_PROGRESS', 'DONE', 'CANCELLED'],
+  IN_PROGRESS: ['OPEN', 'DONE', 'CANCELLED'],
+  DONE: ['OPEN', 'IN_PROGRESS'],
+  CANCELLED: ['OPEN']
+};
 
 export default function IssuesPage() {
   const [search, setSearch] = useSearchParams();
@@ -161,6 +284,8 @@ export function IssueDetailPage({ selectedId, onClose }: { selectedId?: string; 
           </article>)}
         </div>}
       </section>
+      <IssueActionsPanel issueId={issue.id} recommendedAction={issue.enrichment?.recommendedAction}
+        successMetric={issue.enrichment?.successMetric} />
       <section className="issue-panel mt-4"><h2 className="font-semibold">التحليل</h2>
         {!issue.enrichment ? <p className="mt-4 text-sm">لم يُنشأ تحليل سببي لهذه القضية بعد</p> : <>
           <p className="mt-3 rounded-md bg-[var(--color-warn-light)] p-3 text-sm">{classifications[issue.enrichment.classification]}</p>

@@ -479,6 +479,39 @@ async function initIntelligenceSchema(pool) {
             uq_issue_enrichments_issue
         ON issue_enrichments (issue_id)
     `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS operational_actions (
+            id BIGSERIAL PRIMARY KEY,
+            client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            issue_id BIGINT NOT NULL REFERENCES intelligence_issues(id) ON DELETE CASCADE,
+            title VARCHAR(200) NOT NULL CHECK (length(btrim(title)) BETWEEN 1 AND 200),
+            description TEXT CHECK (description IS NULL OR length(description) <= 5000),
+            assignee_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'OPEN'
+                CHECK (status IN ('OPEN', 'IN_PROGRESS', 'DONE', 'CANCELLED')),
+            due_date DATE,
+            created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            completed_at TIMESTAMPTZ,
+            CHECK (
+                (status = 'DONE' AND completed_at IS NOT NULL)
+                OR (status <> 'DONE' AND completed_at IS NULL)
+            )
+        )
+    `);
+
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_operational_actions_issue_order
+        ON operational_actions (client_id, issue_id, status, due_date, created_at DESC)
+    `);
+
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_operational_actions_assignee
+        ON operational_actions (client_id, assignee_user_id)
+        WHERE assignee_user_id IS NOT NULL
+    `);
     console.log('Intelligence schema ready');
 }
 
