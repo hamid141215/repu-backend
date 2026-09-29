@@ -2,7 +2,7 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import { useEffect, useRef, useState } from 'react';
 import { useActionAssignees, useCreateIssueAction, useIssue, useIssueActions, useIssues, useUpdateIssueAction } from '@/lib/queries';
 import { getSessionToken, getSessionUser } from '@/lib/auth';
-import type { Issue, OperationalAction, OperationalActionStatus } from '@/types/issues';
+import type { Issue, OperationalAction, OperationalActionStatus, UpdateOperationalActionInput } from '@/types/issues';
 
 const dimensions: Record<string, string> = {
   SERVICE: 'الخدمة', PRODUCT_QUALITY: 'جودة المنتج', STAFF: 'الموظفون', SPEED: 'سرعة الخدمة',
@@ -49,17 +49,19 @@ function IssueActionsPanel({ issueId, recommendedAction, successMetric }: {
   issueId: string; recommendedAction?: string | null; successMetric?: string | null;
 }) {
   const [showForm, setShowForm] = useState(false);
+  const [editingActionId, setEditingActionId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [assigneeUserId, setAssigneeUserId] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [message, setMessage] = useState('');
   const actions = useIssueActions(issueId);
-  const assignees = useActionAssignees(showForm);
+  const assignees = useActionAssignees(showForm || Boolean(editingActionId));
   const createAction = useCreateIssueAction(issueId);
   const updateAction = useUpdateIssueAction(issueId);
   const user = getSessionUser();
   const canManage = Boolean(getSessionToken() && user && ['owner', 'manager'].includes(user.role));
+  const isActionsEmpty = Boolean(actions.data && actions.data.items.length === 0);
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,10 +82,21 @@ function IssueActionsPanel({ issueId, recommendedAction, successMetric }: {
     });
   }
 
+  function saveAction(action: OperationalAction, input: UpdateOperationalActionInput) {
+    setMessage('');
+    updateAction.mutate({ actionId: action.id, input }, {
+      onSuccess: () => {
+        setEditingActionId(null);
+        setMessage('تم تحديث الإجراء.');
+      },
+      onError: () => setMessage('تعذر حفظ تعديلات الإجراء. تحقق من البيانات وحاول مجددًا.')
+    });
+  }
+
   return <section className="issue-panel mt-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 className="font-semibold">الإجراءات التشغيلية</h2>
-      {canManage && <button type="button" className="section-link" onClick={() => { setMessage(''); setShowForm(value => !value); }}>
+      {canManage && !isActionsEmpty && <button type="button" className="section-link" onClick={() => { setMessage(''); setShowForm(value => !value); }}>
         {showForm ? 'إلغاء' : 'إنشاء إجراء'}
       </button>}
     </div>
@@ -91,8 +104,21 @@ function IssueActionsPanel({ issueId, recommendedAction, successMetric }: {
       : actions.isError ? <p role="alert" className="mt-3 text-sm">تعذر تحميل الإجراءات التشغيلية.</p>
         : actions.data?.items.length ? <div className="mt-3 space-y-3">
           {actions.data.items.map(action => <ActionCard key={action.id} action={action} canManage={canManage}
-            busy={updateAction.isPending} onTransition={status => transition(action, status)} />)}
-        </div> : <p className="mt-3 text-sm text-[var(--color-text-2)]">لم يُنشأ إجراء تشغيلي لهذه القضية بعد.</p>}
+            busy={updateAction.isPending} editing={editingActionId === action.id}
+            editDisabled={Boolean(editingActionId && editingActionId !== action.id)}
+            assignees={assignees.data?.items ?? []} assigneesLoading={assignees.isLoading}
+            assigneesError={assignees.isError}
+            onEdit={() => { updateAction.reset(); setMessage(''); setShowForm(false); setEditingActionId(action.id); }}
+            onCancelEdit={() => { setEditingActionId(null); setMessage(''); }}
+            onSave={input => saveAction(action, input)}
+            onTransition={status => transition(action, status)} />)}
+        </div> : <div className="mt-3 flex flex-wrap items-center gap-3">
+          <p className="m-0 text-sm text-[var(--color-text-2)]">لم يُنشأ إجراء تشغيلي لهذه القضية بعد.</p>
+          {canManage && <button type="button" className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white"
+            onClick={() => { setMessage(''); setShowForm(value => !value); }}>
+            {showForm ? 'إلغاء' : 'إنشاء إجراء'}
+          </button>}
+        </div>}
     {showForm && canManage && <form className="mt-4 space-y-3 rounded-md border border-[var(--color-border)] p-4" onSubmit={submit}>
       <label className="block text-sm">عنوان الإجراء *
         <input required maxLength={200} value={title} onChange={event => setTitle(event.target.value)}
@@ -129,15 +155,24 @@ function IssueActionsPanel({ issueId, recommendedAction, successMetric }: {
   </section>;
 }
 
-function ActionCard({ action, canManage, busy, onTransition }: {
-  action: OperationalAction; canManage: boolean; busy: boolean;
+function ActionCard({ action, canManage, busy, editing, editDisabled, assignees, assigneesLoading, assigneesError,
+  onEdit, onCancelEdit, onSave, onTransition }: {
+  action: OperationalAction; canManage: boolean; busy: boolean; editing: boolean; editDisabled: boolean;
+  assignees: { id: string; displayName: string }[]; assigneesLoading: boolean; assigneesError: boolean;
+  onEdit: () => void; onCancelEdit: () => void; onSave: (input: UpdateOperationalActionInput) => void;
   onTransition: (status: OperationalActionStatus) => void;
 }) {
   const next = nextActionStatuses[action.status];
   return <article className="rounded-md border border-[var(--color-border)] p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <h3 className="min-w-0 break-words font-semibold">{action.title}</h3>
-      <span className="shrink-0 rounded-md bg-[var(--color-primary-light)] px-2 py-1 text-xs">{actionStatuses[action.status]}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="shrink-0 rounded-md bg-[var(--color-primary-light)] px-2 py-1 text-xs">{actionStatuses[action.status]}</span>
+        {canManage && <button type="button" disabled={busy || editDisabled} onClick={onEdit}
+          className="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-medium text-[var(--color-primary)] disabled:opacity-50">
+          تعديل
+        </button>}
+      </div>
     </div>
     {action.description && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-[var(--color-text-2)]">{action.description}</p>}
     <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--color-text-2)]">
@@ -154,7 +189,76 @@ function ActionCard({ action, canManage, busy, onTransition }: {
         {next.map(status => <option key={status} value={status}>{actionStatuses[status]}</option>)}
       </select>
     </label>}
+    {editing && canManage && <ActionEditForm action={action} assignees={assignees}
+      assigneesLoading={assigneesLoading} assigneesError={assigneesError} busy={busy}
+      onCancel={onCancelEdit} onSave={onSave} />}
   </article>;
+}
+
+function ActionEditForm({ action, assignees, assigneesLoading, assigneesError, busy, onCancel, onSave }: {
+  action: OperationalAction; assignees: { id: string; displayName: string }[];
+  assigneesLoading: boolean; assigneesError: boolean; busy: boolean;
+  onCancel: () => void; onSave: (input: UpdateOperationalActionInput) => void;
+}) {
+  const [title, setTitle] = useState(action.title);
+  const [description, setDescription] = useState(action.description ?? '');
+  const [assigneeUserId, setAssigneeUserId] = useState(action.assignee?.id ?? '');
+  const [dueDate, setDueDate] = useState(action.dueDate?.slice(0, 10) ?? '');
+  const currentAssigneeUnavailable = action.assignee && !assignees.some(person => person.id === action.assignee?.id);
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const input: UpdateOperationalActionInput = {};
+    if (title !== action.title) input.title = title;
+    if (description !== (action.description ?? '')) input.description = description;
+    if (assigneeUserId !== (action.assignee?.id ?? '')) input.assigneeUserId = assigneeUserId || null;
+    if (dueDate !== (action.dueDate?.slice(0, 10) ?? '')) input.dueDate = dueDate || null;
+    if (Object.keys(input).length > 0) onSave(input);
+  }
+
+  return <form className="mt-4 grid min-w-0 grid-cols-1 gap-3 rounded-md border border-[var(--color-border)] p-3 sm:p-4"
+    onSubmit={submit}>
+    <label className="block min-w-0 text-sm">عنوان الإجراء *
+      <input required maxLength={200} value={title} onChange={event => setTitle(event.target.value)}
+        className="mt-1 w-full min-w-0 rounded-md border border-[var(--color-border)] bg-white px-3 py-2" />
+    </label>
+    <label className="block min-w-0 text-sm">الوصف
+      <textarea maxLength={5000} rows={3} value={description} onChange={event => setDescription(event.target.value)}
+        className="mt-1 w-full min-w-0 rounded-md border border-[var(--color-border)] bg-white px-3 py-2" />
+    </label>
+    <label className="block min-w-0 text-sm">المسؤول
+      <select value={assigneeUserId} onChange={event => setAssigneeUserId(event.target.value)}
+        className="mt-1 w-full min-w-0 rounded-md border border-[var(--color-border)] bg-white px-3 py-2">
+        <option value="">بدون مسؤول</option>
+        {currentAssigneeUnavailable && action.assignee &&
+          <option value={action.assignee.id}>{action.assignee.displayName} (المسؤول الحالي)</option>}
+        {assignees.map(person => <option key={person.id} value={person.id}>{person.displayName}</option>)}
+      </select>
+    </label>
+    {assigneesLoading && <p className="m-0 text-xs text-[var(--color-text-3)]">جارٍ تحميل المسؤولين…</p>}
+    {assigneesError && <p className="m-0 text-xs text-[var(--color-bad)]">تعذر تحميل قائمة المسؤولين؛ يمكنك إبقاء المسؤول الحالي أو فك الإسناد.</p>}
+    <label className="block min-w-0 text-sm">تاريخ الاستحقاق
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <input type="date" dir="ltr" value={dueDate} onChange={event => setDueDate(event.target.value)}
+          className="block min-w-0 max-w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2" />
+        {dueDate && <button type="button" onClick={() => setDueDate('')}
+          className="rounded-md border border-[var(--color-border)] px-2.5 py-2 text-xs">مسح التاريخ</button>}
+      </div>
+    </label>
+    <div className="flex flex-wrap gap-2">
+      <button type="submit" disabled={busy || !title.trim() || ![
+        title !== action.title,
+        description !== (action.description ?? ''),
+        assigneeUserId !== (action.assignee?.id ?? ''),
+        dueDate !== (action.dueDate?.slice(0, 10) ?? '')
+      ].some(Boolean)}
+        className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+        {busy ? 'جارٍ الحفظ…' : 'حفظ التعديلات'}
+      </button>
+      <button type="button" disabled={busy} onClick={onCancel}
+        className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm disabled:opacity-50">إلغاء</button>
+    </div>
+  </form>;
 }
 
 const nextActionStatuses: Record<OperationalActionStatus, OperationalActionStatus[]> = {
