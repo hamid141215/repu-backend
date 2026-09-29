@@ -2,7 +2,7 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import { useEffect, useRef, useState } from 'react';
 import { useActionAssignees, useCreateIssueAction, useIssue, useIssueActions, useIssues, useUpdateIssueAction } from '@/lib/queries';
 import { getSessionToken, getSessionUser } from '@/lib/auth';
-import type { Issue, OperationalAction, OperationalActionStatus, UpdateOperationalActionInput } from '@/types/issues';
+import type { ActionOutcome, Issue, OperationalAction, OperationalActionStatus, UpdateOperationalActionInput } from '@/types/issues';
 
 const dimensions: Record<string, string> = {
   SERVICE: 'الخدمة', PRODUCT_QUALITY: 'جودة المنتج', STAFF: 'الموظفون', SPEED: 'سرعة الخدمة',
@@ -181,6 +181,7 @@ function ActionCard({ action, canManage, busy, editing, editDisabled, assignees,
       {action.isOverdue && <span className="rounded bg-[var(--color-bad-light)] px-2 py-0.5 text-[var(--color-bad)]">متأخر</span>}
       {action.status === 'DONE' && action.completedAt && <span>اكتمل: {date(action.completedAt)}</span>}
     </div>
+    {action.outcomes?.length ? <OutcomeHistory outcomes={action.outcomes} /> : null}
     {canManage && next.length > 0 && <label className="mt-3 flex flex-wrap items-center gap-2 text-xs">
       تحديث الحالة
       <select value={action.status} disabled={busy} onChange={event => onTransition(event.target.value as OperationalActionStatus)}
@@ -193,6 +194,61 @@ function ActionCard({ action, canManage, busy, editing, editDisabled, assignees,
       assigneesLoading={assigneesLoading} assigneesError={assigneesError} busy={busy}
       onCancel={onCancelEdit} onSave={onSave} />}
   </article>;
+}
+
+const outcomeLabels = {
+  PENDING: 'قيد الرصد', INSUFFICIENT_DATA: 'بيانات غير كافية', IMPROVED: 'تحسن',
+  UNCHANGED: 'لم يظهر تغير واضح', WORSENED: 'تراجع'
+} as const;
+
+function outcomePercent(value: number | null) {
+  return value == null ? '—' : `${(value * 100).toLocaleString('ar-SA', { maximumFractionDigits: 1 })}%`;
+}
+
+function outcomeMovement(delta: number | null) {
+  if (delta == null) return '—';
+  const points = Math.abs(delta * 100).toLocaleString('ar-SA', { maximumFractionDigits: 1 });
+  if (delta < 0) return `انخفاض ${points} نقطة مئوية`;
+  if (delta > 0) return `ارتفاع ${points} نقطة مئوية`;
+  return '0 نقطة مئوية';
+}
+
+function OutcomeHistory({ outcomes }: { outcomes: ActionOutcome[] }) {
+  const latest = outcomes[0];
+  if (!latest) return null;
+  const previous = outcomes.slice(1);
+  return <section className="mt-4 rounded-md bg-[var(--color-bg)] p-3 text-sm">
+    <h4 className="font-semibold">النتيجة بعد التنفيذ</h4>
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <span className="rounded-md bg-[var(--color-primary-light)] px-2 py-1 text-xs">{outcomeLabels[latest.status]}</span>
+      <span className="text-xs text-[var(--color-text-2)]">اكتمل الإجراء: {date(latest.completedAt)}</span>
+    </div>
+    {latest.status === 'PENDING' && <p className="mt-2 text-xs text-[var(--color-text-2)]">
+      تكتمل فترة الرصد في {date(latest.postWindow.end)}.
+    </p>}
+    {latest.status === 'INSUFFICIENT_DATA' && <p className="mt-2 text-xs text-[var(--color-text-2)]">
+      لم تتوفر إشارات كافية للمقارنة بين الفترتين.
+    </p>}
+    {['IMPROVED', 'UNCHANGED', 'WORSENED'].includes(latest.status) && <>
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="rounded border border-[var(--color-border)] p-2">
+          <p className="text-xs text-[var(--color-text-2)]">قبل التنفيذ</p>
+          <p>{latest.baseline.negativeCount} من {latest.baseline.totalCount} سلبية — {outcomePercent(latest.baseline.negativeRate)}</p>
+        </div>
+        <div className="rounded border border-[var(--color-border)] p-2">
+          <p className="text-xs text-[var(--color-text-2)]">بعد التنفيذ</p>
+          <p>{latest.post.negativeCount} من {latest.post.totalCount} سلبية — {outcomePercent(latest.post.negativeRate)}</p>
+        </div>
+      </div>
+      <p className="mt-2">التغير: {outcomeMovement(latest.deltaNegativeRate)}</p>
+    </>}
+    <p className="mt-2 text-xs text-[var(--color-text-2)]">يعكس التغير في إشارات العملاء بعد التنفيذ ولا يثبت السببية.</p>
+    {previous.length > 0 && <div className="mt-3 border-t border-[var(--color-border)] pt-2">
+      {previous.map(outcome => <p key={outcome.id} className="text-xs text-[var(--color-text-2)]">
+        دورة سابقة — {date(outcome.completedAt)} — {outcomeLabels[outcome.status]}
+      </p>)}
+    </div>}
+  </section>;
 }
 
 function ActionEditForm({ action, assignees, assigneesLoading, assigneesError, busy, onCancel, onSave }: {

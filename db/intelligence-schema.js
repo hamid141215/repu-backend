@@ -512,6 +512,55 @@ async function initIntelligenceSchema(pool) {
         ON operational_actions (client_id, assignee_user_id)
         WHERE assignee_user_id IS NOT NULL
     `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS action_outcomes (
+            id BIGSERIAL PRIMARY KEY,
+            action_id BIGINT NOT NULL REFERENCES operational_actions(id) ON DELETE CASCADE,
+            completed_at_snapshot TIMESTAMPTZ NOT NULL,
+            baseline_start TIMESTAMPTZ NOT NULL,
+            baseline_end TIMESTAMPTZ NOT NULL,
+            post_start TIMESTAMPTZ NOT NULL,
+            post_end TIMESTAMPTZ NOT NULL,
+            status VARCHAR(24) NOT NULL DEFAULT 'PENDING'
+                CHECK (status IN ('PENDING', 'INSUFFICIENT_DATA', 'IMPROVED', 'UNCHANGED', 'WORSENED')),
+            baseline_negative_count INTEGER,
+            baseline_total_count INTEGER,
+            baseline_negative_rate NUMERIC(7,6),
+            post_negative_count INTEGER,
+            post_total_count INTEGER,
+            post_negative_rate NUMERIC(7,6),
+            delta_negative_rate NUMERIC(7,6),
+            measured_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (action_id, completed_at_snapshot),
+            CHECK (baseline_start < baseline_end AND baseline_end = completed_at_snapshot),
+            CHECK (post_start = completed_at_snapshot AND post_start < post_end),
+            CHECK (baseline_negative_count IS NULL OR baseline_negative_count >= 0),
+            CHECK (baseline_total_count IS NULL OR baseline_total_count >= 0),
+            CHECK (baseline_negative_count IS NULL OR baseline_total_count IS NULL OR baseline_negative_count <= baseline_total_count),
+            CHECK (baseline_negative_rate IS NULL OR baseline_negative_rate BETWEEN 0 AND 1),
+            CHECK (post_negative_count IS NULL OR post_negative_count >= 0),
+            CHECK (post_total_count IS NULL OR post_total_count >= 0),
+            CHECK (post_negative_count IS NULL OR post_total_count IS NULL OR post_negative_count <= post_total_count),
+            CHECK (post_negative_rate IS NULL OR post_negative_rate BETWEEN 0 AND 1),
+            CHECK (delta_negative_rate IS NULL OR delta_negative_rate BETWEEN -1 AND 1),
+            CHECK (
+                (status = 'PENDING' AND measured_at IS NULL)
+                OR
+                (status <> 'PENDING' AND measured_at IS NOT NULL
+                    AND baseline_negative_count IS NOT NULL AND baseline_total_count IS NOT NULL
+                    AND post_negative_count IS NOT NULL AND post_total_count IS NOT NULL)
+            )
+        )
+    `);
+
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_action_outcomes_pending_post_end
+        ON action_outcomes (post_end)
+        WHERE status = 'PENDING'
+    `);
     console.log('Intelligence schema ready');
 }
 

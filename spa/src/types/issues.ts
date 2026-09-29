@@ -68,6 +68,38 @@ export interface OperationalAction {
   updatedAt: string;
   completedAt: string | null;
   isOverdue: boolean;
+  outcomes?: ActionOutcome[];
+}
+
+export type ActionOutcomeStatus = 'PENDING' | 'INSUFFICIENT_DATA' | 'IMPROVED' | 'UNCHANGED' | 'WORSENED';
+
+export interface ActionOutcomeWindow {
+  start: string;
+  end: string;
+}
+
+export interface ActionOutcomeMetrics {
+  negativeCount: number | null;
+  totalCount: number | null;
+  negativeRate: number | null;
+}
+
+export interface ActionOutcome {
+  id: string;
+  actionId: string;
+  completedAt: string;
+  baselineWindow: ActionOutcomeWindow;
+  postWindow: ActionOutcomeWindow;
+  status: ActionOutcomeStatus;
+  baseline: ActionOutcomeMetrics;
+  post: ActionOutcomeMetrics;
+  deltaNegativeRate: number | null;
+  measuredAt: string | null;
+}
+
+export interface ActionOutcomesResponse {
+  success: true;
+  items: ActionOutcome[];
 }
 
 export interface OperationalActionsResponse {

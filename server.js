@@ -2597,6 +2597,7 @@ const issueReadHandlers = createIssueReadHandlers(pool);
 const issueActionHandlers = createIssueActionHandlers(pool);
 app.get('/api/intelligence/action-assignees', authenticate, issueActionHandlers.assignees);
 app.get('/api/intelligence/issues/:issueId/actions', authenticate, issueActionHandlers.list);
+app.get('/api/intelligence/actions/:actionId/outcomes', authenticate, issueActionHandlers.outcomes);
 app.post('/api/intelligence/issues/:issueId/actions', authenticate, requireRole('owner', 'manager'), issueActionHandlers.create);
 app.patch('/api/intelligence/actions/:actionId', authenticate, requireRole('owner', 'manager'), issueActionHandlers.update);
 app.get('/api/intelligence/issues', authenticate, issueReadHandlers.list);

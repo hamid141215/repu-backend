@@ -9,6 +9,7 @@ const TRANSITIONS = {
 };
 const CREATE_FIELDS = new Set(['title', 'description', 'assigneeUserId', 'dueDate']);
 const PATCH_FIELDS = new Set(['title', 'description', 'assigneeUserId', 'dueDate', 'status']);
+const { createOutcomeCycle, outcomeView } = require('./action-outcome-service');
 
 function fail(statusCode, message) {
     const error = new Error(message);
@@ -86,9 +87,9 @@ function createIssueActionHandlers(db) {
         if (!Number.isSafeInteger(id) || id < 1) fail(403, 'User session required');
         return id;
     };
-    const validAssignee = async (clientId, userId) => {
+    const validAssignee = async (clientId, userId, executor = db) => {
         if (userId == null) return;
-        const { rows } = await db.query(
+        const { rows } = await executor.query(
             'SELECT id FROM users WHERE id = $1 AND client_id = $2 AND is_active = true',
             [userId, clientId]
         );
@@ -120,7 +121,49 @@ function createIssueActionHandlers(db) {
                     WHERE a.client_id = $1 AND a.issue_id = $2
                     ORDER BY (a.status IN ('DONE', 'CANCELLED')) ASC,
                         a.due_date ASC NULLS LAST, a.created_at DESC`, [clientId, issueId]);
-                res.json({ success: true, items: rows.map(actionView) });
+                const items = rows.map(actionView);
+                if (items.length) {
+                    const { rows: outcomeRows } = await db.query(`SELECT o.id, o.action_id, o.completed_at_snapshot,
+                        o.baseline_start, o.baseline_end, o.post_start, o.post_end, o.status,
+                        o.baseline_negative_count, o.baseline_total_count, o.baseline_negative_rate,
+                        o.post_negative_count, o.post_total_count, o.post_negative_rate,
+                        o.delta_negative_rate, o.measured_at
+                        FROM action_outcomes o
+                        JOIN operational_actions a ON a.id = o.action_id
+                        JOIN intelligence_issues i ON i.id = a.issue_id AND i.client_id = a.client_id
+                        WHERE o.action_id = ANY($1::bigint[]) AND a.client_id = $2
+                        ORDER BY o.completed_at_snapshot DESC, o.id DESC`, [items.map(item => item.id), clientId]);
+                    const outcomesByAction = new Map();
+                    for (const row of outcomeRows) {
+                        const actionKey = String(row.action_id);
+                        if (!outcomesByAction.has(actionKey)) outcomesByAction.set(actionKey, []);
+                        outcomesByAction.get(actionKey).push(outcomeView(row));
+                    }
+                    for (const item of items) item.outcomes = outcomesByAction.get(item.id) || [];
+                }
+                res.json({ success: true, items });
+            } catch (error) { sendError(res, error); }
+        },
+
+        outcomes: async (req, res) => {
+            try {
+                const actionId = parseId(req.params.actionId, 'actionId');
+                const clientId = req.clientData.id;
+                const owned = await db.query(`SELECT a.id FROM operational_actions a
+                    JOIN intelligence_issues i ON i.id = a.issue_id AND i.client_id = a.client_id
+                    WHERE a.id = $1 AND a.client_id = $2`, [actionId, clientId]);
+                if (!owned.rows[0]) return res.status(404).json({ error: 'Action not found' });
+                const { rows } = await db.query(`SELECT o.id, o.action_id, o.completed_at_snapshot,
+                    o.baseline_start, o.baseline_end, o.post_start, o.post_end, o.status,
+                    o.baseline_negative_count, o.baseline_total_count, o.baseline_negative_rate,
+                    o.post_negative_count, o.post_total_count, o.post_negative_rate,
+                    o.delta_negative_rate, o.measured_at
+                    FROM action_outcomes o
+                    JOIN operational_actions a ON a.id = o.action_id
+                    JOIN intelligence_issues i ON i.id = a.issue_id AND i.client_id = a.client_id
+                    WHERE o.action_id = $1 AND a.client_id = $2
+                    ORDER BY o.completed_at_snapshot DESC, o.id DESC`, [actionId, clientId]);
+                res.json({ success: true, items: rows.map(outcomeView) });
             } catch (error) { sendError(res, error); }
         },
 
@@ -157,6 +200,8 @@ function createIssueActionHandlers(db) {
         },
 
         update: async (req, res) => {
+            let connection = null;
+            let transactionStarted = false;
             try {
                 requireUser(req);
                 const actionId = parseId(req.params.actionId, 'actionId');
@@ -164,11 +209,18 @@ function createIssueActionHandlers(db) {
                 const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
                 const keys = Object.keys(body);
                 if (!keys.length || keys.some(key => !PATCH_FIELDS.has(key))) fail(400, 'Invalid update fields');
-                const { rows: currentRows } = await db.query(`SELECT id, title, description, assignee_user_id,
+                connection = typeof db.connect === 'function' ? await db.connect() : db;
+                await connection.query('BEGIN');
+                transactionStarted = true;
+                const { rows: currentRows } = await connection.query(`SELECT id, title, description, assignee_user_id,
                     status, due_date, completed_at FROM operational_actions
-                    WHERE id = $1 AND client_id = $2`, [actionId, clientId]);
+                    WHERE id = $1 AND client_id = $2 FOR UPDATE`, [actionId, clientId]);
                 const current = currentRows[0];
-                if (!current) return res.status(404).json({ error: 'Action not found' });
+                if (!current) {
+                    await connection.query('ROLLBACK');
+                    transactionStarted = false;
+                    return res.status(404).json({ error: 'Action not found' });
+                }
 
                 const title = body.title === undefined ? current.title : parseTitle(body.title);
                 const description = body.description === undefined ? current.description : parseDescription(body.description);
@@ -177,7 +229,7 @@ function createIssueActionHandlers(db) {
                 const dueDate = body.dueDate === undefined ? current.due_date : parseDueDate(body.dueDate);
                 const status = body.status === undefined ? current.status : body.status;
                 if (!STATUSES.includes(status) || !TRANSITIONS[current.status]?.includes(status)) fail(400, 'Invalid status transition');
-                if (body.assigneeUserId !== undefined) await validAssignee(clientId, assigneeUserId);
+                if (body.assigneeUserId !== undefined) await validAssignee(clientId, assigneeUserId, connection);
                 const values = [];
                 const assignments = [];
                 const add = (column, value) => {
@@ -190,8 +242,13 @@ function createIssueActionHandlers(db) {
                 if (body.dueDate !== undefined) add('due_date', dueDate);
                 if (body.status !== undefined) {
                     add('status', status);
-                    values.push(status === 'DONE');
-                    assignments.push(`completed_at = CASE WHEN $${values.length} THEN COALESCE(completed_at, NOW()) ELSE NULL END`);
+                    if (status === 'DONE' && current.status !== 'DONE') {
+                        assignments.push('completed_at = NOW()');
+                    } else if (status === 'DONE') {
+                        assignments.push('completed_at = COALESCE(completed_at, NOW())');
+                    } else {
+                        assignments.push('completed_at = NULL');
+                    }
                 }
                 assignments.push('updated_at = NOW()');
                 values.push(actionId, clientId);
@@ -200,16 +257,36 @@ function createIssueActionHandlers(db) {
                     values.push(current.status);
                     where += ` AND status = $${values.length}`;
                 }
-                const { rowCount } = await db.query(
+                const { rowCount } = await connection.query(
                     `UPDATE operational_actions SET ${assignments.join(', ')} WHERE ${where}`,
                     values
                 );
-                if (rowCount === 0) return res.status(409).json({ error: 'Action changed; reload and retry' });
-                const { rows } = await db.query(`${ACTION_SELECT} WHERE a.client_id = $1 AND a.id = $2`,
+                if (rowCount === 0) {
+                    await connection.query('ROLLBACK');
+                    transactionStarted = false;
+                    return res.status(409).json({ error: 'Action changed; reload and retry' });
+                }
+                if (status === 'DONE' && current.status !== 'DONE') {
+                    await createOutcomeCycle(connection, actionId, clientId);
+                }
+                const { rows } = await connection.query(`${ACTION_SELECT} WHERE a.client_id = $1 AND a.id = $2`,
                     [clientId, actionId]);
-                if (!rows[0]) return res.status(404).json({ error: 'Action not found' });
+                if (!rows[0]) {
+                    await connection.query('ROLLBACK');
+                    transactionStarted = false;
+                    return res.status(404).json({ error: 'Action not found' });
+                }
+                await connection.query('COMMIT');
+                transactionStarted = false;
                 res.json({ success: true, action: actionView(rows[0]) });
-            } catch (error) { sendError(res, error); }
+            } catch (error) {
+                if (transactionStarted) {
+                    try { await connection.query('ROLLBACK'); } catch (_) {}
+                }
+                sendError(res, error);
+            } finally {
+                if (connection && connection !== db && typeof connection.release === 'function') connection.release();
+            }
         }
     };
 }

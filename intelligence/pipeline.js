@@ -11,6 +11,7 @@ const {
 const {
     persistIssueCandidates
 } = require('./issue-persistence');
+const { evaluateMatureActionOutcomes } = require('./action-outcome-service');
 
 const RIYADH_OFFSET_MS =
     3 * 60 * 60 * 1000;
@@ -250,6 +251,8 @@ async function runIntelligencePipeline(
         throw error;
     }
 
+    const outcomeResult = await evaluateMatureActionOutcomes(db, clientId);
+
     return {
         client_id: clientId,
 
@@ -269,6 +272,12 @@ async function runIntelligencePipeline(
 
         issues_persisted:
             issueResult.persisted,
+
+        outcomes_evaluated:
+            outcomeResult.evaluated,
+
+        outcomes_insufficient_data:
+            outcomeResult.insufficientData,
 
         issues:
             issueResult.rows
