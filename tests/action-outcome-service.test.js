@@ -103,16 +103,17 @@ test('terminal outcomes are never selected for recomputation', async () => {
     assert.equal(db.calls.some(call => call.sql.includes('UPDATE action_outcomes')), false);
 });
 
-test('pipeline evaluates outcomes after signals and issue persistence inside caller transaction', () => {
+test('pipeline evaluates outcomes after issue persistence; both routes use shared transaction runner', () => {
     const pipeline = fs.readFileSync(path.join(__dirname, '../intelligence/pipeline.js'), 'utf8');
     const issuesAt = pipeline.indexOf('await persistIssueCandidates');
     const outcomesAt = pipeline.indexOf('await evaluateMatureActionOutcomes(db, clientId)');
     assert.ok(issuesAt >= 0 && outcomesAt > issuesAt);
     const server = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
     const routeAt = server.indexOf("app.post('/api/internal/intelligence/run-pipeline'");
-    const beginAt = server.indexOf("await client.query('BEGIN')", routeAt);
-    const pipelineAt = server.indexOf('await runIntelligencePipeline(', routeAt);
-    const commitAt = server.indexOf("await client.query('COMMIT')", routeAt);
-    const rollbackAt = server.indexOf("await client.query('ROLLBACK')", routeAt);
-    assert.ok(routeAt >= 0 && beginAt < pipelineAt && pipelineAt < commitAt && commitAt < rollbackAt);
+    const manualAt = server.indexOf('await runTenantIntelligenceWithLock(pool,', routeAt);
+    const scheduledAt = server.indexOf("app.post('/api/internal/intelligence/run-scheduled-pipeline'", routeAt);
+    assert.ok(routeAt >= 0 && manualAt > routeAt && scheduledAt > manualAt);
+    const runner = fs.readFileSync(path.join(__dirname, '../intelligence/scheduled-pipeline-runner.js'), 'utf8');
+    assert.ok(runner.indexOf("await connection.query('BEGIN')") < runner.indexOf('await pipeline(connection,'));
+    assert.ok(runner.indexOf('await pipeline(connection,') < runner.indexOf("await connection.query('COMMIT')"));
 });

@@ -14,12 +14,14 @@ const { initIntelligenceSchema } = require('./db/intelligence-schema');
 const { classifyFeedback } = require('./intelligence/signal-engine');
 const { buildIssueCandidates } = require('./intelligence/issue-engine');
 const { upsertIssueCandidate } = require('./intelligence/issue-persistence');
-const { runIntelligencePipeline } = require('./intelligence/pipeline');
+const { createPipelineRunner } = require('./intelligence/scheduled-pipeline-runner');
+const { createScheduledPipelineHandler } = require('./intelligence/scheduled-pipeline-api');
 const { enrichIssue } = require('./intelligence/enrichment-service');
 const { createIssueReadHandlers } = require('./intelligence/issue-read-api');
 const { createIssueActionHandlers } = require('./intelligence/issue-action-api');
 
 const app = express();
+const { runTenantIntelligenceWithLock, runScheduledIntelligenceBatch } = createPipelineRunner();
 
 // ─── CORS allowlist (Phase 3) ──────────────────────────────────────────────
 // New Next.js frontend is hosted at app.repu.mawjatalsamt.com (prod) and
@@ -2779,8 +2781,6 @@ app.get('/api/internal/intelligence/issues-dry-run', authenticate, requireRole('
 
 
 app.post('/api/internal/intelligence/run-pipeline', authenticate, requireRole('owner'), async (req, res) => {
-    const client = await pool.connect();
-
     try {
         const requestedDays = Number.parseInt(req.body?.days, 10);
 
@@ -2788,18 +2788,14 @@ app.post('/api/internal/intelligence/run-pipeline', authenticate, requireRole('o
             ? Math.max(1, Math.min(requestedDays, 365))
             : 365;
 
-        await client.query('BEGIN');
-
-        const result =
-            await runIntelligencePipeline(
-                client,
-                {
-                    clientId: req.clientData.id,
-                    days
-                }
-            );
-
-        await client.query('COMMIT');
+        const outcome = await runTenantIntelligenceWithLock(pool, {
+            clientId: req.clientData.id,
+            days
+        });
+        if (outcome.status === 'SKIPPED_LOCKED') {
+            return res.status(409).json({ error: 'PIPELINE_ALREADY_RUNNING' });
+        }
+        const result = outcome.result;
 
         res.json({
             success: true,
@@ -2810,10 +2806,6 @@ app.post('/api/internal/intelligence/run-pipeline', authenticate, requireRole('o
             result
         });
     } catch (e) {
-        try {
-            await client.query('ROLLBACK');
-        } catch (_) {}
-
         console.error(
             'POST /api/internal/intelligence/run-pipeline:',
             e.message
@@ -2822,10 +2814,11 @@ app.post('/api/internal/intelligence/run-pipeline', authenticate, requireRole('o
         res.status(500).json({
             error: 'Intelligence Pipeline Error'
         });
-    } finally {
-        client.release();
     }
 });
+
+app.post('/api/internal/intelligence/run-scheduled-pipeline',
+    createScheduledPipelineHandler({ pool, runBatch: runScheduledIntelligenceBatch }));
 
 
 app.post('/api/internal/intelligence/enrich-issue/:issueId', authenticate, requireRole('owner'), async (req, res) => {
