@@ -4,7 +4,6 @@ const cors     = require('cors');
 const { rateLimit } = require('express-rate-limit');
 const archiver = require('archiver');
 const { Pool } = require('pg');
-const axios    = require('axios');
 const path     = require('path');
 const QRCode   = require('qrcode');
 const bcrypt   = require('bcryptjs');
@@ -50,7 +49,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // ─── Rate limiting (Phase D — for 190-branch enterprise launch) ─────────────
 // Strategy: layered limits — generous for authenticated dashboard, tighter for
-// public touch-points, near-unlimited for webhook (controlled by WhatsApp).
+// public touch-points.
 // All limiters key on the api_key (when present) or client IP.
 const authKeyOrIp = (req) => req.headers['x-api-key'] || req.ip;
 const rateLimitOpts = {
@@ -71,13 +70,7 @@ const limitPublic = rateLimit({
     max: 60,
     message: { error: 'Too many requests. Please slow down.' }
 });
-const limitWebhook = rateLimit({
-    ...rateLimitOpts,
-    windowMs: 60 * 1000,
-    max: 600
-});
 // Apply path-specific limiters (Express resolves them in order — auth wins over public for /api/*)
-app.use('/webhook',         limitWebhook);
 app.use('/api/public',      limitPublic);
 app.use('/api/qr',          limitPublic);
 app.use('/api',             limitAuth);
@@ -102,7 +95,6 @@ const normalizeComplaintStatus = (status) => {
     return ['new', 'in_progress', 'contacted', 'resolved', 'closed'].includes(value) ? value : 'new';
 };
 
-const normalizeWhatsappContact = (contact) => String(contact || '').trim().replace(/\D/g, '');
 
 const resolvePublicNfc = async (nfcId) => {
     const { rows: branchRows } = await pool.query(
@@ -113,7 +105,6 @@ const resolvePublicNfc = async (nfcId) => {
             c.complaint_action,
             c.discount_code,
             c.complaint_message,
-            c.whatsapp_contact,
             b.id AS branch_id,
             b.name AS branch_name,
             b.google_link AS branch_google_link
@@ -134,13 +125,12 @@ const resolvePublicNfc = async (nfcId) => {
             complaintAction: row.complaint_action,
             discountCode: row.discount_code,
             complaintMessage: row.complaint_message,
-            whatsappContact: row.whatsapp_contact,
             isBranch: true
         };
     }
 
     const { rows: clientRows } = await pool.query(
-        `SELECT id, name, google_link, complaint_action, discount_code, complaint_message, whatsapp_contact
+        `SELECT id, name, google_link, complaint_action, discount_code, complaint_message
          FROM clients
          WHERE nfc_id = $1
          LIMIT 1`,
@@ -156,33 +146,8 @@ const resolvePublicNfc = async (nfcId) => {
         complaintAction: client.complaint_action,
         discountCode: client.discount_code,
         complaintMessage: client.complaint_message,
-        whatsappContact: client.whatsapp_contact,
         isBranch: false
     };
-};
-
-// ─── Meta WhatsApp Cloud API ───────────────────────────────────────────────
-const isMockMode = () =>
-    process.env.META_WHATSAPP_TOKEN === 'dummy' ||
-    process.env.META_PHONE_NUMBER_ID === 'dummy';
-
-const sendTextMessage = async (to, text) => {
-    if (isMockMode()) {
-        console.log(`MOCK Meta send to ${normalizePhone(to)}`);
-        return;
-    }
-    const url = `https://graph.facebook.com/v20.0/${process.env.META_PHONE_NUMBER_ID}/messages`;
-    await axios.post(url, {
-        messaging_product: 'whatsapp',
-        to: normalizePhone(to),
-        type: 'text',
-        text: { body: text }
-    }, {
-        headers: {
-            Authorization: `Bearer ${process.env.META_WHATSAPP_TOKEN}`,
-            'Content-Type': 'application/json'
-        }
-    });
 };
 
 // ─── PostgreSQL pool ───────────────────────────────────────────────────────
@@ -551,136 +516,6 @@ app.get('/health', async (req, res) => {
 });
 
 // ─── Meta webhook verification (GET) ──────────────────────────────────────
-app.get('/webhook', (req, res) => {
-    const mode      = req.query['hub.mode'];
-    const token     = req.query['hub.verify_token'];
-    const challenge = req.query['hub.challenge'];
-
-    if (mode === 'subscribe' && token === process.env.META_VERIFY_TOKEN) {
-        return res.status(200).send(challenge);
-    }
-    res.status(403).send('Forbidden');
-});
-
-// ─── Meta webhook receiver (POST) ─────────────────────────────────────────
-app.post('/webhook', async (req, res) => {
-    // Respond immediately — Meta requires a fast 200
-    res.status(200).send('EVENT_RECEIVED');
-
-    try {
-        const body = req.body;
-        if (body.object !== 'whatsapp_business_account') return;
-
-        const value = body.entry?.[0]?.changes?.[0]?.value;
-        if (!value || !value.messages || value.messages.length === 0) return;
-
-        const message = value.messages[0];
-
-        // Ignore group messages
-        if (String(message.from).includes('@g.us')) return;
-
-        // Only handle text messages — ignore media, audio, etc.
-        if (message.type !== 'text') return;
-
-        const customerPhone = message.from; // E.164 without '+', e.g. 966501234567
-        const incomingText  = message.text?.body?.trim() || '';
-        if (!incomingText) return;
-
-        // ── 1. NFC detection ──────────────────────────────────────────────
-        // Current NFC link format: "... (Ref: 101)"
-        let nfcId = null;
-        const refMatch = incomingText.match(/\(Ref:\s*(\d+)\)/i);
-        if (refMatch) nfcId = refMatch[1];
-
-        // Legacy NFC format: "تقييم_101"
-        if (!nfcId && incomingText.startsWith('تقييم_')) {
-            const parts = incomingText.split('_');
-            nfcId = parts[parts.length - 1].trim();
-        }
-
-        if (nfcId) {
-            const { rows } = await pool.query(
-                'SELECT * FROM clients WHERE nfc_id = $1',
-                [nfcId]
-            );
-            const client = rows[0];
-            if (client) {
-                await sendTextMessage(customerPhone,
-                    `مرحباً بك في ${client.name} 👋\n\n` +
-                    `نشكرك على زيارتك! كيف كانت تجربتك معنا اليوم؟\n\n` +
-                    `1️⃣ ردّ بـ *1* إذا كانت تجربتك ممتازة ⭐\n` +
-                    `2️⃣ ردّ بـ *2* إذا لديك ملاحظة أو اقتراح 📝`
-                );
-                await pool.query(
-                    'INSERT INTO evaluations (client_id, phone, name, status) VALUES ($1, $2, $3, $4)',
-                    [client.id, customerPhone, value.contacts?.[0]?.profile?.name || 'عميل', 'pending']
-                );
-            }
-            return;
-        }
-
-        // ── 2. Reply processing ───────────────────────────────────────────
-        const { rows: evalRows } = await pool.query(
-            'SELECT * FROM evaluations WHERE phone = $1 ORDER BY sent_at DESC LIMIT 1',
-            [customerPhone]
-        );
-        const lastEval = evalRows[0];
-        if (!lastEval) return;
-
-        const { rows: clientRows } = await pool.query(
-            'SELECT * FROM clients WHERE id = $1',
-            [lastEval.client_id]
-        );
-        const client = clientRows[0];
-        if (!client) return;
-
-        const t = incomingText;
-        const isThanks    = ['شكراً', 'شكرا', 'تمام', 'يعطيك العافية'].some(w => t.includes(w));
-        const isPositive  = t === '1' || t.includes('ممتاز');
-        const isComplaint = t === '2' || t.includes('ملاحظة') || t.includes('ملاحظات');
-
-        if (isThanks) {
-            await sendTextMessage(customerPhone, `شكراً لك، يسعدنا دائماً خدمتك 😊`);
-            await pool.query(
-                'UPDATE evaluations SET status = $1 WHERE id = $2',
-                ['closed', lastEval.id]
-            );
-        } else if (isPositive) {
-            await sendTextMessage(customerPhone,
-                `شكراً على تقييمك الرائع! 😍\n` +
-                `يسعدنا كثيراً لو شاركت تجربتك على جوجل:\n${client.google_link}`
-            );
-            await pool.query(
-                'UPDATE evaluations SET status = $1, answer = $2 WHERE id = $3',
-                ['replied', '1', lastEval.id]
-            );
-        } else if (isComplaint) {
-            const discountLine = process.env.DISCOUNT_CODE
-                ? `\n\nكود خصم مقدَّم منا: *${process.env.DISCOUNT_CODE}*`
-                : '';
-            await sendTextMessage(customerPhone,
-                `نعتذر منك على أي تقصير 😔\n` +
-                `تم إرسال ملاحظتك لإدارة ${client.name} فوراً وسيتم التواصل معك قريباً.` +
-                discountLine
-            );
-            await pool.query(
-                'UPDATE evaluations SET status = $1, answer = $2 WHERE id = $3',
-                ['complaint', '2', lastEval.id]
-            );
-            // Manager alert — send as plain text, no customer message content
-            if (client.admin_phone) {
-                const directLink = `https://wa.me/${customerPhone.replace(/\D/g, '')}`;
-                await sendTextMessage(client.admin_phone,
-                    `⚠️ شكوى جديدة — ${client.name}\nتواصل مع العميل مباشرة: ${directLink}`
-                );
-            }
-        }
-        // All other messages are silently ignored
-    } catch (err) {
-        console.error('Webhook error:', err.message);
-    }
-});
-
 // ─── SPA (Vite build) — Phase C: served at /admin.html ───────────────────
 // public-app/ contains the Vite production build. Order matters:
 //   1. Serve hashed assets (/assets/*, /brand/*) directly so file requests work.
@@ -766,7 +601,6 @@ app.patch('/api/clients/:id/complaint-settings', superAdminAuth, async (req, res
     const complaintAction = String(req.body.complaint_action || '').trim();
     const discountCode = String(req.body.discount_code || '').trim();
     const complaintMessage = String(req.body.complaint_message || '').trim() || 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.';
-    const whatsappContact = normalizeWhatsappContact(req.body.whatsapp_contact);
 
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid client ID' });
     if (!['contact', 'discount', 'contact_discount'].includes(complaintAction)) {
@@ -776,9 +610,9 @@ app.patch('/api/clients/:id/complaint-settings', superAdminAuth, async (req, res
     try {
         const { rowCount } = await pool.query(
             `UPDATE clients
-             SET complaint_action = $1, discount_code = $2, complaint_message = $3, whatsapp_contact = $4
-             WHERE id = $5`,
-            [complaintAction, discountCode || null, complaintMessage, whatsappContact || null, id]
+             SET complaint_action = $1, discount_code = $2, complaint_message = $3
+             WHERE id = $4`,
+            [complaintAction, discountCode || null, complaintMessage, id]
         );
         if (rowCount === 0) return res.status(404).json({ error: 'Client not found' });
         res.json({ success: true });
@@ -910,9 +744,7 @@ app.get('/api/public/client/:nfcId', async (req, res) => {
             discountCode: resolved.discountCode,
             discount_code: resolved.discountCode,
             complaintMessage: resolved.complaintMessage,
-            complaint_message: resolved.complaintMessage,
-            whatsappNumber: resolved.whatsappContact,
-            whatsapp_contact: resolved.whatsappContact
+            complaint_message: resolved.complaintMessage
         });
     } catch (e) {
         res.status(500).json({ error: 'Database Error' });
@@ -936,7 +768,12 @@ app.post('/api/public/review', async (req, res) => {
     if (rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
         return res.status(400).json({ error: 'Invalid rating' });
     }
-    if (answer === '2' && !feedback) return res.status(400).json({ error: 'Feedback is required' });
+    if ((answer === '2' || (rating !== null && rating <= 3)) && !feedback) {
+        return res.status(400).json({ error: 'Feedback is required' });
+    }
+    if (rating !== null && answer !== (rating <= 3 ? '2' : '1')) {
+        return res.status(400).json({ error: 'Answer does not match rating' });
+    }
 
     try {
         const resolved = await resolvePublicNfc(nfcId);
@@ -962,7 +799,7 @@ app.post('/api/public/review', async (req, res) => {
         const response = {
             success: true,
             status,
-            googleLink: answer === '1' ? resolved.googleLink : undefined
+            googleLink: resolved.googleLink || null
         };
 
         if (answer === '2') {
@@ -1029,9 +866,7 @@ app.get('/api/client-info', authenticate, async (req, res) => {
         google_link: req.clientData.google_link,
         complaint_action: normalizeComplaintAction(req.clientData.complaint_action),
         discount_code: req.clientData.discount_code,
-        complaint_message: req.clientData.complaint_message,
-        whatsapp_number: req.clientData.whatsapp_contact || req.clientData.admin_phone || null,
-        whatsapp_contact: req.clientData.whatsapp_contact
+        complaint_message: req.clientData.complaint_message
     });
 });
 
@@ -1352,27 +1187,6 @@ app.get('/api/client-recent', async (req, res) => {
     }
 });
 
-app.post('/api/send', authenticate, requireRole('owner', 'manager'), async (req, res) => {
-    const { phone, name, branch } = req.body;
-    const cleanPhone = normalizePhone(phone);
-    try {
-        await sendTextMessage(cleanPhone,
-            `مرحباً ${name} 👋\n` +
-            `نشكرك على تعاملك مع ${req.clientData.name}!\n\n` +
-            `كيف كانت تجربتك معنا؟\n\n` +
-            `1️⃣ ردّ بـ *1* إذا كانت تجربتك ممتازة ⭐\n` +
-            `2️⃣ ردّ بـ *2* إذا لديك ملاحظة أو اقتراح 📝`
-        );
-        await pool.query(
-            'INSERT INTO evaluations (client_id, phone, name, branch, status) VALUES ($1, $2, $3, $4, $5)',
-            [req.clientData.id, cleanPhone, name, branch, 'sent']
-        );
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
 app.get('/api/my-reports', authenticate, async (req, res) => {
     const { rows } = await pool.query(
         'SELECT * FROM evaluations WHERE client_id = $1 ORDER BY sent_at DESC',
@@ -1508,7 +1322,11 @@ app.get('/api/branches', authenticate, async (req, res) => {
             ORDER BY b.created_at DESC`,
             [req.clientData.id]
         );
-        res.json({ items: rows });
+        const baseUrl = (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+        res.json({ items: rows.map(branch => ({
+            ...branch,
+            review_url: branch.nfc_id ? `${baseUrl}/r/${encodeURIComponent(branch.nfc_id)}` : null
+        })) });
     } catch (e) {
         console.error('GET /api/branches:', e.message);
         res.status(500).json({ error: 'Database Error' });
@@ -2232,7 +2050,6 @@ app.patch('/api/client/complaint-settings', authenticate, requireRole('owner', '
     const discountCode = String(req.body.discount_code || '').trim();
     const complaintMessage = String(req.body.complaint_message || '').trim()
         || 'تم استلام ملاحظتك وسيتم التواصل معك قريباً.';
-    const whatsappContact = normalizeWhatsappContact(req.body.whatsapp_contact);
 
     if (!['contact', 'discount', 'contact_discount'].includes(complaintAction)) {
         return res.status(400).json({ error: 'Invalid complaint action' });
@@ -2240,10 +2057,10 @@ app.patch('/api/client/complaint-settings', authenticate, requireRole('owner', '
     try {
         const { rowCount, rows } = await pool.query(
             `UPDATE clients
-             SET complaint_action = $1, discount_code = $2, complaint_message = $3, whatsapp_contact = $4
-             WHERE id = $5
-             RETURNING id, complaint_action, discount_code, complaint_message, whatsapp_contact`,
-            [complaintAction, discountCode || null, complaintMessage, whatsappContact || null, req.clientData.id]
+             SET complaint_action = $1, discount_code = $2, complaint_message = $3
+             WHERE id = $4
+             RETURNING id, complaint_action, discount_code, complaint_message`,
+            [complaintAction, discountCode || null, complaintMessage, req.clientData.id]
         );
         if (rowCount === 0) return res.status(404).json({ error: 'Client not found' });
         res.json({ success: true, settings: rows[0] });

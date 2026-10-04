@@ -15,8 +15,6 @@ export interface ClientInfo {
   complaint_action?: 'contact' | 'discount' | 'contact_discount';
   discount_code?: string | null;
   complaint_message?: string | null;
-  whatsapp_number?: string | null;
-  whatsapp_contact?: string | null;
 }
 
 export interface MonthlyPoint { month: string; total: number; }
@@ -141,6 +139,7 @@ export interface BranchRow {
   city: string | null;
   area: string | null;
   nfc_id: string | null;
+  review_url?: string | null;
   google_link: string | null;
   is_active: boolean;
   created_at: string;

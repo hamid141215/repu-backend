@@ -1,5 +1,17 @@
 'use strict';
 
+// Display-only redaction: stored signals and detection rules are unchanged.
+function readableEvidence(value) {
+    return String(value || '').normalize('NFKC')
+        .replace(/[\u0660-\u0669\u06f0-\u06f9]/g, char => String(char.charCodeAt(0) - (char <= '\u0669' ? 0x0660 : 0x06f0)))
+        .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+        .replace(/(?:https?:\/\/|www\.)\S+/gi, '[رابط محجوب]')
+        .replace(/[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+/g, '[بريد محجوب]')
+        .replace(/@[^\s،,;]+/g, '[حساب محجوب]')
+        .replace(/(?:\+|00)?\d(?:[\s().-]*\d){6,}/g, '[رقم محجوب]')
+        .trim();
+}
+
 // Product reads only. No engine, pipeline or provider calls belong here.
 const STATUSES = ['OPEN', 'WATCHING', 'RESOLVED', 'DISMISSED'];
 const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -141,7 +153,8 @@ function createIssueReadHandlers(db) {
                 // Capture the metadata read above so a rolling-window update between
                 // queries cannot attach evidence from a different issue window.
                 const { rows: evidence } = await db.query(`SELECT s.evaluation_id, s.branch_name,
-                    s.dimension, s.sentiment, s.confidence, s.created_at
+                    s.dimension, s.sentiment, s.confidence, s.created_at,
+                    s.evidence_text, e.sent_at AS occurred_at
                     FROM (SELECT $1::integer AS client_id, $2::varchar AS dimension,
                         $3::timestamptz AS window_start, $4::timestamptz AS window_end,
                         $5::varchar AS scope_type, $6::text AS branch_name) i
@@ -151,9 +164,10 @@ function createIssueReadHandlers(db) {
                     ORDER BY s.confidence DESC, s.created_at DESC, s.id DESC LIMIT 10`,
                 [clientId, issue.dimension, issue.window_start, issue.window_end, issue.scope_type, issue.branch_name]);
                 res.json({ success: true, issue: issueView(issue, true), evidence: evidence.map(s => ({
-                    evaluationId: String(s.evaluation_id), branchName: s.branch_name, dimension: s.dimension,
+                    evaluationId: String(s.evaluation_id), branchName: readableEvidence(s.branch_name) || null, dimension: s.dimension,
                     sentiment: s.sentiment, confidence: Number(s.confidence),
-                    createdAt: s.created_at
+                    createdAt: s.created_at, occurredAt: s.occurred_at,
+                    text: readableEvidence(s.evidence_text)
                 })) });
             } catch (error) { handleError(res, error); }
         }

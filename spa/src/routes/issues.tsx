@@ -431,15 +431,16 @@ export function IssueDetailPage({ selectedId, onClose }: { selectedId?: string; 
       </section>
       <section className="issue-panel mt-4"><h2 className="font-semibold">ما الذي يحدث؟</h2><SignalSummary issue={issue} /></section>
       <section className="issue-panel mt-4"><h2 className="font-semibold">الأدلة</h2>
-        <p className="mt-2 text-xs text-[var(--color-text-3)]">بيانات وصفية لما يصل إلى ١٠ إشارات من أصل {number(issue.evidenceCount)} إشارة مؤهلة ضمن نطاق القضية وفترتها.</p>
-        <p className="mt-3 text-sm">نصوص الأدلة غير معروضة حفاظًا على الخصوصية.</p>
+        <p className="mt-2 text-xs text-[var(--color-text-3)]">ما يصل إلى ١٠ إشارات من أصل {number(issue.evidenceCount)} إشارة مؤهلة ضمن نطاق القضية وفترتها.</p>
+        <p className="mt-3 text-sm">معلومات الاتصال محجوبة من النص الداعم.</p>
         {!query.data?.evidence.length && issue.evidenceCount > 0 && <p className="mt-3 text-xs text-[var(--color-text-3)]">تعذر تحميل بيانات معاينة الإشارات حاليًا.</p>}
         {query.data?.evidence.length > 0 && <div className="mt-4 space-y-3">
           {query.data.evidence.map((evidence, index) => <article key={`${evidence.evaluationId}-${index}`} className="rounded-md bg-[var(--color-bg)] p-4">
+            <p className="m-0 mb-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm">{evidence.text}</p>
             <div className="flex flex-wrap gap-3 text-xs text-[var(--color-text-2)]">
               <span>سلبية</span><span>الثقة {percent(evidence.confidence)}</span>
               <span className="break-words">{evidence.branchName ? `الفرع: ${evidence.branchName}` : 'الفرع غير محدد'}</span>
-              <span>تاريخ تسجيل الإشارة: {date(evidence.createdAt)}</span>
+              <time dateTime={evidence.occurredAt}>تاريخ التقييم: {date(evidence.occurredAt)}</time>
             </div>
           </article>)}
         </div>}

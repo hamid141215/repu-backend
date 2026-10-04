@@ -257,7 +257,6 @@ export interface ComplaintSettingsInput {
   complaint_action: 'contact' | 'discount' | 'contact_discount';
   discount_code?: string | null;
   complaint_message?: string | null;
-  whatsapp_contact?: string | null;
 }
 
 interface ComplaintSettingsResponse {
@@ -267,7 +266,6 @@ interface ComplaintSettingsResponse {
     complaint_action: 'contact' | 'discount' | 'contact_discount';
     discount_code: string | null;
     complaint_message: string | null;
-    whatsapp_contact: string | null;
   };
 }
 
@@ -280,26 +278,5 @@ export function useUpdateComplaintSettings() {
         body: JSON.stringify(input)
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['client-info'] })
-  });
-}
-
-/* ─── Campaigns ───────────────────────────────────────────────────────── */
-export interface SendCampaignInput {
-  name: string;
-  phone: string;
-  branch?: string | null;
-}
-
-export function useSendCampaign() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: SendCampaignInput) =>
-      apiClient<{ success: true }>('/api/send', {
-        method: 'POST',
-        body: JSON.stringify(input)
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['activity'] });
-    }
   });
 }

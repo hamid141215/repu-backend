@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
-  IconBuilding, IconBrandGoogle, IconBrandWhatsapp,
+  IconBuilding, IconBrandGoogle,
   IconBellRinging, IconCreditCard, IconKey
 } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
@@ -11,12 +11,11 @@ import { useClientInfo, useUpdateComplaintSettings, type ComplaintSettingsInput 
 import { EmptyState } from '@/components/empty-state';
 import type { ClientInfo } from '@/types/api';
 
-type SectionKey = 'organization' | 'google' | 'whatsapp' | 'notifications' | 'billing' | 'api';
+type SectionKey = 'organization' | 'google' | 'notifications' | 'billing' | 'api';
 
 const SECTIONS: Array<{ key: SectionKey; label: string; icon: React.ReactNode }> = [
   { key: 'organization',  label: 'المؤسسة ومعالجة الإشارات',  icon: <IconBuilding size={16} /> },
   { key: 'google',        label: 'تكامل Google',     icon: <IconBrandGoogle size={16} /> },
-  { key: 'whatsapp',      label: 'تكامل واتساب',     icon: <IconBrandWhatsapp size={16} /> },
   { key: 'notifications', label: 'الإشعارات',        icon: <IconBellRinging size={16} /> },
   { key: 'billing',       label: 'الفوترة',          icon: <IconCreditCard size={16} /> },
   { key: 'api',           label: 'API ومفاتيح',      icon: <IconKey size={16} /> }
@@ -73,7 +72,6 @@ export function SettingsView({ initialClient, initialSection }: Props) {
         <div className="flex flex-col gap-3.5">
           {section === 'organization'  ? <OrganizationSection initialClient={initialClient} /> : null}
           {section === 'google'        ? <GoogleSection client={initialClient} /> : null}
-          {section === 'whatsapp'      ? <WhatsappSection client={initialClient} /> : null}
           {section === 'notifications' ? <SoonSection title="الإشعارات" description="إشعارات البريد والـ webhook عند الأحداث الحرجة" /> : null}
           {section === 'billing'       ? <SoonSection title="الفوترة" description="إدارة الاشتراك والفواتير" /> : null}
           {section === 'api'           ? <ApiKeysSection client={initialClient} /> : null}
@@ -122,8 +120,7 @@ function ComplaintsHandlingCard({ initialClient }: { initialClient: ClientInfo }
   const [form, setForm] = useState<ComplaintSettingsInput>({
     complaint_action:   initialClient.complaint_action ?? 'contact',
     discount_code:      initialClient.discount_code ?? '',
-    complaint_message:  initialClient.complaint_message ?? '',
-    whatsapp_contact:   initialClient.whatsapp_contact ?? ''
+    complaint_message:  initialClient.complaint_message ?? ''
   });
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
@@ -154,8 +151,7 @@ function ComplaintsHandlingCard({ initialClient }: { initialClient: ClientInfo }
       await update.mutateAsync({
         complaint_action:  form.complaint_action,
         discount_code:     form.discount_code?.trim() || null,
-        complaint_message: form.complaint_message?.trim() || null,
-        whatsapp_contact:  form.whatsapp_contact?.trim() || null
+        complaint_message: form.complaint_message?.trim() || null
       });
       setOk(true);
     } catch (e) {
@@ -222,19 +218,6 @@ function ComplaintsHandlingCard({ initialClient }: { initialClient: ClientInfo }
           </Field>
         ) : null}
 
-        <Field label="رقم واتساب للتواصل" hint="رقم يظهر للعميل ليتواصل معك مباشرة (اختياري)">
-          <input
-            value={form.whatsapp_contact ?? ''}
-            onChange={(e) => set('whatsapp_contact', e.target.value)}
-            placeholder="+966 5X XXX XXXX"
-            disabled={update.isPending}
-            dir="ltr"
-            className="num w-full rounded-[7px] border bg-white px-3 py-2 text-[13px] outline-none focus:border-[var(--color-primary)] disabled:opacity-60"
-            style={{ borderColor: 'var(--color-border-strong)', textAlign: 'right' }}
-            maxLength={20}
-          />
-        </Field>
-
         {err ? (
           <Alert kind="error">{err}</Alert>
         ) : null}
@@ -287,22 +270,6 @@ function GoogleSection({ client }: { client: ClientInfo | null }) {
       )}
       <div className="mt-3 text-[12px]" style={{ color: 'var(--color-text-3)' }}>
         لإضافة أو تعديل رابط جوجل لكل فرع، اذهب إلى <span style={{ color: 'var(--color-primary)' }}>الفروع</span> ثم عدّل الفرع المطلوب.
-      </div>
-    </Card>
-  );
-}
-
-/* ─── WhatsApp integration section ───────────────────────────────────── */
-function WhatsappSection({ client }: { client: ClientInfo | null }) {
-  return (
-    <Card>
-      <SectionHead title="تكامل واتساب" subtitle="رقم الأعمال المُستخدم لإرسال طلبات التقييم" />
-      <div className="grid gap-3.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
-        <ReadOnly label="رقم الأعمال" value={client?.whatsapp_number || '—'} dir="ltr" />
-        <ReadOnly label="رقم التواصل للعميل" value={client?.whatsapp_contact || '—'} dir="ltr" />
-      </div>
-      <div className="mt-3 text-[12px]" style={{ color: 'var(--color-text-3)' }}>
-        لتغيير رقم الأعمال، تواصل مع الدعم. رقم التواصل يُعدّل من قسم "المؤسسة ومعالجة الإشارات".
       </div>
     </Card>
   );

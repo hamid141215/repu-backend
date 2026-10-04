@@ -26,7 +26,7 @@ const NAV_MAIN: NavItem[] = [
 ];
 
 const NAV_TOOLS: NavItem[] = [
-  { href: '/campaigns',        label: 'طلبات التقييم', icon: IconSend },
+  { href: '/campaigns',        label: 'روابط التقييم', icon: IconSend },
   { href: '/nfc',              label: 'NFC / QR',       icon: IconWifi },
   { href: '/customer-preview', label: 'صفحة جمع التقييم', icon: IconDeviceMobile }
 ];

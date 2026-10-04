@@ -209,6 +209,7 @@
             opacity: .6;
             cursor: not-allowed;
         }
+        .btn-primary.hidden { display: none; }
 
         /* ─── Ghost button ─── */
         .btn-ghost {
@@ -256,28 +257,6 @@
             background: #f1f5f9;
             margin: 1.25rem 0;
         }
-
-        /* ─── WhatsApp button ─── */
-        .btn-whatsapp {
-            background: #25d366;
-            color: #fff;
-            border: none;
-            border-radius: .875rem;
-            height: 50px;
-            width: 100%;
-            font-family: inherit;
-            font-size: .95rem;
-            font-weight: 700;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: .5rem;
-            text-decoration: none;
-            transition: background .15s;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .btn-whatsapp:hover { background: #1ebe5d; }
 
         /* ─── Reduce motion ─── */
         @media (prefers-reduced-motion: reduce) {
@@ -340,21 +319,22 @@
                             role="radiogroup"
                             aria-label="تقييم التجربة من 1 إلى 5"
                         >
-                            <button type="button" class="star-btn" data-rating="1" role="radio" aria-checked="false" aria-label="1 نجمة من 5">★</button>
-                            <button type="button" class="star-btn" data-rating="2" role="radio" aria-checked="false" aria-label="2 نجوم من 5">★</button>
-                            <button type="button" class="star-btn" data-rating="3" role="radio" aria-checked="false" aria-label="3 نجوم من 5">★</button>
-                            <button type="button" class="star-btn" data-rating="4" role="radio" aria-checked="false" aria-label="4 نجوم من 5">★</button>
-                            <button type="button" class="star-btn" data-rating="5" role="radio" aria-checked="false" aria-label="5 نجوم من 5">★</button>
+                            <button type="button" class="star-btn" data-rating="1" role="radio" aria-checked="false" aria-label="1 نجمة من 5" tabindex="0">★</button>
+                            <button type="button" class="star-btn" data-rating="2" role="radio" aria-checked="false" aria-label="2 نجوم من 5" tabindex="-1">★</button>
+                            <button type="button" class="star-btn" data-rating="3" role="radio" aria-checked="false" aria-label="3 نجوم من 5" tabindex="-1">★</button>
+                            <button type="button" class="star-btn" data-rating="4" role="radio" aria-checked="false" aria-label="4 نجوم من 5" tabindex="-1">★</button>
+                            <button type="button" class="star-btn" data-rating="5" role="radio" aria-checked="false" aria-label="5 نجوم من 5" tabindex="-1">★</button>
                         </div>
-                        <p class="text-center text-xs text-slate-400">اختر عدد النجوم</p>
+                        <p id="ratingDescription" class="text-center text-xs text-slate-500" aria-live="polite">اختر عدد النجوم</p>
                     </div>
                 </div>
 
-                <!-- ══ COMPLAINT FORM ══ -->
-                <form id="complaintForm" class="hidden fade-in space-y-4">
-                    <div class="complaint-header p-4 text-center">
-                        <p class="text-base font-bold text-amber-800">نأسف أن تجربتك لم تكن بالمستوى المطلوب</p>
-                        <p class="mt-1 text-sm leading-relaxed text-amber-700">اترك ملاحظتك وسنتواصل معك لتحسين الخدمة.</p>
+                <!-- ══ REVIEW FORM — shown for every star rating ══ -->
+                <form id="reviewForm" class="mt-5 hidden fade-in space-y-4" novalidate>
+                    <div>
+                        <label for="feedback" class="mb-1.5 block text-sm font-semibold text-slate-700">شاركنا تفاصيل تجربتك <span id="feedbackRequirement" class="font-normal text-slate-500"></span></label>
+                        <textarea id="feedback" name="feedback" rows="4" class="field-input" placeholder="اكتب تعليقك هنا…" aria-describedby="feedbackHint"></textarea>
+                        <p id="feedbackHint" class="mt-1.5 text-xs leading-relaxed text-slate-500"></p>
                     </div>
 
                     <div>
@@ -367,20 +347,9 @@
                         <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" class="field-input" placeholder="05xxxxxxxx">
                     </div>
 
-                    <div>
-                        <label for="feedback" class="mb-1.5 block text-sm font-semibold text-slate-700">ملاحظتك <span class="text-red-500">*</span></label>
-                        <textarea id="feedback" name="feedback" rows="4" required class="field-input" placeholder="اكتب ملاحظتك هنا…"></textarea>
-                    </div>
-
-                    <button id="submitComplaintBtn" type="submit" class="btn-primary">
-                        إرسال الملاحظة
+                    <button id="submitReviewBtn" type="submit" class="btn-primary">
+                        إرسال التقييم
                     </button>
-
-                    <div class="text-center">
-                        <button id="backBtn" type="button" class="btn-ghost">
-                            ← رجوع وتعديل التقييم
-                        </button>
-                    </div>
                 </form>
 
                 <!-- ══ THANK YOU STATE ══ -->
@@ -390,7 +359,7 @@
                         ✓
                     </div>
                     <div id="thankYouInner" class="rounded-2xl p-5 text-center">
-                        <h2 class="mb-2 text-lg font-extrabold">شكراً لك</h2>
+                        <h2 id="confirmationHeading" class="mb-2 text-lg font-extrabold" tabindex="-1">تم حفظ تقييمك</h2>
                         <p id="thankYouMessage" class="text-sm leading-relaxed">
                             تم استلام ملاحظتك، ونقدّر وقتك في مساعدتنا على التحسين.
                         </p>
@@ -399,19 +368,12 @@
                             <p class="mb-1 text-xs font-semibold text-emerald-700">كود الخصم</p>
                             <div id="discountCode" class="font-mono text-2xl font-bold tracking-wide text-emerald-700" dir="ltr"></div>
                         </div>
-                        <!-- whatsapp -->
-                        <a id="whatsappContactBtn" href="#" target="_blank" rel="noopener noreferrer"
-                           class="btn-whatsapp mt-4 hidden">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                            </svg>
-                            تواصل معنا عبر واتساب
-                        </a>
                     </div>
+                    <a id="googleReviewBtn" class="btn-primary mt-4 hidden" target="_blank" rel="noopener noreferrer" style="text-decoration:none">مشاركة تقييمك على Google (اختياري)</a>
                 </div>
 
                 <!-- ══ ERROR STATE ══ -->
-                <div id="errorState" class="mt-3 hidden"></div>
+                <div id="errorState" class="mt-3 hidden" role="alert"></div>
 
                 <!-- ══ CLIENT LOAD ERROR STATE ══ -->
                 <div id="clientErrorState" class="hidden fade-in">
@@ -442,44 +404,37 @@
     </main>
 
     <script>
-        /* ─── DOM refs (all original IDs preserved) ─── */
+        /* ─── DOM refs ─── */
         const nfcId             = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).pop() || '').trim();
         const businessName      = document.getElementById('businessName');
         const branchName        = document.getElementById('branchName');
         const trustLine         = document.getElementById('trustLine');
         const loadingState      = document.getElementById('loadingState');
         const ratingState       = document.getElementById('ratingState');
-        const complaintForm     = document.getElementById('complaintForm');
+        const reviewForm        = document.getElementById('reviewForm');
         const thankYouState     = document.getElementById('thankYouState');
         const thankYouMessage   = document.getElementById('thankYouMessage');
         const thankYouIcon      = document.getElementById('thankYouIcon');
         const thankYouInner     = document.getElementById('thankYouInner');
         const discountBox       = document.getElementById('discountBox');
         const discountCode      = document.getElementById('discountCode');
-        const whatsappContactBtn= document.getElementById('whatsappContactBtn');
         const errorState        = document.getElementById('errorState');
         const clientErrorState  = document.getElementById('clientErrorState');
         const clientErrorMsg    = document.getElementById('clientErrorMsg');
         const retryBtn          = document.getElementById('retryBtn');
         const starButtons       = Array.from(document.querySelectorAll('.star-btn'));
-        const submitComplaintBtn= document.getElementById('submitComplaintBtn');
-        const backBtn           = document.getElementById('backBtn');
-        const phoneLabel        = document.getElementById('phoneLabel');
+        const submitReviewBtn   = document.getElementById('submitReviewBtn');
+        const feedbackInput     = document.getElementById('feedback');
+        const feedbackRequirement = document.getElementById('feedbackRequirement');
+        const feedbackHint      = document.getElementById('feedbackHint');
+        const ratingDescription = document.getElementById('ratingDescription');
+        const confirmationHeading = document.getElementById('confirmationHeading');
+        const googleReviewBtn   = document.getElementById('googleReviewBtn');
         const phoneInput        = document.getElementById('phone');
 
-        let complaintAction = 'contact';
-        let whatsappContact = '';
         let selectedRating  = 0;
-
-        /* ─── Helpers (all original functions preserved) ─── */
-        const requiresComplaintPhone = () => ['contact', 'contact_discount'].includes(complaintAction);
-
-        const updatePhoneRequirement = () => {
-            phoneLabel.textContent = requiresComplaintPhone()
-                ? 'رقم الجوال *'
-                : 'رقم الجوال (اختياري)';
-            phoneInput.setAttribute('aria-required', requiresComplaintPhone() ? 'true' : 'false');
-        };
+        let isSubmitting    = false;
+        let submitted       = false;
 
         const showError = (message) => {
             errorState.innerHTML = `
@@ -496,11 +451,13 @@
         };
 
         const setBusy = (busy) => {
-            starButtons.forEach(b => { b.disabled = busy; });
-            submitComplaintBtn.disabled = busy;
-            submitComplaintBtn.innerHTML = busy
+            starButtons.forEach(b => { b.disabled = busy || submitted; });
+            reviewForm.querySelectorAll('input, textarea').forEach(input => { input.disabled = busy || submitted; });
+            reviewForm.setAttribute('aria-busy', String(busy));
+            submitReviewBtn.disabled = busy || submitted;
+            submitReviewBtn.innerHTML = busy
                 ? '<span class="spinner" style="border-top-color:#fff;border-color:rgba(255,255,255,.3)"></span><span>جارٍ الإرسال…</span>'
-                : 'إرسال الملاحظة';
+                : 'إرسال التقييم';
         };
 
         /* ─── paintStars: pointer-event driven, no hover reliance ─── */
@@ -513,13 +470,8 @@
                 button.classList.toggle('star-lit',      isLit && !isSelected);
                 button.classList.toggle('star-selected', isSelected && r <= hoverRating);
 
-                // when showing hover below selected, keep selected star highlighted
-                if (r <= selectedRating && hoverRating === selectedRating) {
-                    button.classList.add('star-selected');
-                    button.classList.remove('star-lit');
-                }
-
                 button.setAttribute('aria-checked', selectedRating === r ? 'true' : 'false');
+                button.tabIndex = r === (selectedRating || 1) ? 0 : -1;
             });
         };
 
@@ -544,15 +496,6 @@
 
             discountBox.classList.add('hidden');
             discountCode.textContent = '';
-            whatsappContactBtn.classList.add('hidden');
-            whatsappContactBtn.href = '#';
-
-            if (whatsappContact) {
-                const whatsappText = encodeURIComponent('مرحباً، لدي ملاحظة على تجربتي');
-                whatsappContactBtn.href = `https://wa.me/${whatsappContact}?text=${whatsappText}`;
-                whatsappContactBtn.classList.remove('hidden');
-            }
-
             if (action === 'discount' && code) {
                 thankYouMessage.textContent = 'نعتذر لك عن التجربة. يسعدنا تعويضك بكود خصم:';
                 discountCode.textContent    = code;
@@ -597,10 +540,6 @@
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(data.error || 'تعذر تحميل بيانات المنشأة');
 
-                complaintAction = data.complaint_action || data.complaintAction || 'contact';
-                whatsappContact = data.whatsapp_contact || data.whatsappContact || '';
-                updatePhoneRequirement();
-
                 businessName.textContent = data.name || 'المنشأة';
                 trustLine.classList.remove('hidden');
 
@@ -619,9 +558,9 @@
             }
         };
 
-        /* ─── handleRating (original logic preserved) ─── */
-        const handleRating = async (rating) => {
-            if (submitComplaintBtn.disabled) return; // busy guard
+        /* ─── Selecting stars only updates the form; saving is explicit ─── */
+        const handleRating = (rating) => {
+            if (isSubmitting || submitted) return;
             clearError();
             selectedRating = rating;
             paintStars(rating);
@@ -635,37 +574,19 @@
                 }
             });
 
-            if (rating <= 3) {
-                ratingState.classList.add('hidden');
-                complaintForm.classList.remove('hidden');
-                return;
-            }
-
-            setBusy(true);
-            try {
-                const data = await postReview({ nfcId, answer: '1', rating });
-                if (data.googleLink) {
-                    window.location.href = data.googleLink; // original Google redirect preserved
-                    return;
-                }
-                // positive thank-you (no googleLink)
-                thankYouIcon.textContent = '⭐';
-                thankYouIcon.className = 'mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-3xl bg-blue-50';
-                thankYouInner.className = 'success-google rounded-2xl p-5 text-center';
-                thankYouInner.querySelector('h2').className = 'mb-2 text-lg font-extrabold text-blue-800';
-                thankYouMessage.textContent = 'شكراً لك، يسعدنا مشاركة تقييمك على Google!';
-                thankYouMessage.className   = 'text-sm leading-relaxed text-blue-700';
-
-                ratingState.classList.add('hidden');
-                thankYouState.classList.remove('hidden');
-            } catch (error) {
-                showError(error.message);
-            } finally {
-                setBusy(false);
-            }
+            const required = rating <= 3;
+            feedbackInput.required = required;
+            feedbackInput.setAttribute('aria-required', String(required));
+            feedbackInput.removeAttribute('aria-invalid');
+            feedbackRequirement.textContent = required ? '(مطلوب)' : '(اختياري)';
+            feedbackHint.textContent = required
+                ? 'أخبرنا بما يمكننا تحسينه قبل إرسال التقييم.'
+                : 'يمكنك إضافة تعليق أو إرسال التقييم دون تعليق.';
+            ratingDescription.textContent = `تقييمك: ${rating} من 5 — يمكنك تغيير النجوم قبل الإرسال`;
+            reviewForm.classList.remove('hidden');
         };
 
-        /* ─── Star events: pointer events only (no double-fire on mobile) ─── */
+        /* ─── Star input: pointer and keyboard ─── */
         starButtons.forEach(button => {
             const rating = Number(button.dataset.rating);
 
@@ -677,6 +598,26 @@
 
             // Click / tap
             button.addEventListener('click', () => handleRating(rating));
+
+            // Radio-group keyboard navigation follows the visual RTL order.
+            button.addEventListener('keydown', (event) => {
+                if (isSubmitting || submitted) return;
+                const rtl = document.documentElement.dir === 'rtl';
+                const step = {
+                    ArrowLeft: rtl ? 1 : -1,
+                    ArrowRight: rtl ? -1 : 1,
+                    ArrowUp: 1,
+                    ArrowDown: -1
+                }[event.key];
+                let nextRating;
+                if (step !== undefined) nextRating = ((rating - 1 + step + 5) % 5) + 1;
+                else if (event.key === 'Home') nextRating = 1;
+                else if (event.key === 'End') nextRating = 5;
+                else return; // Native buttons handle Space and Enter.
+                event.preventDefault();
+                handleRating(nextRating);
+                starButtons[nextRating - 1].focus();
+            });
         });
 
         // Reset preview on container leave (desktop)
@@ -684,57 +625,73 @@
             if (e.pointerType === 'mouse') paintStars(selectedRating);
         });
 
-        /* ─── Back button ─── */
-        backBtn.addEventListener('click', () => {
-            clearError();
-            complaintForm.classList.add('hidden');
-            ratingState.classList.remove('hidden');
-        });
-
         /* ─── Retry button (new, no new API) ─── */
         retryBtn.addEventListener('click', () => loadClient());
 
-        /* ─── Complaint form submit (original logic preserved) ─── */
-        complaintForm.addEventListener('submit', async (event) => {
+        /* ─── Submit every rating through the existing public review API ─── */
+        reviewForm.addEventListener('submit', async (event) => {
             event.preventDefault();
+            if (isSubmitting || submitted) return;
             clearError();
 
-            const feedback = document.getElementById('feedback').value.trim();
+            const feedback = feedbackInput.value.trim();
             const phone    = phoneInput.value.trim();
+            const isLowRating = selectedRating <= 3;
 
-            if (!feedback) {
-                showError('يرجى كتابة الملاحظة قبل الإرسال.');
+            if (!selectedRating) {
+                showError('اختر عدد النجوم قبل إرسال التقييم.');
                 return;
             }
-            if (requiresComplaintPhone() && !phone) {
-                showError('فضلاً أدخل رقم الجوال حتى نتمكن من التواصل معك.');
+            if (isLowRating && !feedback) {
+                feedbackInput.setAttribute('aria-invalid', 'true');
+                showError('يرجى مشاركة تفاصيل تجربتك قبل إرسال التقييم.');
+                feedbackInput.focus();
                 return;
             }
 
+            feedbackInput.removeAttribute('aria-invalid');
+            isSubmitting = true;
             setBusy(true);
             try {
                 const data = await postReview({
                     nfcId,
-                    answer  : '2',
+                    answer  : isLowRating ? '2' : '1',
                     rating  : selectedRating,
                     name    : document.getElementById('name').value.trim(),
                     phone,
                     feedback
                 });
-                renderComplaintRecovery(data);
-
-                // complaint thank-you styling
-                thankYouIcon.textContent = '🙏';
-                thankYouIcon.className   = 'mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-3xl bg-emerald-50';
-                thankYouInner.className  = 'success-complaint rounded-2xl p-5 text-center';
-                thankYouInner.querySelector('h2').className = 'mb-2 text-lg font-extrabold text-emerald-800';
+                submitted = true;
+                if (isLowRating) {
+                    renderComplaintRecovery(data);
+                } else {
+                    thankYouMessage.textContent = 'شكراً لمشاركتنا تجربتك، تم استلام تقييمك بنجاح.';
+                }
+                thankYouIcon.textContent = '✓';
+                thankYouIcon.className = 'mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-3xl bg-emerald-50';
+                thankYouInner.className = 'success-complaint rounded-2xl p-5 text-center';
+                confirmationHeading.className = 'mb-2 text-lg font-extrabold text-emerald-800';
                 thankYouMessage.className = 'text-sm leading-relaxed text-emerald-700';
 
-                complaintForm.classList.add('hidden');
+                // The same optional Google action is offered after every rating.
+                if (data.googleLink) {
+                    try {
+                        const googleUrl = new URL(data.googleLink, window.location.origin);
+                        if (['https:', 'http:'].includes(googleUrl.protocol)) {
+                            googleReviewBtn.href = googleUrl.href;
+                            googleReviewBtn.classList.remove('hidden');
+                        }
+                    } catch (_) { /* Invalid links do not affect a saved review. */ }
+                }
+
+                ratingState.classList.add('hidden');
+                reviewForm.classList.add('hidden');
                 thankYouState.classList.remove('hidden');
+                confirmationHeading.focus();
             } catch (error) {
-                showError(error.message);
+                showError('تعذر إرسال التقييم. احتفظنا بمدخلاتك؛ حاول الإرسال مرة أخرى.');
             } finally {
+                isSubmitting = false;
                 setBusy(false);
             }
         });
