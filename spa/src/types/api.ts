@@ -38,6 +38,9 @@ export interface BranchPerformance {
 
 export interface ComplaintRow {
   id: number;
+  branch_id?: number | null;
+  source_kind?: string | null;
+  access_method?: 'UNKNOWN' | 'QR' | 'NFC' | 'LINK';
   name: string | null;
   phone: string | null;
   branch: string | null;
@@ -106,6 +109,9 @@ export interface PaginatedResponse<T> {
 
 export interface ReviewRow {
   id: number;
+  branch_id?: number | null;
+  source_kind?: string | null;
+  access_method?: 'UNKNOWN' | 'QR' | 'NFC' | 'LINK';
   name: string | null;
   phone: string | null;
   branch: string | null;

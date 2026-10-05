@@ -219,7 +219,7 @@ function SignalRow({ signal, last, onReview, onComplaint }: {
           <span className="rounded-full px-2 py-0.5 text-[11.5px] font-medium" style={{ background: complaint ? 'var(--color-bad-light)' : 'var(--color-primary-light)', color: complaint ? 'var(--color-bad)' : 'var(--color-primary)' }}>
             {complaint ? 'شكوى' : 'تقييم'}
           </span>
-          <span className="text-[11.5px] text-[var(--color-text-3)]">{sourceLabel(item.source)}</span>
+          <span className="text-[11.5px] text-[var(--color-text-3)]">{sourceLabel(item.source, item.source_kind, item.access_method)}</span>
           {item.branch ? <span className="inline-flex items-center gap-1 text-[11.5px] text-[var(--color-text-3)]"><IconBuildingStore size={12} />{item.branch}</span> : null}
           <span className="text-[11.5px] text-[var(--color-text-3)]">{relativeTimeAr(item.sent_at)}</span>
         </span>
@@ -249,8 +249,11 @@ function StatusBadge({ value }: { value: string | null }) {
   return <span className="rounded-full bg-[#F4F5F7] px-2 py-0.5 text-[11.5px] font-medium text-[var(--color-text-2)]">{labels[value || ''] || value || 'غير محددة'}</span>;
 }
 
-function sourceLabel(source: string | null) {
-  if (source === 'nfc') return 'NFC / QR';
+function sourceLabel(source: string | null, kind?: string | null, method?: string | null) {
+  if (kind === 'REPU' || source === 'nfc') {
+    const access = method && method !== 'UNKNOWN' ? method : 'طريقة وصول غير محددة';
+    return `Repu · ${access}`;
+  }
   if (source === 'dashboard') return 'طلبات التقييم';
   if (source === 'whatsapp') return 'WhatsApp';
   return source || 'غير محدد';

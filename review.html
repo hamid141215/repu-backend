@@ -435,6 +435,9 @@
         let selectedRating  = 0;
         let isSubmitting    = false;
         let submitted       = false;
+        const submissionStorageKey = `repu:review:${nfcId}`;
+        let submissionKey = sessionStorage.getItem(submissionStorageKey) || crypto.randomUUID();
+        sessionStorage.setItem(submissionStorageKey, submissionKey);
 
         const showError = (message) => {
             errorState.innerHTML = `
@@ -655,6 +658,7 @@
             try {
                 const data = await postReview({
                     nfcId,
+                    submissionKey,
                     answer  : isLowRating ? '2' : '1',
                     rating  : selectedRating,
                     name    : document.getElementById('name').value.trim(),
@@ -662,6 +666,7 @@
                     feedback
                 });
                 submitted = true;
+                sessionStorage.removeItem(submissionStorageKey);
                 if (isLowRating) {
                     renderComplaintRecovery(data);
                 } else {

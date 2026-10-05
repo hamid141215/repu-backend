@@ -12,6 +12,23 @@ function readableEvidence(value) {
         .trim();
 }
 
+function redactEvidence(value, privateName = null) {
+    let text = readableEvidence(value);
+    const name = String(privateName || '').normalize('NFKC').trim();
+    if (name.length >= 2) {
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+        text = text.replace(new RegExp(escaped, 'giu'), '[اسم محجوب]');
+    }
+    text = text
+        .replace(/(?:شارع|طريق|حي|منطقة|عنوان|مبنى|عمارة|شقة|صندوق\s+بريد|street|st\.?|road|rd\.?|avenue|ave\.?|district|neighbou?rhood|address|building|apartment|apt\.?)\s+[^،,;؛\n.!؟]{1,120}/giu, '[عنوان محجوب]')
+        .replace(/(?:\+|00)?\d(?:[\s().-]*\d){5,}/g, '[رقم محجوب]')
+        .replace(/\b(?:phone|mobile|email|address|order|identity)\b\s*[:#-]?\s*\[(?:رقم|بريد) محجوب\]/gi, '[بيانات محجوبة]')
+        .trim();
+    const meaningfulWords = text.replace(/\[[^\]]+\]/g, '').match(/[\p{L}]{2,}/gu) || [];
+    if (meaningfulWords.length < 2) return '[المقتطف محجوب لاحتوائه على بيانات شخصية لا يمكن تنقيحها بأمان]';
+    return text;
+}
+
 // Product reads only. No engine, pipeline or provider calls belong here.
 const STATUSES = ['OPEN', 'WATCHING', 'RESOLVED', 'DISMISSED'];
 const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -154,7 +171,7 @@ function createIssueReadHandlers(db) {
                 // queries cannot attach evidence from a different issue window.
                 const { rows: evidence } = await db.query(`SELECT s.evaluation_id, s.branch_name,
                     s.dimension, s.sentiment, s.confidence, s.created_at,
-                    s.evidence_text, e.sent_at AS occurred_at
+                    s.evidence_text, e.name AS private_customer_name
                     FROM (SELECT $1::integer AS client_id, $2::varchar AS dimension,
                         $3::timestamptz AS window_start, $4::timestamptz AS window_end,
                         $5::varchar AS scope_type, $6::text AS branch_name) i
@@ -166,8 +183,7 @@ function createIssueReadHandlers(db) {
                 res.json({ success: true, issue: issueView(issue, true), evidence: evidence.map(s => ({
                     evaluationId: String(s.evaluation_id), branchName: readableEvidence(s.branch_name) || null, dimension: s.dimension,
                     sentiment: s.sentiment, confidence: Number(s.confidence),
-                    createdAt: s.created_at, occurredAt: s.occurred_at,
-                    text: readableEvidence(s.evidence_text)
+                    createdAt: s.created_at, text: redactEvidence(s.evidence_text, s.private_customer_name)
                 })) });
             } catch (error) { handleError(res, error); }
         }

@@ -45,7 +45,6 @@ export interface IssueDetailResponse {
     sentiment: string;
     confidence: number;
     createdAt: string;
-    occurredAt: string;
     text: string;
   }[];
 }

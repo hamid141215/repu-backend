@@ -98,17 +98,21 @@ test('invalid bounds/enums/objects return 400 without database work', async () =
     }
 });
 
-test('detail returns metadata only and SQL enforces tenant, normalized scope, window and eligibility', async () => {
+test('detail returns readable redacted evidence and SQL enforces tenant, normalized scope, window and eligibility', async () => {
     const calls = [];
     const db = { async query(sql, params) {
         calls.push({ sql, params });
         return { rows: calls.length === 1 ? [issue] : [{ evaluation_id: 12, branch_name: ' الرياض ',
             dimension: 'SPEED', sentiment: 'NEGATIVE', confidence: '0.9',
             created_at: '2026-09-27',
-            evidence_text: 'فاطمة أحمد، جوال ٠٥٥١٢٣٤٥٦٧، fatima@example.test، هوية ١٠٢٣٤٥٦٧٨٩، طلب ٩٩١٢٣٤، شارع الملك فهد، الرياض',
+            evidence_text: 'تأخر الطلب في الخدمة كان مزعجًا. فاطمة أحمد، جوال ٠٥٥١٢٣٤٥٦٧، fatima@example.test, Street King Fahd، هوية ١٠٢٣٤٥٦٧٨٩، طلب ٩٩١٢٣٤، شارع الملك فهد، الرياض',
             comment_body: 'نص حر إضافي', raw_text: 'raw free text',
             customer_name: 'فاطمة أحمد', phone: '٠٥٥١٢٣٤٥٦٧', email: 'fatima@example.test',
-            identity_number: '١٠٢٣٤٥٦٧٨٩', order_number: '٩٩١٢٣٤', address: 'شارع الملك فهد' }] };
+            private_customer_name: 'فاطمة أحمد',
+            identity_number: '١٠٢٣٤٥٦٧٨٩', order_number: '٩٩١٢٣٤', address: 'شارع الملك فهد' },
+        { evaluation_id: 14, branch_name: 'الرياض', dimension: 'SPEED', sentiment: 'NEGATIVE', confidence: '0.8',
+            created_at: '2026-09-28', evidence_text: '٠٥٥١٢٣٤٥٦٧ fatima@example.test شارع الملك فهد',
+            private_customer_name: 'فاطمة أحمد' }] };
     } };
     const res = response();
     await createIssueReadHandlers(db).detail({ clientData: { id: 7 }, params: { issueId: '1' } }, res);
@@ -122,14 +126,19 @@ test('detail returns metadata only and SQL enforces tenant, normalized scope, wi
         "BTRIM(COALESCE(s.branch_name, '')) = BTRIM(COALESCE(i.branch_name, ''))", 's.confidence >= 0.70',
         "s.sentiment = 'NEGATIVE'", 's.confidence DESC, s.created_at DESC', 'LIMIT 10']) assert.ok(sql.includes(clause), clause);
     const text = JSON.stringify(res.body);
-    for (const secret of ['فاطمة أحمد', '٠٥٥١٢٣٤٥٦٧', 'fatima@example.test', '١٠٢٣٤٥٦٧٨٩',
+    for (const secret of ['فاطمة أحمد', '٠٥٥١٢٣٤٥٦٧', 'fatima@example.test', 'Street King Fahd', '١٠٢٣٤٥٦٧٨٩',
         '٩٩١٢٣٤', 'شارع الملك فهد', 'evidenceText', 'evidence_text', 'comment_body', 'raw_text',
         'customer_name', 'phone', 'email', 'identity_number', 'order_number', 'address', 'model_name']) {
         assert.ok(!text.includes(secret), `response leaked ${secret}`);
     }
     assert.deepEqual(Object.keys(res.body.evidence[0]).sort(),
-        ['branchName', 'confidence', 'createdAt', 'dimension', 'evaluationId', 'sentiment']);
-    assert.ok(!sql.slice(0, sql.indexOf('FROM')).includes('evidence_text'), 'detail SELECT projection must not select free text');
+        ['branchName', 'confidence', 'createdAt', 'dimension', 'evaluationId', 'sentiment', 'text']);
+    assert.match(res.body.evidence[0].text, /تأخر الطلب في الخدمة كان مزعجًا/);
+    assert.ok(res.body.evidence[0].text.includes('[اسم محجوب]'));
+    assert.equal(res.body.evidence[1].text, '[المقتطف محجوب لاحتوائه على بيانات شخصية لا يمكن تنقيحها بأمان]');
+    assert.ok(sql.includes('s.evidence_text') && sql.includes('e.name AS private_customer_name'),
+        'detail selects evidence only so the server can redact it before returning the snippet');
+    assert.ok(!sql.includes('e.phone') && !sql.includes('e.email'));
     assert.equal(res.body.issue.negativeCount, 3);
     assert.equal(res.body.issue.evidenceCount, 3);
 });
@@ -170,7 +179,8 @@ test('BRANCH matching trims both stored branch values like issue aggregation', a
     assert.match(calls[1].sql, /BTRIM\(COALESCE\(s\.branch_name, ''\)\) = BTRIM\(COALESCE\(i\.branch_name, ''\)\)/);
     assert.equal(calls[1].params[4], 'BRANCH');
     assert.equal(calls[1].params[5], 'الرياض');
-    assert.equal(res.body.evidence[0].branchName, ' الرياض ');
+    // Matching trims both sides and the public branch label is normalized too.
+    assert.equal(res.body.evidence[0].branchName, 'الرياض');
 });
 
 test('CLIENT scope includes matching-dimension signals from multiple branches', async () => {

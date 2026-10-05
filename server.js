@@ -10,6 +10,7 @@ const bcrypt   = require('bcryptjs');
 const crypto   = require('crypto');
 const nodemailer = require('nodemailer');
 const { initIntelligenceSchema } = require('./db/intelligence-schema');
+const { saveRepuFeedback } = require('./db/repu-feedback');
 const { classifyFeedback } = require('./intelligence/signal-engine');
 const { buildIssueCandidates } = require('./intelligence/issue-engine');
 const { upsertIssueCandidate } = require('./intelligence/issue-persistence');
@@ -84,6 +85,10 @@ const normalizePhone = (phone) => {
     if (p.startsWith('5') && p.length === 9) p = '966' + p;
     return p;
 };
+const maskContact = (row) => ({
+    ...row,
+    phone: row.phone ? `••••${String(row.phone).slice(-4)}` : row.phone
+});
 
 const normalizeComplaintAction = (action) => {
     const value = String(action || '').trim();
@@ -119,6 +124,7 @@ const resolvePublicNfc = async (nfcId) => {
         const row = branchRows[0];
         return {
             clientId: row.client_id,
+            branchId: row.branch_id,
             name: row.client_name,
             branchName: row.branch_name,
             googleLink: row.branch_google_link || row.client_google_link,
@@ -140,6 +146,7 @@ const resolvePublicNfc = async (nfcId) => {
     if (!client) return null;
     return {
         clientId: client.id,
+        branchId: null,
         name: client.name,
         branchName: null,
         googleLink: client.google_link,
@@ -758,6 +765,7 @@ app.post('/api/public/review', async (req, res) => {
     const phoneInput = String(req.body.phone || '').trim();
     const phone = phoneInput ? normalizePhone(phoneInput) : '';
     const feedback = String(req.body.feedback || '').trim() || null;
+    const submissionKey = req.body.submissionKey == null ? null : String(req.body.submissionKey).trim();
     const rawRating = req.body.rating;
     const rating = rawRating === undefined || rawRating === null || rawRating === ''
         ? null
@@ -780,25 +788,18 @@ app.post('/api/public/review', async (req, res) => {
         if (!resolved) return res.status(404).json({ error: 'Client not found' });
 
         const status = answer === '1' ? 'replied' : 'complaint';
-        const branch = resolved.branchName || String(req.body.branch || '').trim() || null;
-        if (answer === '2') {
-            await pool.query(
-                `INSERT INTO evaluations
-                    (client_id, phone, name, branch, status, answer, source, feedback, rating, complaint_status, complaint_updated_at, complaint_resolved_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NULL)`,
-                [resolved.clientId, phone, name, branch, status, answer, 'nfc', feedback, rating, 'new']
-            );
-        } else {
-            await pool.query(
-                `INSERT INTO evaluations (client_id, phone, name, branch, status, answer, source, feedback, rating)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-                [resolved.clientId, phone, name, branch, status, answer, 'nfc', feedback, rating]
-            );
-        }
+        const saved = await saveRepuFeedback(pool, {
+            clientId: resolved.clientId, branchId: resolved.branchId,
+            // A client-wide link cannot assert a branch through an untrusted body.
+            branch: resolved.branchName, nfcId, status, answer, name, phone,
+            feedback, rating, submissionKey
+        });
 
         const response = {
             success: true,
             status,
+            evaluationId: String(saved.id),
+            replayed: saved.replayed,
             googleLink: resolved.googleLink || null
         };
 
@@ -810,6 +811,7 @@ app.post('/api/public/review', async (req, res) => {
 
         res.json(response);
     } catch (e) {
+        if (e.statusCode) return res.status(e.statusCode).json({ error: e.message });
         res.status(500).json({ error: 'Database Error' });
     }
 });
@@ -1099,8 +1101,8 @@ app.get('/api/dashboard-summary', authenticate, async (req, res) => {
                 closed_count: Number(workflow.closed_count || 0),
                 overdue_count: Number(workflow.overdue_count || 0)
             },
-            recent_activity: recentRows,
-            urgent_complaints: complaintRows
+            recent_activity: recentRows.map(maskContact),
+            urgent_complaints: complaintRows.map(maskContact)
         });
     } catch (e) {
         console.error('Dashboard summary error:', e.message);
@@ -1154,7 +1156,7 @@ app.patch('/api/client/complaints/:id/status', authenticate, requireRole('owner'
         );
 
         if (!rows[0]) return res.status(404).json({ error: 'Complaint not found' });
-        res.json({ success: true, complaint: rows[0] });
+        res.json({ success: true, complaint: maskContact(rows[0]) });
     } catch (e) {
         res.status(500).json({ error: 'Database Error' });
     }
@@ -1181,7 +1183,7 @@ app.get('/api/client-recent', async (req, res) => {
             [client.id]
         );
 
-        res.json({ success: true, items: rows });
+        res.json({ success: true, items: rows.map(maskContact) });
     } catch (e) {
         res.status(500).json({ error: 'Database Error' });
     }
@@ -1189,10 +1191,14 @@ app.get('/api/client-recent', async (req, res) => {
 
 app.get('/api/my-reports', authenticate, async (req, res) => {
     const { rows } = await pool.query(
-        'SELECT * FROM evaluations WHERE client_id = $1 ORDER BY sent_at DESC',
+        `SELECT id, name, phone, branch, branch_id, source, source_kind, access_method,
+                status, answer, feedback, rating, sent_at, complaint_status,
+                complaint_updated_at, complaint_resolved_at, complaint_note,
+                reply_text, replied_at
+         FROM evaluations WHERE client_id = $1 ORDER BY sent_at DESC`,
         [req.clientData.id]
     );
-    res.json(rows);
+    res.json(rows.map(maskContact));
 });
 
 app.get('/api/export-excel', async (req, res) => {
@@ -1219,7 +1225,7 @@ app.get('/api/export-excel', async (req, res) => {
         ['العميل', 'رقم الجوال', 'الفرع', 'الحالة', 'الرد', 'التوقيت'],
         ...rows.map(row => [
             row.name,
-            row.phone == null ? '' : `="${String(row.phone).replace(/"/g, '""')}"`,
+            maskContact(row).phone || '',
             row.branch,
             row.status,
             row.answer,
@@ -1816,7 +1822,8 @@ app.get('/api/complaints', authenticate, async (req, res) => {
 
         const pagedParams = [...params, pageSize, offset];
         const { rows } = await pool.query(
-            `SELECT id, name, phone, branch, status, answer, source, feedback, sent_at,
+            `SELECT id, name, phone, branch, branch_id, source_kind, access_method,
+                    status, answer, source, feedback, sent_at,
                     complaint_status, complaint_updated_at, complaint_resolved_at, complaint_note,
                     rating, reply_text, replied_at
              FROM evaluations
@@ -1834,7 +1841,7 @@ app.get('/api/complaints', authenticate, async (req, res) => {
             }
             items = items.filter(r => r.priority === priorityFilter);
         }
-        res.json(paginatedResponse(items, total, page, pageSize));
+        res.json(paginatedResponse(items.map(maskContact), total, page, pageSize));
     } catch (e) {
         if (e.statusCode === 400) return res.status(400).json({ error: e.message });
         console.error('GET /api/complaints:', e.message);
@@ -1847,7 +1854,8 @@ app.get('/api/complaints/:id', authenticate, async (req, res) => {
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid complaint ID' });
     try {
         const { rows } = await pool.query(
-            `SELECT id, name, phone, branch, status, answer, source, feedback, sent_at,
+            `SELECT id, name, phone, branch, branch_id, source_kind, access_method,
+                    status, answer, source, feedback, sent_at,
                     complaint_status, complaint_updated_at, complaint_resolved_at, complaint_note,
                     rating, reply_text, replied_at
              FROM evaluations
@@ -1855,7 +1863,9 @@ app.get('/api/complaints/:id', authenticate, async (req, res) => {
             [id, req.clientData.id]
         );
         if (!rows[0]) return res.status(404).json({ error: 'Complaint not found' });
-        res.json(computeComplaintFields(rows[0]));
+        const complaint = computeComplaintFields(rows[0]);
+        res.json(['owner', 'manager'].includes(req.role)
+            ? complaint : { ...complaint, phone: null });
     } catch (e) {
         console.error('GET /api/complaints/:id:', e.message);
         res.status(500).json({ error: 'Database Error' });
@@ -1892,7 +1902,8 @@ app.get('/api/reviews', authenticate, async (req, res) => {
 
         const pagedParams = [...params, pageSize, offset];
         const { rows } = await pool.query(
-            `SELECT id, name, phone, branch, rating, feedback, source, status, answer,
+            `SELECT id, name, phone, branch, branch_id, source_kind, access_method,
+                    rating, feedback, source, status, answer,
                     sent_at, reply_text, replied_at
              FROM evaluations
              WHERE ${where}
@@ -1900,7 +1911,7 @@ app.get('/api/reviews', authenticate, async (req, res) => {
              LIMIT $${pagedParams.length - 1} OFFSET $${pagedParams.length}`,
             pagedParams
         );
-        res.json(paginatedResponse(rows, total, page, pageSize));
+        res.json(paginatedResponse(rows.map(maskContact), total, page, pageSize));
     } catch (e) {
         if (e.statusCode === 400) return res.status(400).json({ error: e.message });
         console.error('GET /api/reviews:', e.message);
@@ -1919,12 +1930,13 @@ app.post('/api/reviews/:id/reply', authenticate, requireRole('owner', 'manager')
             `UPDATE evaluations
              SET reply_text = $1, replied_at = NOW()
              WHERE id = $2 AND client_id = $3 AND rating IS NOT NULL
-             RETURNING id, name, phone, branch, rating, feedback, source, status, answer,
+             RETURNING id, name, phone, branch, branch_id, source_kind, access_method,
+                       rating, feedback, source, status, answer,
                        sent_at, reply_text, replied_at`,
             [text, id, req.clientData.id]
         );
         if (!rows[0]) return res.status(404).json({ error: 'Review not found' });
-        res.json({ success: true, review: rows[0] });
+        res.json({ success: true, review: maskContact(rows[0]) });
     } catch (e) {
         console.error('POST /api/reviews/:id/reply:', e.message);
         res.status(500).json({ error: 'Database Error' });

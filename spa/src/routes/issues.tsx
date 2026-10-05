@@ -432,7 +432,7 @@ export function IssueDetailPage({ selectedId, onClose }: { selectedId?: string; 
       <section className="issue-panel mt-4"><h2 className="font-semibold">ما الذي يحدث؟</h2><SignalSummary issue={issue} /></section>
       <section className="issue-panel mt-4"><h2 className="font-semibold">الأدلة</h2>
         <p className="mt-2 text-xs text-[var(--color-text-3)]">ما يصل إلى ١٠ إشارات من أصل {number(issue.evidenceCount)} إشارة مؤهلة ضمن نطاق القضية وفترتها.</p>
-        <p className="mt-3 text-sm">معلومات الاتصال محجوبة من النص الداعم.</p>
+        <p className="mt-3 text-sm">تُعرض مقتطفات الأدلة بعد حجب البيانات الشخصية، ويُحجب المقتطف وحده إذا تعذر تنقيحه بأمان.</p>
         {!query.data?.evidence.length && issue.evidenceCount > 0 && <p className="mt-3 text-xs text-[var(--color-text-3)]">تعذر تحميل بيانات معاينة الإشارات حاليًا.</p>}
         {query.data?.evidence.length > 0 && <div className="mt-4 space-y-3">
           {query.data.evidence.map((evidence, index) => <article key={`${evidence.evaluationId}-${index}`} className="rounded-md bg-[var(--color-bg)] p-4">
@@ -440,7 +440,7 @@ export function IssueDetailPage({ selectedId, onClose }: { selectedId?: string; 
             <div className="flex flex-wrap gap-3 text-xs text-[var(--color-text-2)]">
               <span>سلبية</span><span>الثقة {percent(evidence.confidence)}</span>
               <span className="break-words">{evidence.branchName ? `الفرع: ${evidence.branchName}` : 'الفرع غير محدد'}</span>
-              <time dateTime={evidence.occurredAt}>تاريخ التقييم: {date(evidence.occurredAt)}</time>
+              <time dateTime={evidence.createdAt}>وقت إنشاء الإشارة: {date(evidence.createdAt)}</time>
             </div>
           </article>)}
         </div>}

@@ -3,6 +3,10 @@
 Worktree: `D:\repu-backend\.phase2a`, detached from release `04320a2`.
 No commit, push, deployment, schema change, new dependencies or AI calls.
 
+## Later V1 decision — Repu release `5f9456d`
+
+This newer, release-specific decision supersedes the Phase 2A detail-preview restriction below: an authenticated user may read issue evidence within their tenant as readable excerpts **after personal-data redaction**. Keep issue, branch, tenant and time-window matching unchanged. Select source text and the structured customer name only inside the server detail query so the response can redact them; never return the name, phone, or raw text separately. If a particular excerpt cannot be made safe, replace only that excerpt with an explanation; continue returning other safe excerpts. The list endpoint remains metadata-only.
+
 Modified files: `server.js`, `spa/src/App.tsx`, `spa/src/components/layout/sidebar.tsx`, `spa/src/lib/queries.ts`, `spa/src/index.css`, `intelligence/issue-read-api.js`, `spa/src/types/issues.ts`, `spa/src/routes/issues.tsx`, `tests/issue-read-api.test.js`.
 
 Added files: `intelligence/issue-read-api.js`, `spa/src/types/issues.ts`, `spa/src/routes/issues.tsx`, `tests/issue-read-api.test.js`, `PHASE2A_REVIEW.md`.
@@ -15,7 +19,7 @@ Added files: `intelligence/issue-read-api.js`, `spa/src/types/issues.ts`, `spa/s
 - page >= 1 (maximum 1,000,000); pageSize default 20, maximum 100. Invalid inputs return 400.
 - Ordering: priority, updated_at, detected_at, id descending. One list SQL statement shares a filtered CTE for count and pagination and joins enrichment/count only for the requested page.
 - List contains no evidence texts, provider/model metadata, raw payloads or privacy tokens. Enrichment summaries are limited to 240 characters per text field.
-- Detail reads full enrichment plus up to 10 eligible negative signal metadata rows, confidence descending, then signal creation time and ID descending. The detail query does not select evidence text.
+- Detail reads full enrichment plus up to 10 eligible negative signals, confidence descending, then signal creation time and ID descending. It returns readable text excerpts after redaction, plus evaluation ID, branch, dimension, sentiment, confidence and signal creation time.
 
 ## Evidence interpretation and privacy
 
@@ -23,7 +27,7 @@ There is no issue-to-signal FK. Match tenant and dimension, evaluation `sent_at 
 
 `evidenceCount` counts currently linked negative signal rows with confidence >= 0.70 and nonempty evidence text, the existing eligibility criterion. It can be lower than `negativeCount` when an eligible negative signal has empty evidence text. It is not a unique-text count or a historical snapshot and is independent of stored total/negative metrics. Duplicate texts may represent separate evaluations. Preview can contain fewer than the count because it is capped at 10. No fuzzy matching is used.
 
-Evaluation evidence text is not selected by the detail query and is never serialized. The evidence preview returns only evaluation ID, branch, dimension, sentiment, confidence and signal creation time. Structured evaluation name and phone columns are not selected for evidence counting or detail reads.
+The detail query selects evaluation text and the contributor name only to redact the returned excerpt. The response never exposes structured name or phone fields. Redaction covers known contributor names, phone-like numbers, email addresses, URLs, handles, numeric identifiers and address phrases. A safe readable excerpt stays visible; an excerpt with too little safe content is replaced individually with an explanation. Stored evidence, tenant filtering, branch matching, eligibility and issue-window boundaries are unchanged.
 
 ## Frontend
 
@@ -60,8 +64,8 @@ On a local/staging server with authorized existing data, using desktop (1440px) 
 5. Open a real issue drawer; check counts, priority, scope, period and negative rate against API. Test close button, Escape, backdrop, keyboard focus containment and focus return.
 6. Open direct detail link, refresh it and return to list with filters preserved.
 7. For an enriched real issue verify cause, why, suggested action, metric, timestamps and «فرضية تحتاج تحقق». For a real unenriched issue verify «لم يُنشأ تحليل سببي لهذه القضية بعد» and no AI request.
-8. Verify evidence metadata, confidence, branch, date, preview cap and count eligibility. Confirm «نصوص الأدلة غير معروضة حفاظًا على الخصوصية.» appears even when evidenceCount is positive.
-9. Use a second tenant's real issue ID with the first tenant's authentication: 404, no existence disclosure. Verify evidence response includes no text/customer/contact fields.
+8. Verify readable evidence appears after redaction, metadata, confidence, branch, date, preview cap and count eligibility. Include a fixture where the excerpt is entirely private and confirm only that excerpt is replaced with an explanation.
+9. Use a second tenant's real issue ID with the first tenant's authentication: 404, no existence disclosure. Verify returned text contains no known customer name, phone, email, identifier or address.
 11. Confirm homepage, complaints workflow, branches and executive brief still operate as before.
 
 Do not add fake product data, invoke pipelines/enrichment, mutate issues or contact production for this QA.
